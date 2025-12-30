@@ -1,0 +1,64 @@
+[package]
+name = "sunaba"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "A 2D falling-sand physics sandbox survival game"
+license = "MIT"
+repository = "https://github.com/yourusername/sunaba"
+
+[dependencies]
+# Graphics
+wgpu = "0.19"
+winit = "0.29"
+bytemuck = { version = "1.14", features = ["derive"] }
+
+# Physics (rigid bodies)
+rapier2d = "0.18"
+
+# Math
+glam = "0.25"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+ron = "0.8"
+
+# Compression for chunk storage
+lz4_flex = "0.11"
+
+# Parallelism
+rayon = "1.8"
+
+# Random number generation
+rand = "0.8"
+rand_xoshiro = "0.6"  # Fast, seedable RNG
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Utilities
+bitflags = "2.4"
+pollster = "0.3"  # Simple async executor for wgpu init
+
+[dev-dependencies]
+criterion = "0.5"  # Benchmarking
+
+[profile.dev]
+opt-level = 1  # Some optimization even in debug for playable simulation
+
+[profile.dev.package."*"]
+opt-level = 3  # Full optimization for dependencies
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[[bench]]
+name = "simulation"
+harness = false
