@@ -4,7 +4,6 @@ use std::iter;
 use anyhow::Result;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
-use glam::IVec2;
 
 use crate::world::{World, Chunk, CHUNK_SIZE};
 
@@ -86,13 +85,20 @@ impl Renderer {
         let size = window.inner_size();
         
         // Create instance
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
         
         // Create surface
-        let surface = instance.create_surface(window)?;
+        // SAFETY: The window must outlive the surface. This is ensured by the App struct
+        // owning both the window and the renderer, with the renderer field appearing after
+        // the window field (drop order is reverse of declaration order in Rust).
+        let surface = unsafe {
+            let target = wgpu::SurfaceTargetUnsafe::from_window(&window)
+                .map_err(|e| anyhow::anyhow!("Failed to create surface target: {:?}", e))?;
+            instance.create_surface_unsafe(target)?
+        };
         
         // Request adapter
         let adapter = instance
@@ -111,7 +117,6 @@ impl Renderer {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     label: Some("device"),
-                    memory_hints: Default::default(),
                 },
                 None,
             )
@@ -259,19 +264,17 @@ impl Renderer {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: Some("vs_main"),
+                entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
-                compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: Some("fs_main"),
+                entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -289,7 +292,6 @@ impl Renderer {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
-            cache: None,
         });
         
         // Vertex and index buffers

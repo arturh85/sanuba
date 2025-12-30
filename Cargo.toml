@@ -59,6 +59,6 @@ opt-level = 3  # Full optimization for dependencies
 lto = "thin"
 codegen-units = 1
 
-[[bench]]
-name = "simulation"
-harness = false
+# [[bench]]
+# name = "simulation"
+# harness = false
