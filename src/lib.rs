@@ -19,3 +19,32 @@ pub mod prelude {
     pub use crate::simulation::{Materials, MaterialId, MaterialType};
     pub use glam::{Vec2, IVec2};
 }
+
+// WASM entry point
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn start() {
+    // Set up panic hook for better error messages in the browser console
+    console_error_panic_hook::set_once();
+
+    // Initialize logging for WASM
+    console_log::init_with_level(log::Level::Info).expect("Failed to initialize logger");
+
+    log::info!("Sunaba WASM module initialized");
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn run() -> Result<(), JsValue> {
+    log::info!("Starting Sunaba (WASM)");
+
+    let app = App::new()
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Failed to create app: {}", e)))?;
+
+    app.run()
+        .map_err(|e| JsValue::from_str(&format!("Failed to run app: {}", e)))
+}
