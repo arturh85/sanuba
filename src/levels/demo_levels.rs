@@ -424,3 +424,480 @@ pub fn generate_level_8_volcano(world: &mut World) {
         }
     }
 }
+
+/// Level 9: Bridge Demolition
+/// Stone bridge supported by pillars - remove pillars to collapse bridge
+pub fn generate_level_9_bridge(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER (required for anchoring)
+            if cy == -2 {
+                // Full bedrock chunk at bottom
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                // Bedrock bottom 8 pixels
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Bridge structure
+            if cx == 0 && cy == 0 {
+                // Left pillar (x: 10-13, height: 20)
+                for x in 10..=13 {
+                    for y in 0..20 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Right pillar (x: 50-53, height: 20)
+                for x in 50..=53 {
+                    for y in 0..20 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Bridge span (connecting the two pillars at height 20-23)
+                for x in 10..=53 {
+                    for y in 20..=23 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 10: Tower Collapse
+/// Three towers of different sizes to demonstrate small vs large debris threshold
+pub fn generate_level_10_towers(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Three towers of different sizes
+            if cx == 0 && cy == 0 {
+                // Tower 1 (left): 2 pixels wide, 20 tall (40 pixels total - small debris)
+                for x in 14..=15 {
+                    for y in 0..20 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Tower 2 (center): 4 pixels wide, 30 tall (120 pixels total - large debris)
+                for x in 30..=33 {
+                    for y in 0..30 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Tower 3 (right): 6 pixels wide, 40 tall (240 pixels total - large debris)
+                for x in 48..=53 {
+                    for y in 0..40 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 11: Floating Islands
+/// Multiple stone platforms supported by thin columns
+pub fn generate_level_11_islands(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Islands with support columns
+            if cx == 0 && cy == 0 {
+                // Island 1 (left): 10×10 platform at height 35
+                for x in 6..=15 {
+                    for y in 35..=44 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                // Support column for island 1
+                for x in 10..=11 {
+                    for y in 0..35 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Island 2 (center): 8×8 platform at height 45
+                for x in 28..=35 {
+                    for y in 45..=52 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                // Support column for island 2
+                for x in 31..=32 {
+                    for y in 0..45 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Island 3 (right): 12×12 platform at height 25
+                for x in 48..=59 {
+                    for y in 25..=36 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                // Support column for island 3
+                for x in 53..=54 {
+                    for y in 0..25 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 12: Crumbling Wall
+/// Tall wall with pre-placed gaps for mixed debris demonstration
+pub fn generate_level_12_wall(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Wall with strategic gaps
+            if cx == 0 && cy == 0 {
+                // Build wall (x: 22-42, y: 0-50)
+                for x in 22..=42 {
+                    for y in 0..50 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Cut strategic gaps to create sections
+                // Gap 1 (creates left section ~30px wide × 20px tall = 600px)
+                for x in 22..=26 {
+                    for y in 15..=30 {
+                        chunk.set_material(x, y, MaterialId::AIR);
+                    }
+                }
+
+                // Gap 2 (creates middle small section ~5px × 8px = 40px)
+                for x in 32..=36 {
+                    for y in 20..=27 {
+                        chunk.set_material(x, y, MaterialId::AIR);
+                    }
+                }
+
+                // Gap 3 (creates right section ~15px × 15px = 225px)
+                for x in 38..=42 {
+                    for y in 10..=24 {
+                        chunk.set_material(x, y, MaterialId::AIR);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 13: Castle Siege
+/// Castle structure with towers and walls
+pub fn generate_level_13_castle(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Castle structure
+            if cx == 0 && cy == 0 {
+                // Foundation platform
+                for x in 10..=54 {
+                    for y in 0..=3 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Left tower (6×15)
+                for x in 12..=17 {
+                    for y in 4..=18 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Right tower (6×15)
+                for x in 47..=52 {
+                    for y in 4..=18 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Central keep (12×20)
+                for x in 26..=37 {
+                    for y in 4..=23 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Connecting walls (4 pixels thick)
+                for x in 18..=26 {
+                    for y in 4..=7 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                for x in 37..=47 {
+                    for y in 4..=7 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 14: Domino Effect
+/// Line of thin pillars for chain reaction physics
+pub fn generate_level_14_domino(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Line of dominos
+            if cx == 0 && cy == 0 {
+                // Create 8 thin pillars (2 pixels wide, 25 tall, spaced 7 apart)
+                for i in 0..8 {
+                    let x_start = 6 + (i * 7);
+                    for x in x_start..=(x_start + 1) {
+                        for y in 0..25 {
+                            chunk.set_material(x, y, MaterialId::STONE);
+                        }
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 15: Quarry
+/// Layered stone with support beams to simulate mining
+pub fn generate_level_15_quarry(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Layered quarry
+            if cx == 0 && cy == 0 {
+                // Bottom layer (anchored to bedrock)
+                for x in 10..=54 {
+                    for y in 0..=3 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Support beams for layer 2
+                for x in 20..=22 {
+                    for y in 4..=13 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                for x in 42..=44 {
+                    for y in 4..=13 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Layer 2
+                for x in 12..=52 {
+                    for y in 14..=17 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Support beams for layer 3
+                for x in 25..=27 {
+                    for y in 18..=27 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                for x in 37..=39 {
+                    for y in 18..=27 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Layer 3 (top)
+                for x in 14..=50 {
+                    for y in 28..=31 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 16: Stress Test
+/// Massive 40×40 structure on single support - performance demonstration
+pub fn generate_level_16_stress(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK LAYER
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Massive structure
+            if cx == 0 && cy == 0 {
+                // Critical support column (4 pixels wide, 15 tall)
+                for x in 30..=33 {
+                    for y in 0..15 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Massive platform above (40×40 pixels = 1600 pixels!)
+                for x in 12..=51 {
+                    for y in 15..=54 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}

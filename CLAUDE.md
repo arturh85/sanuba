@@ -189,22 +189,35 @@ sunaba/
 
 ## Development Phases
 
-### Phase 1: Core Simulation ✅ CURRENT
+### Phase 1: Core Simulation ✅ COMPLETED
 - [x] Project setup, wgpu boilerplate
-- [ ] Chunk data structure
-- [ ] Material registry (load from RON)
-- [ ] Basic CA: sand, water, stone, air
-- [ ] Pixel buffer rendering
-- [ ] Player placeholder (rectangle, WASD movement)
-- [ ] Camera following player
+- [x] Chunk data structure
+- [x] Material registry (hard-coded, RON loading deferred)
+- [x] Basic CA: sand, water, stone, air
+- [x] Pixel buffer rendering
+- [x] Player placeholder (rectangle, WASD movement)
+- [x] Camera following player
+- [x] Camera zoom controls (+/-, mouse wheel)
 
-### Phase 2: Materials & Reactions
-- [ ] Temperature field + diffusion
-- [ ] State changes (melt, freeze, boil)
-- [ ] Fire propagation
-- [ ] Gas behavior (rising, pressure)
-- [ ] Reaction system
-- [ ] More materials (oil, acid, lava, wood, etc.)
+**Note:** Material registry is fully functional with 13 materials defined in code (air, stone, sand, water, wood, fire, smoke, steam, lava, oil, acid, ice, glass, metal). RON file loading can be added later for modding support but is not blocking progression.
+
+**Additional Phase 1 features implemented:**
+- Temperature simulation and state changes (melting, freezing, boiling)
+- Fire propagation and burning mechanics
+- Chemical reaction system with configurable conditions
+- Debug UI with egui integration (stats, help panel, tooltips)
+- Demo level system with multiple scenarios
+- Temperature overlay visualization
+
+### Phase 2: Materials & Reactions ✅ MOSTLY COMPLETED
+- [x] Temperature field + diffusion
+- [x] State changes (melt, freeze, boil)
+- [x] Fire propagation
+- [x] Gas behavior (rising, disperses - pressure field exists but not fully utilized)
+- [x] Reaction system
+- [x] More materials (oil, acid, lava, wood, ice, glass, metal - 13 total)
+
+**Note:** Basic implementation complete. Pressure field infrastructure exists but gas pressure equalization not yet fully implemented.
 
 ### Phase 3: Structural Integrity
 - [ ] Anchor detection

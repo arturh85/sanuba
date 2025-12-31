@@ -7,8 +7,10 @@ use super::{Chunk, Pixel, CHUNK_SIZE, pixel_flags};
 use crate::simulation::{
     Materials, MaterialId, MaterialType,
     TemperatureSimulator, StateChangeSystem, ReactionRegistry,
+    StructuralIntegritySystem,
     add_heat_at_pixel, get_temperature_at_pixel,
 };
+use crate::physics::PhysicsWorld;
 
 /// The game world, composed of chunks
 pub struct World {
@@ -23,6 +25,12 @@ pub struct World {
 
     /// Chemical reaction registry
     reactions: ReactionRegistry,
+
+    /// Structural integrity checker
+    structural_system: StructuralIntegritySystem,
+
+    /// Physics world for rigid bodies
+    physics_world: PhysicsWorld,
 
     /// Player position (pixel coordinates)
     pub player_pos: glam::Vec2,
@@ -41,14 +49,16 @@ impl World {
             materials: Materials::new(),
             temperature_sim: TemperatureSimulator::new(),
             reactions: ReactionRegistry::new(),
+            structural_system: StructuralIntegritySystem::new(),
+            physics_world: PhysicsWorld::new(),
             player_pos: glam::Vec2::new(0.0, 100.0),
             active_chunks: Vec::new(),
             time_accumulator: 0.0,
         };
-        
+
         // Initialize with some test chunks
         world.generate_test_world();
-        
+
         world
     }
     
@@ -62,30 +72,58 @@ impl World {
                 let mut chunk = Chunk::new(cx, cy);
                 let mut chunk_pixels = 0;
 
-                // Fill bottom half with stone
-                for y in 0..32 {
-                    for x in 0..CHUNK_SIZE {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                        chunk_pixels += 1;
-                    }
-                }
-
-                // Add some sand on top
-                if cy == 0 {
-                    for x in 20..44 {
-                        for y in 32..40 {
-                            chunk.set_material(x, y, MaterialId::SAND);
+                // BEDROCK LAYER: Full bedrock at bottom chunk (cy == -2)
+                if cy == -2 {
+                    for y in 0..CHUNK_SIZE {
+                        for x in 0..CHUNK_SIZE {
+                            chunk.set_material(x, y, MaterialId::BEDROCK);
                             chunk_pixels += 1;
                         }
                     }
                 }
-
-                // Add some water
-                if cx == 1 && cy == 0 {
-                    for x in 10..30 {
-                        for y in 35..50 {
-                            chunk.set_material(x, y, MaterialId::WATER);
+                // Bottom of cy == -1: bedrock layer (8 pixels deep)
+                else if cy == -1 {
+                    for y in 0..8 {
+                        for x in 0..CHUNK_SIZE {
+                            chunk.set_material(x, y, MaterialId::BEDROCK);
                             chunk_pixels += 1;
+                        }
+                    }
+                    // Stone above bedrock
+                    for y in 8..32 {
+                        for x in 0..CHUNK_SIZE {
+                            chunk.set_material(x, y, MaterialId::STONE);
+                            chunk_pixels += 1;
+                        }
+                    }
+                }
+                // Original generation for cy >= 0
+                else {
+                    // Fill bottom half with stone
+                    for y in 0..32 {
+                        for x in 0..CHUNK_SIZE {
+                            chunk.set_material(x, y, MaterialId::STONE);
+                            chunk_pixels += 1;
+                        }
+                    }
+
+                    // Add some sand on top
+                    if cy == 0 {
+                        for x in 20..44 {
+                            for y in 32..40 {
+                                chunk.set_material(x, y, MaterialId::SAND);
+                                chunk_pixels += 1;
+                            }
+                        }
+                    }
+
+                    // Add some water
+                    if cx == 1 && cy == 0 {
+                        for x in 10..30 {
+                            for y in 35..50 {
+                                chunk.set_material(x, y, MaterialId::WATER);
+                                chunk_pixels += 1;
+                            }
                         }
                     }
                 }
@@ -190,6 +228,22 @@ impl World {
         // 4. State changes based on temperature
         for pos in &self.active_chunks.clone() {
             self.check_chunk_state_changes(*pos, stats);
+        }
+
+        // 5. Process structural integrity checks
+        let positions = self.structural_system.drain_queue();
+        let checks_processed = StructuralIntegritySystem::process_checks(self, positions);
+        if checks_processed > 0 {
+            log::debug!("Processed {} structural integrity checks", checks_processed);
+        }
+
+        // 6. Update rigid body physics
+        self.physics_world.step();
+
+        // 7. Check for settled debris and reconstruct as pixels
+        let settled = self.physics_world.get_settled_debris();
+        for handle in settled {
+            self.reconstruct_debris(handle);
         }
     }
     
@@ -476,12 +530,31 @@ impl World {
     
     /// Set pixel at world coordinates
     pub fn set_pixel(&mut self, world_x: i32, world_y: i32, material_id: u16) {
+        // Check if we're removing a structural material
+        let schedule_check = if let Some(old_pixel) = self.get_pixel(world_x, world_y) {
+            if !old_pixel.is_empty() {
+                let old_material = self.materials.get(old_pixel.material_id);
+                old_material.structural && old_material.material_type == MaterialType::Solid
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // Set the new pixel
         let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
         if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
             chunk.set_material(local_x, local_y, material_id);
         } else {
             log::warn!("set_pixel: chunk {:?} not loaded (world: {}, {})",
                       chunk_pos, world_x, world_y);
+            return;
+        }
+
+        // Schedule structural check if we removed structural material with AIR
+        if schedule_check && material_id == MaterialId::AIR {
+            self.structural_system.schedule_check(world_x, world_y);
         }
     }
 
@@ -519,6 +592,123 @@ impl World {
         &self.materials
     }
 
+    /// Get active debris for rendering
+    pub fn get_active_debris(&self) -> Vec<crate::physics::DebrisRenderData> {
+        self.physics_world.get_debris_render_data()
+    }
+
+    /// Add bedrock collider for a chunk (called when chunk is loaded)
+    pub fn add_bedrock_collider(&mut self, chunk_x: i32, chunk_y: i32) {
+        self.physics_world.add_bedrock_collider(chunk_x, chunk_y);
+    }
+
+    /// Create falling debris from a pixel region
+    /// Removes pixels from world and creates a rigid body
+    pub fn create_debris(&mut self, region: std::collections::HashSet<IVec2>) -> rapier2d::dynamics::RigidBodyHandle {
+        log::info!("Creating debris from {} pixels", region.len());
+
+        // Build pixel map with materials
+        let mut pixels = std::collections::HashMap::new();
+        for pos in &region {
+            if let Some(pixel) = self.get_pixel(pos.x, pos.y) {
+                if !pixel.is_empty() {
+                    pixels.insert(*pos, pixel.material_id);
+                }
+            }
+        }
+
+        if pixels.is_empty() {
+            log::warn!("No valid pixels to create debris");
+            // Return a dummy handle (this shouldn't happen in practice)
+            return rapier2d::dynamics::RigidBodyHandle::from_raw_parts(0, 0);
+        }
+
+        // Remove pixels from world (convert to air)
+        for pos in &region {
+            self.set_pixel_direct(pos.x, pos.y, MaterialId::AIR);
+        }
+
+        // Create rigid body in physics world
+        let handle = self.physics_world.create_debris(pixels);
+        log::debug!("Created rigid body handle: {:?}", handle);
+        handle
+    }
+
+    /// Set pixel without triggering structural checks (internal use)
+    fn set_pixel_direct(&mut self, world_x: i32, world_y: i32, material_id: u16) {
+        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+            chunk.set_material(local_x, local_y, material_id);
+        }
+    }
+
+    /// Set pixel without triggering structural checks, returns success/failure
+    fn set_pixel_direct_checked(&mut self, world_x: i32, world_y: i32, material_id: u16) -> bool {
+        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+            chunk.set_material(local_x, local_y, material_id);
+            true
+        } else {
+            log::trace!("set_pixel_direct_checked: chunk {:?} not loaded for pixel at ({}, {})",
+                       chunk_pos, world_x, world_y);
+            false
+        }
+    }
+
+    /// Reconstruct debris that has settled as static pixels
+    fn reconstruct_debris(&mut self, handle: rapier2d::dynamics::RigidBodyHandle) {
+        log::info!("Reconstructing debris: handle={:?}", handle);
+
+        // Get final position BEFORE removing debris
+        let (final_center, rotation) = match self.physics_world.get_debris_transform(handle) {
+            Some(transform) => transform,
+            None => {
+                log::warn!("Failed to get debris transform {:?}", handle);
+                return;
+            }
+        };
+
+        // Get debris from physics world (removes it)
+        let debris = match self.physics_world.remove_debris(handle) {
+            Some(d) => d,
+            None => {
+                log::warn!("Failed to remove debris {:?}", handle);
+                return;
+            }
+        };
+
+        log::debug!("Reconstructing {} pixels at ({:.1}, {:.1}), rotation={:.2}°",
+                   debris.pixels.len(), final_center.x, final_center.y, rotation.to_degrees());
+
+        // Place pixels relative to new center position
+        let mut placed_count = 0;
+        let mut failed_count = 0;
+
+        for (relative_pos, material_id) in debris.pixels.iter() {
+            // Apply rotation (currently ignored - can be added later)
+            let rotated_x = relative_pos.x as f32;
+            let rotated_y = relative_pos.y as f32;
+
+            // Translate to world position
+            let world_x = (final_center.x + rotated_x).round() as i32;
+            let world_y = (final_center.y + rotated_y).round() as i32;
+
+            // Place pixel
+            if self.set_pixel_direct_checked(world_x, world_y, *material_id) {
+                placed_count += 1;
+            } else {
+                failed_count += 1;
+            }
+        }
+
+        if failed_count > 0 {
+            log::warn!("Reconstruction: {} pixels placed, {} failed (chunk not loaded?)",
+                       placed_count, failed_count);
+        } else {
+            log::info!("Reconstruction: {} pixels placed successfully", placed_count);
+        }
+    }
+
     /// Clear all chunks from the world
     pub fn clear_all_chunks(&mut self) {
         self.chunks.clear();
@@ -529,6 +719,10 @@ impl World {
     /// Add a chunk to the world
     pub fn add_chunk(&mut self, chunk: Chunk) {
         let pos = IVec2::new(chunk.x, chunk.y);
+
+        // Check if this chunk contains bedrock
+        let has_bedrock = chunk.pixels().iter().any(|p| p.material_id == MaterialId::BEDROCK);
+
         self.chunks.insert(pos, chunk);
 
         // Add to active chunks if within range of player
@@ -538,6 +732,11 @@ impl World {
             if !self.active_chunks.contains(&pos) {
                 self.active_chunks.push(pos);
             }
+        }
+
+        // Add physics collider for bedrock chunks
+        if has_bedrock {
+            self.add_bedrock_collider(pos.x, pos.y);
         }
     }
 

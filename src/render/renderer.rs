@@ -591,10 +591,20 @@ impl Renderer {
             pixel[2] = 52;  // B
             pixel[3] = 255; // A
         }
-        
+
         // Render each chunk
         for chunk in world.active_chunks() {
             self.render_chunk_to_buffer(chunk, world);
+        }
+
+        // Render active debris on top of chunks
+        let debris_list = world.get_active_debris();
+        if debris_list.len() > 0 {
+            log::debug!("Rendering {} active debris", debris_list.len());
+        }
+
+        for debris_data in &debris_list {
+            self.render_debris_to_buffer(debris_data, world.materials());
         }
     }
     
@@ -645,9 +655,57 @@ impl Renderer {
         self.camera.zoom
     }
 
+    /// Update camera zoom level with delta and clamp to min/max
+    pub fn update_zoom(&mut self, zoom_delta: f32, min_zoom: f32, max_zoom: f32) {
+        self.camera.zoom *= zoom_delta;
+        self.camera.zoom = self.camera.zoom.clamp(min_zoom, max_zoom);
+    }
+
     /// Get window size
     pub fn window_size(&self) -> (u32, u32) {
         (self.size.width, self.size.height)
+    }
+
+    /// Render a single debris to the pixel buffer
+    fn render_debris_to_buffer(
+        &mut self,
+        debris: &crate::physics::DebrisRenderData,
+        materials: &crate::simulation::Materials,
+    ) {
+        // For each pixel in the debris
+        for (local_pos, material_id) in &debris.pixels {
+            // Apply rotation
+            let rotated = Self::rotate_point(*local_pos, debris.rotation);
+
+            // Translate to world position
+            let world_x = (debris.position.x + rotated.x as f32).round() as i32;
+            let world_y = (debris.position.y + rotated.y as f32).round() as i32;
+
+            // Convert world coordinates to texture coordinates
+            let tex_x = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + world_x;
+            let tex_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + world_y;
+
+            // Bounds check
+            if tex_x >= 0 && tex_x < Self::WORLD_TEXTURE_SIZE as i32 &&
+               tex_y >= 0 && tex_y < Self::WORLD_TEXTURE_SIZE as i32 {
+                // Write pixel to buffer
+                let idx = ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
+                let color = materials.get_color(*material_id);
+                self.pixel_buffer[idx] = color[0];
+                self.pixel_buffer[idx + 1] = color[1];
+                self.pixel_buffer[idx + 2] = color[2];
+                self.pixel_buffer[idx + 3] = color[3];
+            }
+        }
+    }
+
+    /// Rotate a point around origin
+    fn rotate_point(point: glam::IVec2, angle: f32) -> glam::IVec2 {
+        let cos = angle.cos();
+        let sin = angle.sin();
+        let x = point.x as f32 * cos - point.y as f32 * sin;
+        let y = point.x as f32 * sin + point.y as f32 * cos;
+        glam::IVec2::new(x.round() as i32, y.round() as i32)
     }
 
     /// Update temperature overlay texture with data from world

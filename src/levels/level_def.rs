@@ -70,6 +70,54 @@ impl LevelManager {
                 description: "Lava eruption demo",
                 generator: generate_level_8_volcano,
             },
+            LevelDef {
+                id: 8,
+                name: "Bridge Demolition",
+                description: "Remove pillars to collapse the bridge (large debris demo)",
+                generator: generate_level_9_bridge,
+            },
+            LevelDef {
+                id: 9,
+                name: "Tower Collapse",
+                description: "Watch towers crumble - small vs large debris",
+                generator: generate_level_10_towers,
+            },
+            LevelDef {
+                id: 10,
+                name: "Floating Islands",
+                description: "Cut support columns to drop floating islands",
+                generator: generate_level_11_islands,
+            },
+            LevelDef {
+                id: 11,
+                name: "Crumbling Wall",
+                description: "Strategic wall demolition - mixed debris sizes",
+                generator: generate_level_12_wall,
+            },
+            LevelDef {
+                id: 12,
+                name: "Castle Siege",
+                description: "Destroy the castle foundation for cascading collapse",
+                generator: generate_level_13_castle,
+            },
+            LevelDef {
+                id: 13,
+                name: "Domino Effect",
+                description: "Knock over the first domino and watch the chain reaction",
+                generator: generate_level_14_domino,
+            },
+            LevelDef {
+                id: 14,
+                name: "Quarry",
+                description: "Mine support beams to collapse layered stone",
+                generator: generate_level_15_quarry,
+            },
+            LevelDef {
+                id: 15,
+                name: "Stress Test",
+                description: "Remove the critical support - massive structure stress test",
+                generator: generate_level_16_stress,
+            },
         ];
 
         Self {

@@ -15,10 +15,16 @@ use crate::simulation::MaterialId;
 use crate::ui::UiState;
 use crate::levels::LevelManager;
 
+// Zoom constants
+const ZOOM_SPEED: f32 = 1.1; // Multiplicative zoom factor per keypress
+const MIN_ZOOM: f32 = 0.001; // Max zoom out (see more of the world)
+const MAX_ZOOM: f32 = 0.5;   // Max zoom in (closer view)
+
 /// Print controls to console
 fn print_controls() {
     println!("=== Sunaba Controls ===");
     println!("Movement: WASD");
+    println!("Zoom: +/- or Mouse Wheel");
     println!("Materials: 1-9 (Stone, Sand, Water, Wood, Fire, Smoke, Steam, Lava, Oil)");
     println!("Spawn: Left Click");
     println!("Toggle Temperature Overlay: T");
@@ -67,6 +73,9 @@ pub struct InputState {
     // Mouse state
     pub mouse_world_pos: Option<(i32, i32)>, // Converted to world coords
     pub left_mouse_pressed: bool,
+
+    // Zoom control
+    pub zoom_delta: f32, // Zoom change this frame (1.0 = no change)
 }
 
 impl InputState {
@@ -79,6 +88,7 @@ impl InputState {
             selected_material: MaterialId::SAND, // Start with sand
             mouse_world_pos: None,
             left_mouse_pressed: false,
+            zoom_delta: 1.0, // No change by default
         }
     }
 }
@@ -178,7 +188,10 @@ impl App {
                             KeyCode::KeyS => input_state.s_pressed = pressed,
                             KeyCode::KeyD => input_state.d_pressed = pressed,
 
-                            // Material selection (1-9)
+                            // Material selection (0-9)
+                            KeyCode::Digit0 => if pressed {
+                                input_state.selected_material = MaterialId::AIR;
+                            },
                             KeyCode::Digit1 => if pressed {
                                 input_state.selected_material = MaterialId::STONE;
                             },
@@ -226,6 +239,16 @@ impl App {
                                 level_manager.prev_level(&mut world);
                             },
 
+                            // Zoom controls
+                            KeyCode::Equal | KeyCode::NumpadAdd => if pressed {
+                                input_state.zoom_delta *= ZOOM_SPEED;
+                                log::debug!("Zoom in: delta={:.2}", input_state.zoom_delta);
+                            },
+                            KeyCode::Minus | KeyCode::NumpadSubtract => if pressed {
+                                input_state.zoom_delta /= ZOOM_SPEED;
+                                log::debug!("Zoom out: delta={:.2}", input_state.zoom_delta);
+                            },
+
                             _ => {}
                         }
                     }
@@ -256,12 +279,36 @@ impl App {
                         log::info!("Mouse: {}", if state == ElementState::Pressed { "clicked" } else { "released" });
                     }
                 }
+                Event::WindowEvent {
+                    event: WindowEvent::MouseWheel { delta, .. },
+                    ..
+                } => {
+                    // Skip input if egui wants it
+                    if egui_ctx.wants_pointer_input() {
+                        return;
+                    }
+
+                    let scroll_amount = match delta {
+                        winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                        winit::event::MouseScrollDelta::PixelDelta(pos) => {
+                            (pos.y / 50.0) as f32 // Normalize pixel deltas
+                        }
+                    };
+
+                    // Zoom in/out based on scroll direction
+                    let zoom_factor = 1.0 + (scroll_amount * 0.1);
+                    input_state.zoom_delta *= zoom_factor;
+                    log::debug!("Mouse wheel: scroll={:.2}, zoom_delta={:.2}", scroll_amount, input_state.zoom_delta);
+                }
                 Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                     // Begin frame timing
                     ui_state.stats.begin_frame();
 
                     // Update player from input
                     world.update_player(&input_state, 1.0 / 60.0);
+
+                    // Update camera zoom
+                    renderer.update_zoom(input_state.zoom_delta, MIN_ZOOM, MAX_ZOOM);
 
                     // Log camera state periodically
                     static mut FRAME_COUNT: u32 = 0;
@@ -309,6 +356,9 @@ impl App {
                     if let Err(e) = renderer.render(&world, &egui_ctx, full_output.textures_delta, full_output.shapes) {
                         log::error!("Render error: {e}");
                     }
+
+                    // Reset per-frame input state
+                    input_state.zoom_delta = 1.0;
                 }
                 Event::AboutToWait => {
                     window.request_redraw();

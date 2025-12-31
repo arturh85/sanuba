@@ -5,6 +5,7 @@
 pub mod app;
 pub mod world;
 pub mod simulation;
+pub mod physics;
 pub mod render;
 pub mod ui;
 pub mod levels;

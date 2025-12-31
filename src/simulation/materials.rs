@@ -20,6 +20,7 @@ impl MaterialId {
     pub const ICE: u16 = 11;
     pub const GLASS: u16 = 12;
     pub const METAL: u16 = 13;
+    pub const BEDROCK: u16 = 14;
 }
 
 /// How a material behaves physically
@@ -321,6 +322,19 @@ impl Materials {
             melts_to: Some(MaterialId::LAVA), // Molten metal
             heat_conductivity: 0.9,
             conducts_electricity: true,
+            ..Default::default()
+        });
+
+        // Bedrock - indestructible foundation
+        self.register(MaterialDef {
+            id: MaterialId::BEDROCK,
+            name: "bedrock".to_string(),
+            material_type: MaterialType::Solid,
+            color: [40, 40, 50, 255], // Dark gray
+            density: 100.0,
+            hardness: None, // None = indestructible
+            structural: true,
+            heat_conductivity: 0.1,
             ..Default::default()
         });
     }

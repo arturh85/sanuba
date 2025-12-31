@@ -38,13 +38,19 @@ impl ControlsHelpState {
                 ui.label("W/A/S/D - Move camera");
 
                 ui.add_space(8.0);
+                ui.heading("Camera");
+                ui.label("+/- - Zoom in/out");
+                ui.label("Mouse Wheel - Zoom in/out");
+
+                ui.add_space(8.0);
                 ui.heading("Materials");
 
                 // Get selected material name for highlighting
                 let selected_material = materials.get(selected_material_id);
 
-                // List all materials 1-9
+                // List all materials 0-9
                 let material_ids = [
+                    (0, crate::simulation::MaterialId::AIR),
                     (1, crate::simulation::MaterialId::STONE),
                     (2, crate::simulation::MaterialId::SAND),
                     (3, crate::simulation::MaterialId::WATER),
@@ -114,13 +120,19 @@ impl ControlsHelpState {
                 ui.label("W/A/S/D - Move camera");
 
                 ui.add_space(8.0);
+                ui.heading("Camera");
+                ui.label("+/- - Zoom in/out");
+                ui.label("Mouse Wheel - Zoom in/out");
+
+                ui.add_space(8.0);
                 ui.heading("Materials");
 
                 // Get selected material name for highlighting
                 let selected_material = materials.get(selected_material_id);
 
-                // List all materials 1-9
+                // List all materials 0-9
                 let material_ids = [
+                    (0, crate::simulation::MaterialId::AIR),
                     (1, crate::simulation::MaterialId::STONE),
                     (2, crate::simulation::MaterialId::SAND),
                     (3, crate::simulation::MaterialId::WATER),
