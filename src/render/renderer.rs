@@ -58,24 +58,35 @@ pub struct Renderer {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    
+
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
-    
+
     // World texture (stores all visible chunks)
     world_texture: wgpu::Texture,
     world_texture_view: wgpu::TextureView,
     world_sampler: wgpu::Sampler,
     world_bind_group: wgpu::BindGroup,
-    
+
     // Camera
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     camera: CameraUniform,
-    
+
     // Pixel buffer for CPU-side rendering
     pixel_buffer: Vec<u8>,
+
+    // UI rendering
+    egui_renderer: egui_wgpu::Renderer,
+
+    // Temperature overlay
+    temp_texture: wgpu::Texture,
+    temp_texture_view: wgpu::TextureView,
+    temp_sampler: wgpu::Sampler,
+    overlay_uniform_buffer: wgpu::Buffer,
+    temp_bind_group: wgpu::BindGroup,
+    overlay_enabled: bool,
 }
 
 impl Renderer {
@@ -245,16 +256,105 @@ impl Renderer {
             }],
         });
         
+        // Temperature overlay texture (40x40 for 5x5 chunks × 8x8 cells)
+        const TEMP_TEXTURE_SIZE: u32 = 40;
+        let temp_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("temp_texture"),
+            size: wgpu::Extent3d {
+                width: TEMP_TEXTURE_SIZE,
+                height: TEMP_TEXTURE_SIZE,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        let temp_texture_view = temp_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let temp_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest, // Nearest for R32Float (not filterable)
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        // Overlay uniform buffer (enabled flag)
+        let overlay_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("overlay_uniform_buffer"),
+            size: 32, // u32 (4) + vec3<u32> padding (16 due to alignment) + struct padding (12) = 32 bytes
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Temperature overlay bind group layout
+        let temp_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("temp_bind_group_layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let temp_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("temp_bind_group"),
+            layout: &temp_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&temp_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&temp_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: overlay_uniform_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
         // Shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
-        
+
         // Pipeline layout
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("render_pipeline_layout"),
-            bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
+            bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout, &temp_bind_group_layout],
             push_constant_ranges: &[],
         });
         
@@ -266,6 +366,7 @@ impl Renderer {
                 module: &shader,
                 entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -275,6 +376,7 @@ impl Renderer {
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -309,7 +411,18 @@ impl Renderer {
         
         // Pixel buffer for CPU rendering
         let pixel_buffer = vec![0u8; (Self::WORLD_TEXTURE_SIZE * Self::WORLD_TEXTURE_SIZE * 4) as usize];
-        
+
+        // Initialize egui renderer
+        let egui_renderer = egui_wgpu::Renderer::new(
+            &device,
+            config.format,
+            None,
+            1,
+        );
+
+        // Initialize overlay as disabled (32 bytes: enabled + padding)
+        queue.write_buffer(&overlay_uniform_buffer, 0, bytemuck::cast_slice(&[0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]));
+
         Ok(Self {
             surface,
             device,
@@ -327,6 +440,13 @@ impl Renderer {
             camera_bind_group,
             camera,
             pixel_buffer,
+            egui_renderer,
+            temp_texture,
+            temp_texture_view,
+            temp_sampler,
+            overlay_uniform_buffer,
+            temp_bind_group,
+            overlay_enabled: false,
         })
     }
     
@@ -343,7 +463,13 @@ impl Renderer {
         }
     }
     
-    pub fn render(&mut self, world: &World) -> Result<()> {
+    pub fn render(
+        &mut self,
+        world: &World,
+        egui_ctx: &egui::Context,
+        textures_delta: egui::TexturesDelta,
+        shapes: Vec<egui::epaint::ClippedShape>,
+    ) -> Result<()> {
         log::trace!("Render frame: camera pos=({:.1}, {:.1}), zoom={:.2}",
                    self.camera.position[0], self.camera.position[1], self.camera.zoom);
 
@@ -370,22 +496,37 @@ impl Renderer {
                 depth_or_array_layers: 1,
             },
         );
-        
+
         // Update camera position to follow player
         self.camera.position = [world.player_pos.x, world.player_pos.y];
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera]));
-        
+
         // Get output texture
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("render_encoder"),
         });
-        
+
+        // Update egui textures
+        for (id, image_delta) in &textures_delta.set {
+            self.egui_renderer.update_texture(&self.device, &self.queue, *id, image_delta);
+        }
+
+        // Prepare egui primitives
+        let screen_descriptor = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: 1.0,
+        };
+
+        let primitives = egui_ctx.tessellate(shapes, 1.0);
+        self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &primitives, &screen_descriptor);
+
+        // Render world
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("render_pass"),
+                label: Some("world_render_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -402,18 +543,43 @@ impl Renderer {
                 depth_stencil_attachment: None,
                 ..Default::default()
             });
-            
+
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.world_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(2, &self.temp_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..6, 0, 0..1);
         }
-        
+
+        // Render egui UI
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("egui_render_pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+
+            self.egui_renderer.render(&mut render_pass, &primitives, &screen_descriptor);
+        }
+
+        // Free egui textures
+        for id in &textures_delta.free {
+            self.egui_renderer.free_texture(id);
+        }
+
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
-        
+
         Ok(())
     }
     
@@ -482,5 +648,84 @@ impl Renderer {
     /// Get window size
     pub fn window_size(&self) -> (u32, u32) {
         (self.size.width, self.size.height)
+    }
+
+    /// Update temperature overlay texture with data from world
+    pub fn update_temperature_overlay(&mut self, world: &World) {
+        const TEMP_TEXTURE_SIZE: u32 = 40;
+        const CELLS_PER_CHUNK: usize = 8; // 8x8 temperature grid per chunk
+
+        // Create temperature data buffer (40x40 = 5x5 chunks × 8x8 cells)
+        let mut temp_data = vec![20.0f32; (TEMP_TEXTURE_SIZE * TEMP_TEXTURE_SIZE) as usize];
+
+        // Sample temperature from 5x5 chunks around player
+        let player_chunk_x = (world.player_pos.x / CHUNK_SIZE as f32).floor() as i32;
+        let player_chunk_y = (world.player_pos.y / CHUNK_SIZE as f32).floor() as i32;
+
+        for cy in -2..=2 {
+            for cx in -2..=2 {
+                let chunk_x = player_chunk_x + cx;
+                let chunk_y = player_chunk_y + cy;
+
+                // Get temperature data for this chunk
+                for cell_y in 0..CELLS_PER_CHUNK {
+                    for cell_x in 0..CELLS_PER_CHUNK {
+                        // World coordinates of this cell
+                        let world_x = chunk_x * CHUNK_SIZE as i32 + (cell_x * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
+                        let world_y = chunk_y * CHUNK_SIZE as i32 + (cell_y * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
+
+                        // Texture coordinates (40x40)
+                        let tex_x = ((cx + 2) * CELLS_PER_CHUNK as i32 + cell_x as i32) as usize;
+                        let tex_y = ((cy + 2) * CELLS_PER_CHUNK as i32 + cell_y as i32) as usize;
+
+                        // Get temperature at this world position
+                        let temp = world.get_temperature_at_pixel(world_x, world_y);
+
+                        let idx = tex_y * TEMP_TEXTURE_SIZE as usize + tex_x;
+                        if idx < temp_data.len() {
+                            temp_data[idx] = temp;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Upload to GPU
+        self.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &self.temp_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&temp_data),
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(TEMP_TEXTURE_SIZE * 4), // 4 bytes per f32
+                rows_per_image: Some(TEMP_TEXTURE_SIZE),
+            },
+            wgpu::Extent3d {
+                width: TEMP_TEXTURE_SIZE,
+                height: TEMP_TEXTURE_SIZE,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+
+    /// Toggle temperature overlay on/off
+    pub fn toggle_temperature_overlay(&mut self) {
+        self.overlay_enabled = !self.overlay_enabled;
+        let enabled_value = if self.overlay_enabled { 1u32 } else { 0u32 };
+        self.queue.write_buffer(
+            &self.overlay_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[enabled_value, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]),
+        );
+        log::info!("Temperature overlay: {}", if self.overlay_enabled { "ON" } else { "OFF" });
+    }
+
+    /// Check if temperature overlay is enabled
+    pub fn is_temperature_overlay_enabled(&self) -> bool {
+        self.overlay_enabled
     }
 }

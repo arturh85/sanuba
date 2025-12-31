@@ -12,6 +12,21 @@ use glam::Vec2;
 use crate::world::World;
 use crate::render::Renderer;
 use crate::simulation::MaterialId;
+use crate::ui::UiState;
+use crate::levels::LevelManager;
+
+/// Print controls to console
+fn print_controls() {
+    println!("=== Sunaba Controls ===");
+    println!("Movement: WASD");
+    println!("Materials: 1-9 (Stone, Sand, Water, Wood, Fire, Smoke, Steam, Lava, Oil)");
+    println!("Spawn: Left Click");
+    println!("Toggle Temperature Overlay: T");
+    println!("Toggle Stats: F1");
+    println!("Toggle Help: H");
+    println!("Next/Prev Level: N/P");
+    println!("======================");
+}
 
 /// Convert screen coordinates to world coordinates
 fn screen_to_world(
@@ -80,32 +95,63 @@ pub struct App {
     renderer: Renderer,
     world: World,
     input_state: InputState,
+    egui_ctx: egui::Context,
+    egui_state: egui_winit::State,
+    ui_state: UiState,
+    level_manager: LevelManager,
 }
 
 impl App {
     pub async fn new() -> Result<Self> {
         let event_loop = EventLoop::new()?;
         let window = WindowBuilder::new()
-            .with_title("Sunaba")
+            .with_title("Sunaba - 2D Physics Sandbox")
             .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
             .build(&event_loop)?;
-        
+
         let renderer = Renderer::new(&window).await?;
-        let world = World::new();
-        
+        let mut world = World::new();
+
+        // Initialize level manager and load first level
+        let level_manager = LevelManager::new();
+        level_manager.load_current_level(&mut world);
+
+        // Initialize egui
+        let egui_ctx = egui::Context::default();
+        let egui_state = egui_winit::State::new(
+            egui_ctx.clone(),
+            egui::ViewportId::ROOT,
+            &window,
+            Some(window.scale_factor() as f32),
+            None,
+        );
+
+        // Print controls to console
+        print_controls();
+        log::info!("Loaded level: {}", level_manager.current_level_name());
+
         Ok(Self {
             window,
             event_loop,
             renderer,
             world,
             input_state: InputState::default(),
+            egui_ctx,
+            egui_state,
+            ui_state: UiState::new(),
+            level_manager,
         })
     }
     
     pub fn run(self) -> Result<()> {
-        let Self { window, event_loop, mut renderer, mut world, mut input_state } = self;
+        let Self { window, event_loop, mut renderer, mut world, mut input_state, egui_ctx, mut egui_state, mut ui_state, mut level_manager } = self;
         
         event_loop.run(move |event, elwt| {
+            // Let egui handle events first
+            if let Event::WindowEvent { ref event, .. } = event {
+                let _ = egui_state.on_window_event(&window, event);
+            }
+
             match event {
                 Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                     elwt.exit();
@@ -117,6 +163,10 @@ impl App {
                     event: WindowEvent::KeyboardInput { event: key_event, .. },
                     ..
                 } => {
+                    // Skip input if egui wants it
+                    if egui_ctx.wants_keyboard_input() {
+                        return;
+                    }
                     if let PhysicalKey::Code(code) = key_event.physical_key {
                         let pressed = key_event.state == ElementState::Pressed;
                         log::debug!("Keyboard: {:?} {}", code, if pressed { "pressed" } else { "released" });
@@ -156,6 +206,26 @@ impl App {
                             KeyCode::Digit9 => if pressed {
                                 input_state.selected_material = MaterialId::OIL;
                             },
+
+                            // UI toggles
+                            KeyCode::F1 => if pressed {
+                                ui_state.toggle_stats();
+                            },
+                            KeyCode::KeyH => if pressed {
+                                ui_state.toggle_help();
+                            },
+                            KeyCode::KeyT => if pressed {
+                                renderer.toggle_temperature_overlay();
+                            },
+
+                            // Level switching
+                            KeyCode::KeyN => if pressed {
+                                level_manager.next_level(&mut world);
+                            },
+                            KeyCode::KeyP => if pressed {
+                                level_manager.prev_level(&mut world);
+                            },
+
                             _ => {}
                         }
                     }
@@ -187,6 +257,9 @@ impl App {
                     }
                 }
                 Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+                    // Begin frame timing
+                    ui_state.stats.begin_frame();
+
                     // Update player from input
                     world.update_player(&input_state, 1.0 / 60.0);
 
@@ -207,11 +280,33 @@ impl App {
                         }
                     }
 
-                    // Update simulation
-                    world.update(1.0 / 60.0);
+                    // Update simulation with timing
+                    ui_state.stats.begin_sim();
+                    world.update(1.0 / 60.0, &mut ui_state.stats);
+                    ui_state.stats.end_sim();
 
-                    // Render
-                    if let Err(e) = renderer.render(&world) {
+                    // Collect world stats
+                    ui_state.stats.collect_world_stats(&world);
+
+                    // Update tooltip with world data
+                    ui_state.update_tooltip(&world, world.materials(), input_state.mouse_world_pos);
+
+                    // Prepare egui frame
+                    let raw_input = egui_state.take_egui_input(&window);
+                    let full_output = egui_ctx.run(raw_input, |ctx| {
+                        // Get cursor position from egui context
+                        let cursor_pos = ctx.pointer_hover_pos().unwrap_or(egui::pos2(0.0, 0.0));
+                        ui_state.render(ctx, cursor_pos, input_state.selected_material, world.materials(), level_manager.current_level_name());
+                    });
+
+                    // Handle egui output
+                    egui_state.handle_platform_output(&window, full_output.platform_output);
+
+                    // Update temperature overlay texture
+                    renderer.update_temperature_overlay(&world);
+
+                    // Render world + UI
+                    if let Err(e) = renderer.render(&world, &egui_ctx, full_output.textures_delta, full_output.shapes) {
                         log::error!("Render error: {e}");
                     }
                 }

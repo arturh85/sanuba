@@ -3,23 +3,33 @@
 use std::collections::HashMap;
 use glam::IVec2;
 
-use super::{Chunk, Pixel, CHUNK_SIZE};
-use crate::simulation::{Materials, MaterialId};
+use super::{Chunk, Pixel, CHUNK_SIZE, pixel_flags};
+use crate::simulation::{
+    Materials, MaterialId, MaterialType,
+    TemperatureSimulator, StateChangeSystem, ReactionRegistry,
+    add_heat_at_pixel, get_temperature_at_pixel,
+};
 
 /// The game world, composed of chunks
 pub struct World {
     /// Loaded chunks, keyed by chunk coordinates
     chunks: HashMap<IVec2, Chunk>,
-    
+
     /// Material definitions
     pub materials: Materials,
-    
+
+    /// Temperature simulation system
+    temperature_sim: TemperatureSimulator,
+
+    /// Chemical reaction registry
+    reactions: ReactionRegistry,
+
     /// Player position (pixel coordinates)
     pub player_pos: glam::Vec2,
-    
+
     /// Which chunks are currently active (being simulated)
     active_chunks: Vec<IVec2>,
-    
+
     /// Simulation time accumulator
     time_accumulator: f32,
 }
@@ -29,6 +39,8 @@ impl World {
         let mut world = Self {
             chunks: HashMap::new(),
             materials: Materials::new(),
+            temperature_sim: TemperatureSimulator::new(),
+            reactions: ReactionRegistry::new(),
             player_pos: glam::Vec2::new(0.0, 100.0),
             active_chunks: Vec::new(),
             time_accumulator: 0.0,
@@ -146,33 +158,42 @@ impl World {
     }
 
     /// Update simulation
-    pub fn update(&mut self, dt: f32) {
+    pub fn update(&mut self, dt: f32, stats: &mut crate::ui::StatsCollector) {
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
-        
+
         self.time_accumulator += dt;
-        
+
         while self.time_accumulator >= FIXED_TIMESTEP {
-            self.step_simulation();
+            self.step_simulation(stats);
             self.time_accumulator -= FIXED_TIMESTEP;
         }
     }
     
-    fn step_simulation(&mut self) {
-        // Clear update flags
+    fn step_simulation(&mut self, stats: &mut crate::ui::StatsCollector) {
+        // 1. Clear update flags
         for pos in &self.active_chunks {
             if let Some(chunk) = self.chunks.get_mut(pos) {
                 chunk.clear_update_flags();
             }
         }
-        
+
+        // 2. CA updates (movement)
         // TODO: Implement Noita-style checkerboard update pattern
         // For now, simple sequential update
         for pos in self.active_chunks.clone() {
-            self.update_chunk_ca(pos);
+            self.update_chunk_ca(pos, stats);
+        }
+
+        // 3. Temperature diffusion (30fps throttled)
+        self.temperature_sim.update(&mut self.chunks);
+
+        // 4. State changes based on temperature
+        for pos in &self.active_chunks.clone() {
+            self.check_chunk_state_changes(*pos, stats);
         }
     }
     
-    fn update_chunk_ca(&mut self, chunk_pos: IVec2) {
+    fn update_chunk_ca(&mut self, chunk_pos: IVec2, stats: &mut crate::ui::StatsCollector) {
         // Update from bottom to top so falling works correctly
         for y in 0..CHUNK_SIZE {
             // Alternate direction each row for symmetry
@@ -181,49 +202,70 @@ impl World {
             } else {
                 Box::new((0..CHUNK_SIZE).rev())
             };
-            
+
             for x in x_iter {
-                self.update_pixel(chunk_pos, x, y);
+                self.update_pixel(chunk_pos, x, y, stats);
             }
         }
     }
     
-    fn update_pixel(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+    fn update_pixel(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
         let chunk = match self.chunks.get(&chunk_pos) {
             Some(c) => c,
             None => return,
         };
-        
+
         let pixel = chunk.get_pixel(x, y);
         if pixel.is_empty() {
             return;
         }
-        
-        let material = self.materials.get(pixel.material_id);
-        
-        match material.material_type {
-            crate::simulation::MaterialType::Powder => {
-                self.update_powder(chunk_pos, x, y);
+
+        // Special handling for fire
+        if pixel.material_id == MaterialId::FIRE {
+            self.update_fire(chunk_pos, x, y, stats);
+            return;
+        }
+
+        // Check if pixel should ignite (before movement)
+        if pixel.flags & pixel_flags::BURNING == 0 {
+            self.check_ignition(chunk_pos, x, y);
+        }
+
+        // Update burning materials
+        if pixel.flags & pixel_flags::BURNING != 0 {
+            self.update_burning_material(chunk_pos, x, y);
+        }
+
+        // Get material type for movement logic
+        let material_type = self.materials.get(pixel.material_id).material_type;
+
+        // Normal CA movement
+        match material_type {
+            MaterialType::Powder => {
+                self.update_powder(chunk_pos, x, y, stats);
             }
-            crate::simulation::MaterialType::Liquid => {
-                self.update_liquid(chunk_pos, x, y);
+            MaterialType::Liquid => {
+                self.update_liquid(chunk_pos, x, y, stats);
             }
-            crate::simulation::MaterialType::Gas => {
-                self.update_gas(chunk_pos, x, y);
+            MaterialType::Gas => {
+                self.update_gas(chunk_pos, x, y, stats);
             }
-            crate::simulation::MaterialType::Solid => {
+            MaterialType::Solid => {
                 // Solids don't move
             }
         }
+
+        // Check reactions with neighbors (after movement)
+        self.check_pixel_reactions(chunk_pos, x, y, stats);
     }
     
-    fn update_powder(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+    fn update_powder(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
         // Convert to world coordinates
         let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
         let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
 
         // Try to fall down
-        if self.try_move_world(world_x, world_y, world_x, world_y - 1) {
+        if self.try_move_world(world_x, world_y, world_x, world_y - 1, stats) {
             return;
         }
 
@@ -231,29 +273,29 @@ impl World {
         let try_left_first = rand::random::<bool>();
 
         if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
                 return;
             }
         } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
                 return;
             }
         }
     }
     
-    fn update_liquid(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+    fn update_liquid(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
         // Convert to world coordinates
         let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
         let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
 
         // Try to fall down
-        if self.try_move_world(world_x, world_y, world_x, world_y - 1) {
+        if self.try_move_world(world_x, world_y, world_x, world_y - 1, stats) {
             return;
         }
 
@@ -261,46 +303,46 @@ impl World {
         let try_left_first = rand::random::<bool>();
 
         if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
                 return;
             }
         } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
                 return;
             }
         }
 
         // Try to flow horizontally
         if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
                 return;
             }
         } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
                 return;
             }
         }
     }
     
-    fn update_gas(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+    fn update_gas(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
         // Convert to world coordinates
         let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
         let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
 
         // Gases rise (positive Y)
-        if self.try_move_world(world_x, world_y, world_x, world_y + 1) {
+        if self.try_move_world(world_x, world_y, world_x, world_y + 1, stats) {
             return;
         }
 
@@ -308,34 +350,34 @@ impl World {
         let try_left_first = rand::random::<bool>();
 
         if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1, stats) {
                 return;
             }
         } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1, stats) {
                 return;
             }
         }
 
         // Disperse horizontally
         if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
                 return;
             }
         } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
                 return;
             }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y) {
+            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
                 return;
             }
         }
@@ -369,6 +411,7 @@ impl World {
         from_world_y: i32,
         to_world_x: i32,
         to_world_y: i32,
+        stats: &mut crate::ui::StatsCollector,
     ) -> bool {
         // Convert to chunk coordinates
         let (src_chunk_pos, src_x, src_y) = Self::world_to_chunk_coords(from_world_x, from_world_y);
@@ -396,6 +439,7 @@ impl World {
             // Same chunk - use swap for efficiency
             if let Some(chunk) = self.chunks.get_mut(&src_chunk_pos) {
                 chunk.swap_pixels(src_x, src_y, dst_x, dst_y);
+                stats.record_pixel_moved();
                 return true;
             }
         } else {
@@ -410,6 +454,7 @@ impl World {
             // Then, set destination
             if let Some(dst_chunk) = self.chunks.get_mut(&dst_chunk_pos) {
                 dst_chunk.set_pixel(dst_x, dst_y, src_pixel);
+                stats.record_pixel_moved();
                 return true;
             } else {
                 // Rollback: restore source pixel
@@ -439,7 +484,17 @@ impl World {
                       chunk_pos, world_x, world_y);
         }
     }
-    
+
+    /// Get temperature at world coordinates
+    pub fn get_temperature_at_pixel(&self, world_x: i32, world_y: i32) -> f32 {
+        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunks.get(&chunk_pos) {
+            get_temperature_at_pixel(chunk, local_x, local_y)
+        } else {
+            20.0 // Default ambient temperature
+        }
+    }
+
     /// Convert world coordinates to chunk coordinates + local offset
     fn world_to_chunk_coords(world_x: i32, world_y: i32) -> (IVec2, usize, usize) {
         let chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);
@@ -457,6 +512,194 @@ impl World {
     /// Get all loaded chunks
     pub fn chunks(&self) -> &HashMap<IVec2, Chunk> {
         &self.chunks
+    }
+
+    /// Get materials registry
+    pub fn materials(&self) -> &Materials {
+        &self.materials
+    }
+
+    /// Clear all chunks from the world
+    pub fn clear_all_chunks(&mut self) {
+        self.chunks.clear();
+        self.active_chunks.clear();
+        log::info!("Cleared all chunks");
+    }
+
+    /// Add a chunk to the world
+    pub fn add_chunk(&mut self, chunk: Chunk) {
+        let pos = IVec2::new(chunk.x, chunk.y);
+        self.chunks.insert(pos, chunk);
+
+        // Add to active chunks if within range of player
+        let dist_x = (pos.x - (self.player_pos.x as i32 / CHUNK_SIZE as i32)).abs();
+        let dist_y = (pos.y - (self.player_pos.y as i32 / CHUNK_SIZE as i32)).abs();
+        if dist_x <= 2 && dist_y <= 2 {
+            if !self.active_chunks.contains(&pos) {
+                self.active_chunks.push(pos);
+            }
+        }
+    }
+
+    /// Check all pixels in a chunk for state changes based on temperature
+    fn check_chunk_state_changes(&mut self, chunk_pos: IVec2, stats: &mut crate::ui::StatsCollector) {
+        let chunk = match self.chunks.get_mut(&chunk_pos) {
+            Some(c) => c,
+            None => return,
+        };
+
+        for y in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
+                let pixel = chunk.get_pixel(x, y);
+                if pixel.is_empty() {
+                    continue;
+                }
+
+                let material = self.materials.get(pixel.material_id);
+                let temp = get_temperature_at_pixel(chunk, x, y);
+
+                let mut new_pixel = pixel;
+                if StateChangeSystem::check_state_change(&mut new_pixel, material, temp) {
+                    chunk.set_pixel(x, y, new_pixel);
+                    stats.record_state_change();
+                }
+            }
+        }
+    }
+
+    /// Update fire pixel behavior
+    fn update_fire(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
+        // 1. Add heat to temperature field
+        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+            add_heat_at_pixel(chunk, x, y, 50.0); // Fire adds significant heat
+        }
+
+        // 2. Fire behaves like gas (rises)
+        self.update_gas(chunk_pos, x, y, stats);
+
+        // 3. Fire has limited lifetime - random chance to become smoke
+        if rand::random::<f32>() < 0.02 {
+            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+            self.set_pixel(world_x, world_y, MaterialId::SMOKE);
+        }
+    }
+
+    /// Check if a pixel should ignite based on temperature
+    fn check_ignition(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+        let chunk = match self.chunks.get(&chunk_pos) {
+            Some(c) => c,
+            None => return,
+        };
+
+        let pixel = chunk.get_pixel(x, y);
+        let material = self.materials.get(pixel.material_id);
+
+        if !material.flammable {
+            return;
+        }
+
+        let temp = get_temperature_at_pixel(chunk, x, y);
+
+        if let Some(ignition_temp) = material.ignition_temp {
+            if temp >= ignition_temp {
+                // Mark pixel as burning
+                let chunk = self.chunks.get_mut(&chunk_pos).unwrap();
+                let mut new_pixel = pixel;
+                new_pixel.flags |= pixel_flags::BURNING;
+                chunk.set_pixel(x, y, new_pixel);
+
+                // Try to spawn fire in adjacent air cell
+                let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+                let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+
+                for (dx, dy) in [(0, 1), (1, 0), (-1, 0), (0, -1)] {
+                    if let Some(neighbor) = self.get_pixel(world_x + dx, world_y + dy) {
+                        if neighbor.is_empty() {
+                            self.set_pixel(world_x + dx, world_y + dy, MaterialId::FIRE);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Update burning material (gradual consumption)
+    fn update_burning_material(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
+        let chunk = match self.chunks.get(&chunk_pos) {
+            Some(c) => c,
+            None => return,
+        };
+
+        let pixel = chunk.get_pixel(x, y);
+        let material = self.materials.get(pixel.material_id);
+
+        // Probability check - material burns gradually
+        if rand::random::<f32>() < material.burn_rate {
+            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+
+            // Transform to burns_to material (or air if not specified)
+            let new_material = material.burns_to.unwrap_or(MaterialId::AIR);
+            self.set_pixel(world_x, world_y, new_material);
+
+            // Add heat from burning
+            if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+                add_heat_at_pixel(chunk, x, y, 20.0);
+            }
+        }
+    }
+
+    /// Check for chemical reactions with neighboring pixels
+    fn check_pixel_reactions(&mut self, chunk_pos: IVec2, x: usize, y: usize, stats: &mut crate::ui::StatsCollector) {
+        let chunk = match self.chunks.get(&chunk_pos) {
+            Some(c) => c,
+            None => return,
+        };
+
+        let pixel = chunk.get_pixel(x, y);
+        if pixel.is_empty() {
+            return;
+        }
+
+        let temp = get_temperature_at_pixel(chunk, x, y);
+        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+
+        // Check 4 neighbors for reactions
+        for (dx, dy) in [(0, 1), (1, 0), (0, -1), (-1, 0)] {
+            let neighbor = match self.get_pixel(world_x + dx, world_y + dy) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            if neighbor.is_empty() {
+                continue;
+            }
+
+            // Find matching reaction
+            if let Some(reaction) = self.reactions.find_reaction(
+                pixel.material_id,
+                neighbor.material_id,
+                temp,
+            ) {
+                // Probability check
+                if rand::random::<f32>() < reaction.probability {
+                    // Apply reaction - get correct outputs based on material order
+                    let (output_a, output_b) = self.reactions.get_outputs(
+                        reaction,
+                        pixel.material_id,
+                        neighbor.material_id,
+                    );
+
+                    self.set_pixel(world_x, world_y, output_a);
+                    self.set_pixel(world_x + dx, world_y + dy, output_b);
+                    stats.record_reaction();
+                    return; // Only one reaction per pixel per frame
+                }
+            }
+        }
     }
 }
 

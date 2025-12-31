@@ -34,6 +34,53 @@ var world_texture: texture_2d<f32>;
 @group(0) @binding(1)
 var world_sampler: sampler;
 
+// Temperature overlay
+@group(2) @binding(0)
+var temp_texture: texture_2d<f32>;
+@group(2) @binding(1)
+var temp_sampler: sampler;
+
+struct OverlayUniform {
+    enabled: u32,
+    _padding: vec3<u32>,
+};
+
+@group(2) @binding(2)
+var<uniform> overlay: OverlayUniform;
+
+// Map temperature (in Celsius) to color gradient
+fn temperature_to_color(temp: f32) -> vec3<f32> {
+    // Temperature ranges and colors:
+    // < 0°C: Deep blue (frozen)
+    // 0-20°C: Blue to Cyan (cold)
+    // 20-50°C: Cyan to Green (cool)
+    // 50-100°C: Green to Yellow (warm)
+    // 100-200°C: Yellow to Orange (hot)
+    // 200-500°C: Orange to Red (very hot)
+    // > 500°C: Bright red (extreme)
+
+    if temp < 0.0 {
+        return vec3<f32>(0.0, 0.0, 0.5); // Deep blue
+    } else if temp < 20.0 {
+        let t = temp / 20.0;
+        return mix(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.0, 1.0, 1.0), t); // Blue to cyan
+    } else if temp < 50.0 {
+        let t = (temp - 20.0) / 30.0;
+        return mix(vec3<f32>(0.0, 1.0, 1.0), vec3<f32>(0.0, 1.0, 0.0), t); // Cyan to green
+    } else if temp < 100.0 {
+        let t = (temp - 50.0) / 50.0;
+        return mix(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 1.0, 0.0), t); // Green to yellow
+    } else if temp < 200.0 {
+        let t = (temp - 100.0) / 100.0;
+        return mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.5, 0.0), t); // Yellow to orange
+    } else if temp < 500.0 {
+        let t = (temp - 200.0) / 300.0;
+        return mix(vec3<f32>(1.0, 0.5, 0.0), vec3<f32>(1.0, 0.0, 0.0), t); // Orange to red
+    } else {
+        return vec3<f32>(1.0, 0.0, 0.0); // Bright red
+    }
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Transform screen space to NDC to world space
@@ -59,5 +106,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let color = textureSample(world_texture, world_sampler, tex_coords);
+
+    // Apply temperature overlay if enabled
+    if overlay.enabled != 0u {
+        // Sample temperature texture (40x40 for 5x5 chunks × 8x8 cells)
+        let temp_value = textureSample(temp_texture, temp_sampler, tex_coords).r;
+        let temp_color = temperature_to_color(temp_value);
+
+        // Blend with 40% overlay opacity
+        let blended = mix(color.rgb, temp_color, 0.4);
+        return vec4<f32>(blended * color.a, color.a);
+    }
+
     return vec4<f32>(color.rgb * color.a, color.a);
 }

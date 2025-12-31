@@ -6,6 +6,8 @@ pub mod app;
 pub mod world;
 pub mod simulation;
 pub mod render;
+pub mod ui;
+pub mod levels;
 
 pub use app::App;
 

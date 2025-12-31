@@ -9,9 +9,14 @@ repository = "https://github.com/yourusername/sunaba"
 
 [dependencies]
 # Graphics
-wgpu = "0.19"
+wgpu = "0.20"
 winit = "0.29"
 bytemuck = { version = "1.14", features = ["derive"] }
+
+# UI
+egui = "0.28"
+egui-wgpu = "0.28"
+egui-winit = "0.28"
 
 # Physics (rigid bodies)
 rapier2d = "0.18"
