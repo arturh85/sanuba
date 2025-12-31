@@ -1,5 +1,6 @@
 use crate::world::chunk::Chunk;
 use crate::world::generation::WorldGenerator;
+use crate::entity::player::Player;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -13,6 +14,10 @@ pub struct WorldMetadata {
     pub created_at: String,
     pub last_played: String,
     pub play_time_seconds: u64,
+
+    /// Player save data (inventory, health, hunger)
+    #[serde(default)]
+    pub player_data: Option<Player>,
 }
 
 impl Default for WorldMetadata {
@@ -24,6 +29,7 @@ impl Default for WorldMetadata {
             created_at: chrono::Local::now().to_rfc3339(),
             last_played: chrono::Local::now().to_rfc3339(),
             play_time_seconds: 0,
+            player_data: None, // Will be populated on first save
         }
     }
 }

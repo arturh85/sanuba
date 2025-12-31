@@ -6,7 +6,11 @@ use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 pub struct WorldGenerator {
     pub seed: u64,
     cave_noise: Fbm<Perlin>,
-    ore_noise: Perlin,
+    // Separate noise layers for different ore types
+    coal_noise: Perlin,
+    iron_noise: Perlin,
+    copper_noise: Perlin,
+    gold_noise: Perlin,
 }
 
 impl WorldGenerator {
@@ -18,12 +22,19 @@ impl WorldGenerator {
             .set_lacunarity(2.0) // Octave frequency multiplier
             .set_persistence(0.5); // Octave amplitude multiplier
 
-        let ore_noise = Perlin::new((seed + 1) as u32);
+        // Separate noise layers for each ore type (different seeds for variety)
+        let coal_noise = Perlin::new((seed + 1) as u32);
+        let iron_noise = Perlin::new((seed + 2) as u32);
+        let copper_noise = Perlin::new((seed + 3) as u32);
+        let gold_noise = Perlin::new((seed + 4) as u32);
 
         Self {
             seed,
             cave_noise,
-            ore_noise,
+            coal_noise,
+            iron_noise,
+            copper_noise,
+            gold_noise,
         }
     }
 
@@ -75,18 +86,59 @@ impl WorldGenerator {
         // Solid terrain: depth-based material selection
         let depth = SURFACE_LEVEL - world_y;
 
-        // Top layer: sand (4-8 pixels)
-        if depth < 8 {
+        // Top layer: dirt and sand (shallow)
+        if depth < 4 {
+            return MaterialId::DIRT;
+        } else if depth < 8 {
             return MaterialId::SAND;
         }
 
-        // Ore veins using separate noise layer
-        let ore_value = self
-            .ore_noise
-            .get([world_x as f64 * 0.1, world_y as f64 * 0.1]);
+        // Ore generation with depth stratification
+        // Noise scale: 0.1 = ~10 pixel wavelength for vein patterns
+        const NOISE_SCALE: f64 = 0.08;
 
-        if ore_value > 0.7 {
-            return MaterialId::METAL; // Metal veins
+        // Coal: shallow (depth 8-40, roughly y=24 to y=-8)
+        if depth >= 8 && depth <= 40 {
+            let coal_value = self
+                .coal_noise
+                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+            // Threshold 0.75 = ~3% density
+            if coal_value > 0.75 {
+                return MaterialId::COAL_ORE;
+            }
+        }
+
+        // Copper: medium depth (depth 20-60, roughly y=12 to y=-28)
+        if depth >= 20 && depth <= 60 {
+            let copper_value = self
+                .copper_noise
+                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+            // Threshold 0.77 = ~2.5% density
+            if copper_value > 0.77 {
+                return MaterialId::COPPER_ORE;
+            }
+        }
+
+        // Iron: medium-deep (depth 30-80, roughly y=2 to y=-48)
+        if depth >= 30 && depth <= 80 {
+            let iron_value = self
+                .iron_noise
+                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+            // Threshold 0.76 = ~2.8% density
+            if iron_value > 0.76 {
+                return MaterialId::IRON_ORE;
+            }
+        }
+
+        // Gold: deep (depth 60-120, roughly y=-28 to y=-88)
+        if depth >= 60 && depth <= 120 {
+            let gold_value = self
+                .gold_noise
+                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+            // Threshold 0.80 = ~2% density (rarest)
+            if gold_value > 0.80 {
+                return MaterialId::GOLD_ORE;
+            }
         }
 
         // Default: stone

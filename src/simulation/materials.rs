@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 pub struct MaterialId;
 
 impl MaterialId {
+    // Original materials (0-14)
     pub const AIR: u16 = 0;
     pub const STONE: u16 = 1;
     pub const SAND: u16 = 2;
@@ -21,6 +22,32 @@ impl MaterialId {
     pub const GLASS: u16 = 12;
     pub const METAL: u16 = 13;
     pub const BEDROCK: u16 = 14;
+
+    // Phase 5: New materials (15-30+)
+    // Organic materials
+    pub const DIRT: u16 = 15;
+    pub const PLANT_MATTER: u16 = 16;
+    pub const FRUIT: u16 = 17;
+    pub const FLESH: u16 = 18;
+    pub const BONE: u16 = 19;
+    pub const ASH: u16 = 20;
+
+    // Ore materials
+    pub const COAL_ORE: u16 = 21;
+    pub const IRON_ORE: u16 = 22;
+    pub const COPPER_ORE: u16 = 23;
+    pub const GOLD_ORE: u16 = 24;
+
+    // Refined materials
+    pub const COPPER_INGOT: u16 = 25;
+    pub const IRON_INGOT: u16 = 26;
+    pub const BRONZE_INGOT: u16 = 27;
+    pub const STEEL_INGOT: u16 = 28;
+
+    // Special materials
+    pub const GUNPOWDER: u16 = 29;
+    pub const POISON_GAS: u16 = 30;
+    pub const FERTILIZER: u16 = 31;
 }
 
 /// How a material behaves physically
@@ -34,6 +61,27 @@ pub enum MaterialType {
     Liquid,
     /// Rises, disperses (steam, smoke)
     Gas,
+}
+
+/// Tags for material categorization and behavior
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MaterialTag {
+    /// Organic matter (wood, flesh, plant)
+    Organic,
+    /// Metallic materials (iron, copper, gold)
+    Metallic,
+    /// Edible by creatures
+    Edible,
+    /// Mineable ore
+    Ore,
+    /// Combustible fuel
+    Fuel,
+    /// Toxic/poisonous
+    Toxic,
+    /// Natural stone/mineral
+    Mineral,
+    /// Manufactured/refined
+    Refined,
 }
 
 /// Definition of a material's properties
@@ -86,6 +134,20 @@ pub struct MaterialDef {
     /// Can support other solid pixels
     pub structural: bool,
     pub conducts_electricity: bool,
+
+    // Creature interaction properties (Phase 5)
+    /// Food value when consumed (0-100 calories)
+    pub nutritional_value: Option<f32>,
+    /// Poison damage per second when consumed
+    pub toxicity: Option<f32>,
+    /// Mining speed multiplier (1.0 = normal, 2.0 = twice as hard)
+    pub hardness_multiplier: f32,
+    /// Maximum weight this material can support before collapse
+    pub structural_strength: Option<f32>,
+    /// Energy released when burned (for smelting/cooking)
+    pub fuel_value: Option<f32>,
+    /// Material category tags
+    pub tags: Vec<MaterialTag>,
 }
 
 impl Default for MaterialDef {
@@ -112,6 +174,12 @@ impl Default for MaterialDef {
             flammable: false,
             structural: false,
             conducts_electricity: false,
+            nutritional_value: None,
+            toxicity: None,
+            hardness_multiplier: 1.0,
+            structural_strength: None,
+            fuel_value: None,
+            tags: Vec::new(),
         }
     }
 }
@@ -198,8 +266,10 @@ impl Materials {
             structural: true,
             flammable: true,
             ignition_temp: Some(300.0),
-            burns_to: Some(MaterialId::AIR), // TODO: Ash material
+            burns_to: Some(MaterialId::ASH),
             burn_rate: 0.02,
+            fuel_value: Some(15.0),
+            tags: vec![MaterialTag::Organic, MaterialTag::Fuel],
             ..Default::default()
         });
         
@@ -335,6 +405,297 @@ impl Materials {
             hardness: None, // None = indestructible
             structural: true,
             heat_conductivity: 0.1,
+            ..Default::default()
+        });
+
+        // ===== PHASE 5: NEW MATERIALS =====
+
+        // ORGANIC MATERIALS
+
+        // Dirt - mineable ground material
+        self.register(MaterialDef {
+            id: MaterialId::DIRT,
+            name: "dirt".to_string(),
+            material_type: MaterialType::Powder,
+            color: [101, 67, 33, 255], // Brown
+            density: 1.3,
+            hardness: Some(1),
+            friction: 0.4,
+            hardness_multiplier: 0.5, // Easy to mine
+            tags: vec![MaterialTag::Organic, MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Plant Matter - grows, provides food
+        self.register(MaterialDef {
+            id: MaterialId::PLANT_MATTER,
+            name: "plant_matter".to_string(),
+            material_type: MaterialType::Solid,
+            color: [34, 139, 34, 255], // Forest green
+            density: 0.4,
+            hardness: Some(1),
+            flammable: true,
+            ignition_temp: Some(250.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.03,
+            nutritional_value: Some(10.0), // Low calories
+            fuel_value: Some(5.0),
+            hardness_multiplier: 0.3, // Very easy to harvest
+            tags: vec![MaterialTag::Organic, MaterialTag::Edible, MaterialTag::Fuel],
+            ..Default::default()
+        });
+
+        // Fruit - high nutrition
+        self.register(MaterialDef {
+            id: MaterialId::FRUIT,
+            name: "fruit".to_string(),
+            material_type: MaterialType::Powder,
+            color: [255, 69, 0, 255], // Red-orange
+            density: 0.6,
+            hardness: Some(1),
+            friction: 0.2,
+            nutritional_value: Some(40.0), // High calories
+            hardness_multiplier: 0.1, // Almost instant harvest
+            tags: vec![MaterialTag::Organic, MaterialTag::Edible],
+            ..Default::default()
+        });
+
+        // Flesh - creature material, high nutrition but toxic when rotten
+        self.register(MaterialDef {
+            id: MaterialId::FLESH,
+            name: "flesh".to_string(),
+            material_type: MaterialType::Powder,
+            color: [205, 92, 92, 255], // Indian red
+            density: 1.0,
+            hardness: Some(1),
+            friction: 0.3,
+            nutritional_value: Some(50.0), // Very high calories
+            flammable: true,
+            ignition_temp: Some(200.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.04,
+            tags: vec![MaterialTag::Organic, MaterialTag::Edible],
+            ..Default::default()
+        });
+
+        // Bone - structural organic material
+        self.register(MaterialDef {
+            id: MaterialId::BONE,
+            name: "bone".to_string(),
+            material_type: MaterialType::Solid,
+            color: [245, 245, 220, 255], // Beige
+            density: 1.8,
+            hardness: Some(4),
+            structural: true,
+            structural_strength: Some(50.0),
+            hardness_multiplier: 1.5,
+            tags: vec![MaterialTag::Organic],
+            ..Default::default()
+        });
+
+        // Ash - burn product, can be fertilizer
+        self.register(MaterialDef {
+            id: MaterialId::ASH,
+            name: "ash".to_string(),
+            material_type: MaterialType::Powder,
+            color: [128, 128, 128, 200], // Gray, slightly transparent
+            density: 0.5,
+            hardness: Some(1),
+            friction: 0.1, // Very slippery
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // ORE MATERIALS
+
+        // Coal Ore - fuel source
+        self.register(MaterialDef {
+            id: MaterialId::COAL_ORE,
+            name: "coal_ore".to_string(),
+            material_type: MaterialType::Solid,
+            color: [25, 25, 25, 255], // Almost black
+            density: 2.3,
+            hardness: Some(3),
+            structural: true,
+            flammable: true,
+            ignition_temp: Some(400.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.01,
+            fuel_value: Some(30.0), // High energy
+            hardness_multiplier: 1.2,
+            tags: vec![MaterialTag::Ore, MaterialTag::Fuel, MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Iron Ore - common metal ore
+        self.register(MaterialDef {
+            id: MaterialId::IRON_ORE,
+            name: "iron_ore".to_string(),
+            material_type: MaterialType::Solid,
+            color: [139, 90, 90, 255], // Rusty brown
+            density: 5.0,
+            hardness: Some(5),
+            structural: true,
+            melting_point: Some(1200.0),
+            melts_to: Some(MaterialId::IRON_INGOT),
+            hardness_multiplier: 2.0, // Harder to mine
+            tags: vec![MaterialTag::Ore, MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Copper Ore - conductive metal ore
+        self.register(MaterialDef {
+            id: MaterialId::COPPER_ORE,
+            name: "copper_ore".to_string(),
+            material_type: MaterialType::Solid,
+            color: [184, 115, 51, 255], // Copper brown
+            density: 4.5,
+            hardness: Some(4),
+            structural: true,
+            melting_point: Some(1000.0),
+            melts_to: Some(MaterialId::COPPER_INGOT),
+            hardness_multiplier: 1.8,
+            conducts_electricity: true,
+            tags: vec![MaterialTag::Ore, MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Gold Ore - valuable rare ore
+        self.register(MaterialDef {
+            id: MaterialId::GOLD_ORE,
+            name: "gold_ore".to_string(),
+            material_type: MaterialType::Solid,
+            color: [255, 215, 0, 255], // Gold
+            density: 8.0,
+            hardness: Some(4),
+            structural: true,
+            melting_point: Some(1064.0),
+            melts_to: Some(MaterialId::COPPER_INGOT), // FIXME: Should be gold_ingot
+            hardness_multiplier: 1.5,
+            conducts_electricity: true,
+            tags: vec![MaterialTag::Ore, MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // REFINED MATERIALS
+
+        // Copper Ingot - smelted copper
+        self.register(MaterialDef {
+            id: MaterialId::COPPER_INGOT,
+            name: "copper_ingot".to_string(),
+            material_type: MaterialType::Solid,
+            color: [205, 127, 50, 255], // Bronze
+            density: 8.9,
+            hardness: Some(6),
+            structural: true,
+            melting_point: Some(1084.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.9,
+            conducts_electricity: true,
+            structural_strength: Some(100.0),
+            hardness_multiplier: 2.5,
+            tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
+            ..Default::default()
+        });
+
+        // Iron Ingot - smelted iron
+        self.register(MaterialDef {
+            id: MaterialId::IRON_INGOT,
+            name: "iron_ingot".to_string(),
+            material_type: MaterialType::Solid,
+            color: [169, 169, 169, 255], // Dark gray
+            density: 7.8,
+            hardness: Some(7),
+            structural: true,
+            melting_point: Some(1538.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.8,
+            conducts_electricity: true,
+            structural_strength: Some(150.0),
+            hardness_multiplier: 3.0,
+            tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
+            ..Default::default()
+        });
+
+        // Bronze Ingot - copper + tin alloy (using copper for now)
+        self.register(MaterialDef {
+            id: MaterialId::BRONZE_INGOT,
+            name: "bronze_ingot".to_string(),
+            material_type: MaterialType::Solid,
+            color: [140, 120, 83, 255], // Bronze brown
+            density: 8.7,
+            hardness: Some(6),
+            structural: true,
+            melting_point: Some(950.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.7,
+            structural_strength: Some(120.0),
+            hardness_multiplier: 2.8,
+            tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
+            ..Default::default()
+        });
+
+        // Steel Ingot - iron + carbon alloy
+        self.register(MaterialDef {
+            id: MaterialId::STEEL_INGOT,
+            name: "steel_ingot".to_string(),
+            material_type: MaterialType::Solid,
+            color: [192, 192, 192, 255], // Silver
+            density: 7.85,
+            hardness: Some(8),
+            structural: true,
+            melting_point: Some(1370.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.75,
+            structural_strength: Some(200.0),
+            hardness_multiplier: 3.5, // Very hard to mine
+            tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
+            ..Default::default()
+        });
+
+        // SPECIAL MATERIALS
+
+        // Gunpowder - explosive powder
+        self.register(MaterialDef {
+            id: MaterialId::GUNPOWDER,
+            name: "gunpowder".to_string(),
+            material_type: MaterialType::Powder,
+            color: [64, 64, 64, 255], // Dark gray
+            density: 1.7,
+            hardness: Some(1),
+            friction: 0.2,
+            flammable: true,
+            ignition_temp: Some(150.0),
+            burns_to: Some(MaterialId::SMOKE),
+            burn_rate: 0.9, // Burns VERY fast (explosion)
+            fuel_value: Some(50.0), // High energy
+            tags: vec![MaterialTag::Fuel],
+            ..Default::default()
+        });
+
+        // Poison Gas - toxic gas
+        self.register(MaterialDef {
+            id: MaterialId::POISON_GAS,
+            name: "poison_gas".to_string(),
+            material_type: MaterialType::Gas,
+            color: [50, 205, 50, 150], // Lime green, transparent
+            density: 0.002,
+            hardness: None,
+            toxicity: Some(5.0), // 5 damage per second
+            tags: vec![MaterialTag::Toxic],
+            ..Default::default()
+        });
+
+        // Fertilizer - enhances plant growth
+        self.register(MaterialDef {
+            id: MaterialId::FERTILIZER,
+            name: "fertilizer".to_string(),
+            material_type: MaterialType::Powder,
+            color: [101, 67, 33, 255], // Dark brown
+            density: 0.9,
+            hardness: Some(1),
+            friction: 0.3,
+            tags: vec![MaterialTag::Organic],
             ..Default::default()
         });
     }

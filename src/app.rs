@@ -367,8 +367,9 @@ impl App {
                     const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
                     if matches!(game_mode, GameMode::PersistentWorld) {
                         if last_autosave.elapsed() >= AUTOSAVE_INTERVAL {
-                            world.save_dirty_chunks();
+                            world.save_all_dirty_chunks(); // Save chunks AND player data
                             last_autosave = Instant::now();
+                            log::info!("Auto-saved world and player data");
                         }
                     }
 

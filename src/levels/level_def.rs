@@ -118,6 +118,30 @@ impl LevelManager {
                 description: "Remove the critical support - massive structure stress test",
                 generator: generate_level_16_stress,
             },
+            LevelDef {
+                id: 16,
+                name: "Survival Tutorial",
+                description: "Practice mining (right-click), building (left-click), and inventory (I key)",
+                generator: generate_level_17_survival,
+            },
+            LevelDef {
+                id: 17,
+                name: "Material Showcase",
+                description: "Phase 5 materials: organics, ores, refined metals, and special materials",
+                generator: generate_level_18_material_showcase,
+            },
+            LevelDef {
+                id: 18,
+                name: "Alchemy Lab",
+                description: "Smelting ores, acid reactions, gunpowder explosions, and organic cooking",
+                generator: generate_level_19_alchemy_lab,
+            },
+            LevelDef {
+                id: 19,
+                name: "Crafting Workshop",
+                description: "Plant growth, composting ash to fertilizer, erosion, and decay chains",
+                generator: generate_level_20_crafting_workshop,
+            },
         ];
 
         Self {

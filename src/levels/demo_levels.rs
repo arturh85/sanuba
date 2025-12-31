@@ -901,3 +901,715 @@ pub fn generate_level_16_stress(world: &mut World) {
         }
     }
 }
+
+/// Level 17: Survival Tutorial
+/// Beginner-friendly environment demonstrating mining, inventory, and placement mechanics
+pub fn generate_level_17_survival(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK FOUNDATION (required for structural integrity)
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Main survival area
+            if cx == 0 && cy == 0 {
+                // Stone ground layer (easily mineable)
+                for x in 0..CHUNK_SIZE {
+                    for y in 0..8 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Left side: Resource deposits
+                // Sand pile (easy powder mining practice)
+                for x in 4..16 {
+                    for y in 8..(8 + (x - 4) / 2).min(20) {
+                        chunk.set_material(x, y, MaterialId::SAND);
+                    }
+                }
+
+                // Stone wall (solid mining practice)
+                for x in 18..24 {
+                    for y in 8..28 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Center: Open building area (flat platform)
+                for x in 26..38 {
+                    for y in 8..10 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Right side: More resources
+                // Small water pool (liquid practice, future water source)
+                for x in 40..52 {
+                    for y in 8..14 {
+                        chunk.set_material(x, y, MaterialId::WATER);
+                    }
+                }
+
+                // Wood deposit (future crafting material)
+                for x in 54..60 {
+                    for y in 8..24 {
+                        chunk.set_material(x, y, MaterialId::WOOD);
+                    }
+                }
+            }
+
+            // LEFT CHUNK - Additional mining area
+            if cx == -1 && cy == 0 {
+                // Ground
+                for x in 0..CHUNK_SIZE {
+                    for y in 0..6 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Mixed material wall (variety practice)
+                for y in 6..32 {
+                    for x in 48..CHUNK_SIZE {
+                        if y < 12 {
+                            chunk.set_material(x, y, MaterialId::SAND);
+                        } else if y < 20 {
+                            chunk.set_material(x, y, MaterialId::STONE);
+                        } else {
+                            chunk.set_material(x, y, MaterialId::WOOD);
+                        }
+                    }
+                }
+            }
+
+            // RIGHT CHUNK - Extra building space
+            if cx == 1 && cy == 0 {
+                // Ground
+                for x in 0..CHUNK_SIZE {
+                    for y in 0..6 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Simple shelter outline (can be modified)
+                // Floor
+                for x in 8..24 {
+                    chunk.set_material(x, 6, MaterialId::STONE);
+                }
+                // Left wall
+                for y in 7..16 {
+                    chunk.set_material(8, y, MaterialId::STONE);
+                }
+                // Right wall
+                for y in 7..16 {
+                    chunk.set_material(23, y, MaterialId::STONE);
+                }
+                // Roof
+                for x in 8..24 {
+                    chunk.set_material(x, 16, MaterialId::STONE);
+                }
+            }
+
+            // UPPER CHUNKS - Sky area for building upward
+            // (mostly empty, allowing player to build towers)
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 18: Phase 5 Material Showcase
+/// Display all new materials from Phase 5 (organics, ores, refined, special)
+pub fn generate_level_18_material_showcase(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK FOUNDATION
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Material display chambers
+            if cx == 0 && cy == 0 {
+                // Stone base
+                for y in 0..6 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Create vertical dividers for chambers
+                for y in 6..56 {
+                    for x in (0..CHUNK_SIZE).step_by(8) {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Chamber 1: ORGANIC MATERIALS (x: 1-7)
+                // Dirt
+                for x in 1..4 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::DIRT);
+                    }
+                }
+                // Plant Matter
+                for x in 4..7 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::PLANT_MATTER);
+                    }
+                }
+                // Fruit
+                for x in 1..4 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::FRUIT);
+                    }
+                }
+                // Flesh
+                for x in 4..7 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::FLESH);
+                    }
+                }
+                // Bone
+                for x in 1..4 {
+                    for y in 22..30 {
+                        chunk.set_material(x, y, MaterialId::BONE);
+                    }
+                }
+                // Ash
+                for x in 4..7 {
+                    for y in 22..30 {
+                        chunk.set_material(x, y, MaterialId::ASH);
+                    }
+                }
+
+                // Chamber 2: ORE MATERIALS (x: 9-15)
+                // Coal Ore
+                for x in 9..12 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::COAL_ORE);
+                    }
+                }
+                // Iron Ore
+                for x in 12..15 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::IRON_ORE);
+                    }
+                }
+                // Copper Ore
+                for x in 9..12 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::COPPER_ORE);
+                    }
+                }
+                // Gold Ore
+                for x in 12..15 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::GOLD_ORE);
+                    }
+                }
+
+                // Chamber 3: REFINED MATERIALS (x: 17-23)
+                // Copper Ingot
+                for x in 17..20 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::COPPER_INGOT);
+                    }
+                }
+                // Iron Ingot
+                for x in 20..23 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::IRON_INGOT);
+                    }
+                }
+                // Bronze Ingot
+                for x in 17..20 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::BRONZE_INGOT);
+                    }
+                }
+                // Steel Ingot
+                for x in 20..23 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::STEEL_INGOT);
+                    }
+                }
+
+                // Chamber 4: SPECIAL MATERIALS (x: 25-31)
+                // Gunpowder
+                for x in 25..28 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::GUNPOWDER);
+                    }
+                }
+                // Poison Gas
+                for x in 28..31 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::POISON_GAS);
+                    }
+                }
+                // Fertilizer
+                for x in 25..28 {
+                    for y in 14..22 {
+                        chunk.set_material(x, y, MaterialId::FERTILIZER);
+                    }
+                }
+
+                // Chamber 5: EXISTING MATERIALS FOR COMPARISON (x: 33-63)
+                // Show a few existing materials for context
+                for x in 33..36 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+                for x in 36..39 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::SAND);
+                    }
+                }
+                for x in 39..42 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::WATER);
+                    }
+                }
+                for x in 42..45 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::WOOD);
+                    }
+                }
+                for x in 45..48 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::FIRE);
+                    }
+                }
+                for x in 48..51 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::LAVA);
+                    }
+                }
+                for x in 51..54 {
+                    for y in 6..14 {
+                        chunk.set_material(x, y, MaterialId::METAL);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 19: Alchemy Lab
+/// Demonstrates smelting, chemical reactions, and explosives
+pub fn generate_level_19_alchemy_lab(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK FOUNDATION
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Alchemy demonstrations
+            if cx == 0 && cy == 0 {
+                // Stone base
+                for y in 0..4 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // === SMELTING FURNACES (left side) ===
+
+                // Furnace 1: Iron Ore Smelting (x: 4-12)
+                // Stone chamber
+                for x in 4..12 {
+                    chunk.set_material(x, 4, MaterialId::STONE);
+                    chunk.set_material(x, 20, MaterialId::STONE);
+                }
+                for y in 4..21 {
+                    chunk.set_material(4, y, MaterialId::STONE);
+                    chunk.set_material(12, y, MaterialId::STONE);
+                }
+                // Iron ore at top
+                for x in 6..10 {
+                    for y in 16..20 {
+                        chunk.set_material(x, y, MaterialId::IRON_ORE);
+                    }
+                }
+                // Fire at bottom (will smelt ore)
+                for x in 6..10 {
+                    for y in 5..8 {
+                        chunk.set_material(x, y, MaterialId::FIRE);
+                    }
+                }
+
+                // Furnace 2: Copper Ore Smelting (x: 14-22)
+                for x in 14..22 {
+                    chunk.set_material(x, 4, MaterialId::STONE);
+                    chunk.set_material(x, 20, MaterialId::STONE);
+                }
+                for y in 4..21 {
+                    chunk.set_material(14, y, MaterialId::STONE);
+                    chunk.set_material(22, y, MaterialId::STONE);
+                }
+                // Copper ore
+                for x in 16..20 {
+                    for y in 16..20 {
+                        chunk.set_material(x, y, MaterialId::COPPER_ORE);
+                    }
+                }
+                // Fire
+                for x in 16..20 {
+                    for y in 5..8 {
+                        chunk.set_material(x, y, MaterialId::FIRE);
+                    }
+                }
+
+                // === ACID REACTIONS (middle) ===
+
+                // Acid chamber (x: 26-34)
+                // Container
+                for x in 26..34 {
+                    chunk.set_material(x, 4, MaterialId::STONE);
+                }
+                for y in 4..16 {
+                    chunk.set_material(26, y, MaterialId::STONE);
+                    chunk.set_material(34, y, MaterialId::STONE);
+                }
+                // Acid pool
+                for x in 27..33 {
+                    for y in 5..10 {
+                        chunk.set_material(x, y, MaterialId::ACID);
+                    }
+                }
+                // Metal to corrode (drop in)
+                for x in 28..32 {
+                    for y in 12..14 {
+                        chunk.set_material(x, y, MaterialId::METAL);
+                    }
+                }
+
+                // === EXPLOSIVE DEMONSTRATION (right side) ===
+
+                // Explosion chamber (x: 38-54)
+                // Safe stone walls
+                for x in 38..54 {
+                    chunk.set_material(x, 4, MaterialId::STONE);
+                    chunk.set_material(x, 30, MaterialId::STONE);
+                }
+                for y in 4..31 {
+                    chunk.set_material(38, y, MaterialId::STONE);
+                    chunk.set_material(54, y, MaterialId::STONE);
+                }
+
+                // Gunpowder pile
+                for x in 42..50 {
+                    for y in 5..12 {
+                        chunk.set_material(x, y, MaterialId::GUNPOWDER);
+                    }
+                }
+
+                // Fuse (wood leading to fire)
+                for x in 50..54 {
+                    chunk.set_material(x, 11, MaterialId::WOOD);
+                }
+                // Fire source (ignites fuse)
+                chunk.set_material(54, 11, MaterialId::FIRE);
+                chunk.set_material(54, 12, MaterialId::FIRE);
+
+                // === ORGANIC COOKING (bottom left) ===
+
+                // Cooking pit (x: 4-12, y: 24-32)
+                for x in 4..12 {
+                    chunk.set_material(x, 24, MaterialId::STONE);
+                }
+                for y in 24..33 {
+                    chunk.set_material(4, y, MaterialId::STONE);
+                    chunk.set_material(12, y, MaterialId::STONE);
+                }
+                // Fire
+                for x in 6..10 {
+                    for y in 25..27 {
+                        chunk.set_material(x, y, MaterialId::FIRE);
+                    }
+                }
+                // Flesh to cook
+                for x in 6..10 {
+                    for y in 28..30 {
+                        chunk.set_material(x, y, MaterialId::FLESH);
+                    }
+                }
+
+                // === GAS DEMONSTRATION (bottom middle) ===
+
+                // Poison gas chamber (x: 16-24, y: 24-32)
+                for x in 16..24 {
+                    chunk.set_material(x, 24, MaterialId::STONE);
+                }
+                for y in 24..33 {
+                    chunk.set_material(16, y, MaterialId::STONE);
+                    chunk.set_material(24, y, MaterialId::STONE);
+                }
+                // Poison gas
+                for x in 18..22 {
+                    for y in 25..30 {
+                        chunk.set_material(x, y, MaterialId::POISON_GAS);
+                    }
+                }
+                // Water to absorb it
+                for x in 18..22 {
+                    chunk.set_material(x, 30, MaterialId::WATER);
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}
+
+/// Level 20: Crafting Workshop
+/// Demonstrates growth, composting, and material transformation chains
+pub fn generate_level_20_crafting_workshop(world: &mut World) {
+    world.clear_all_chunks();
+
+    for cy in -2..=2 {
+        for cx in -2..=2 {
+            let mut chunk = Chunk::new(cx, cy);
+
+            // BEDROCK FOUNDATION
+            if cy == -2 {
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            } else if cy == -1 {
+                for y in 0..8 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::BEDROCK);
+                    }
+                }
+            }
+
+            // CENTER CHUNK - Crafting demonstrations
+            if cx == 0 && cy == 0 {
+                // Stone floor
+                for y in 0..6 {
+                    for x in 0..CHUNK_SIZE {
+                        chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // === PLANT FARM (left) ===
+
+                // Farm plot 1: Plant + Water (x: 4-14)
+                // Soil base
+                for x in 4..14 {
+                    for y in 6..8 {
+                        chunk.set_material(x, y, MaterialId::DIRT);
+                    }
+                }
+                // Plant matter
+                for x in 5..13 {
+                    for y in 8..12 {
+                        if (x + y) % 3 == 0 {
+                            chunk.set_material(x, y, MaterialId::PLANT_MATTER);
+                        }
+                    }
+                }
+                // Water source (irrigation)
+                for x in 4..14 {
+                    chunk.set_material(x, 12, MaterialId::WATER);
+                    chunk.set_material(x, 13, MaterialId::WATER);
+                }
+
+                // Farm plot 2: With Fertilizer (x: 16-26)
+                // Soil
+                for x in 16..26 {
+                    for y in 6..8 {
+                        chunk.set_material(x, y, MaterialId::DIRT);
+                    }
+                }
+                // Plant matter
+                for x in 17..25 {
+                    for y in 8..12 {
+                        if (x + y) % 3 == 0 {
+                            chunk.set_material(x, y, MaterialId::PLANT_MATTER);
+                        }
+                    }
+                }
+                // Fertilizer mixed with soil
+                for x in 16..26 {
+                    if x % 2 == 0 {
+                        chunk.set_material(x, 7, MaterialId::FERTILIZER);
+                    }
+                }
+                // Water
+                for x in 16..26 {
+                    chunk.set_material(x, 12, MaterialId::WATER);
+                }
+
+                // === COMPOSTING STATION (middle) ===
+
+                // Composter (x: 30-38, y: 6-18)
+                // Stone container
+                for x in 30..38 {
+                    chunk.set_material(x, 6, MaterialId::STONE);
+                }
+                for y in 6..19 {
+                    chunk.set_material(30, y, MaterialId::STONE);
+                    chunk.set_material(38, y, MaterialId::STONE);
+                }
+
+                // Ash (to be composted)
+                for x in 32..36 {
+                    for y in 7..10 {
+                        chunk.set_material(x, y, MaterialId::ASH);
+                    }
+                }
+
+                // Water (converts ash to fertilizer)
+                for x in 32..36 {
+                    for y in 10..14 {
+                        chunk.set_material(x, y, MaterialId::WATER);
+                    }
+                }
+
+                // Output chamber for fertilizer (below)
+                for x in 31..37 {
+                    chunk.set_material(x, 15, MaterialId::AIR);
+                    chunk.set_material(x, 16, MaterialId::AIR);
+                }
+
+                // === EROSION DEMONSTRATION (right) ===
+
+                // Dirt pile with water (x: 42-52)
+                // Dirt pyramid
+                for y in 6..20 {
+                    let width = (20 - y) / 2;
+                    for dx in 0..width {
+                        let x = 47 - dx;
+                        if x >= 42 && x < 52 {
+                            chunk.set_material(x, y, MaterialId::DIRT);
+                        }
+                        let x = 47 + dx;
+                        if x >= 42 && x < 52 {
+                            chunk.set_material(x, y, MaterialId::DIRT);
+                        }
+                    }
+                }
+
+                // Water flow at top (erodes dirt to sand)
+                for x in 44..50 {
+                    chunk.set_material(x, 20, MaterialId::WATER);
+                    chunk.set_material(x, 21, MaterialId::WATER);
+                }
+
+                // === DECAY CHAMBER (bottom) ===
+
+                // Decay chamber (x: 6-18, y: 24-36)
+                for x in 6..18 {
+                    chunk.set_material(x, 24, MaterialId::STONE);
+                }
+                for y in 24..37 {
+                    chunk.set_material(6, y, MaterialId::STONE);
+                    chunk.set_material(18, y, MaterialId::STONE);
+                }
+
+                // Flesh in water (decays to poison gas)
+                for x in 8..16 {
+                    for y in 25..28 {
+                        if (x + y) % 2 == 0 {
+                            chunk.set_material(x, y, MaterialId::FLESH);
+                        } else {
+                            chunk.set_material(x, y, MaterialId::WATER);
+                        }
+                    }
+                }
+                // More water above
+                for x in 8..16 {
+                    for y in 28..32 {
+                        chunk.set_material(x, y, MaterialId::WATER);
+                    }
+                }
+
+                // === FRUIT PRODUCTION (bottom right) ===
+
+                // Fruit tree simulation (x: 44-56, y: 24-40)
+                // Trunk (wood)
+                for y in 24..35 {
+                    chunk.set_material(49, y, MaterialId::WOOD);
+                    chunk.set_material(50, y, MaterialId::WOOD);
+                }
+
+                // Canopy (plant matter)
+                for x in 44..56 {
+                    for y in 35..38 {
+                        if ((x as i32 - 49).abs() + (y as i32 - 36).abs()) <= 5 {
+                            chunk.set_material(x, y, MaterialId::PLANT_MATTER);
+                        }
+                    }
+                }
+
+                // Fruit clusters
+                for x in 46..54 {
+                    for y in 36..38 {
+                        if (x + y) % 4 == 0 {
+                            chunk.set_material(x, y, MaterialId::FRUIT);
+                        }
+                    }
+                }
+
+                // Soil at base
+                for x in 44..56 {
+                    for y in 24..26 {
+                        chunk.set_material(x, y, MaterialId::DIRT);
+                    }
+                }
+            }
+
+            world.add_chunk(chunk);
+        }
+    }
+}

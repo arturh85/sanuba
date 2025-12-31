@@ -880,7 +880,23 @@ impl World {
         let metadata = persistence.load_metadata();
 
         self.generator = WorldGenerator::new(metadata.seed);
-        self.player.position = glam::Vec2::new(metadata.spawn_point.0, metadata.spawn_point.1);
+
+        // Restore player data if it exists, otherwise use spawn point
+        if let Some(saved_player) = metadata.player_data {
+            self.player = saved_player;
+            log::info!("Restored player data: inventory={}/{} slots, health={:.0}/{:.0}, hunger={:.0}/{:.0}",
+                      self.player.inventory.used_slot_count(),
+                      self.player.inventory.max_slots,
+                      self.player.health.current,
+                      self.player.health.max,
+                      self.player.hunger.current,
+                      self.player.hunger.max);
+        } else {
+            // New world - set player at spawn point
+            self.player.position = glam::Vec2::new(metadata.spawn_point.0, metadata.spawn_point.1);
+            log::info!("New world - player spawned at {:?}", self.player.position);
+        }
+
         self.persistence = Some(persistence);
 
         // Load initial chunks around spawn
@@ -996,7 +1012,7 @@ impl World {
     pub fn save_all_dirty_chunks(&mut self) {
         self.save_dirty_chunks();
 
-        // Also save metadata
+        // Also save metadata with player data
         if let Some(persistence) = &self.persistence {
             let metadata = WorldMetadata {
                 version: 1,
@@ -1005,12 +1021,13 @@ impl World {
                 created_at: String::new(), // Preserved from load
                 last_played: chrono::Local::now().to_rfc3339(),
                 play_time_seconds: 0, // TODO: track play time
+                player_data: Some(self.player.clone()), // Save player inventory, health, hunger
             };
 
             if let Err(e) = persistence.save_metadata(&metadata) {
                 log::error!("Failed to save world metadata: {}", e);
             } else {
-                log::info!("Saved world metadata");
+                log::info!("Saved world metadata with player data");
             }
         }
     }
