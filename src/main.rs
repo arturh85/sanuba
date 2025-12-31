@@ -1,9 +1,32 @@
+use clap::Parser;
 use sunaba::App;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Delete existing world and generate fresh
+    #[arg(long)]
+    regenerate: bool,
+}
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+
+    // Parse command-line arguments
+    let args = Args::parse();
+
+    // Handle --regenerate flag
+    if args.regenerate {
+        log::info!("--regenerate flag detected, deleting existing world");
+        let world_dir = PathBuf::from("worlds/default");
+        if world_dir.exists() {
+            std::fs::remove_dir_all(&world_dir)?;
+            log::info!("Deleted world directory: {:?}", world_dir);
+        }
+    }
+
     log::info!("Starting Sunaba");
-    
     pollster::block_on(run())
 }
 

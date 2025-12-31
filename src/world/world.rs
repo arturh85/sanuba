@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use glam::IVec2;
 
 use super::{Chunk, Pixel, CHUNK_SIZE, pixel_flags};
+use super::generation::WorldGenerator;
+use super::persistence::{ChunkPersistence, WorldMetadata};
 use crate::simulation::{
     Materials, MaterialId, MaterialType,
     TemperatureSimulator, StateChangeSystem, ReactionRegistry,
@@ -40,6 +42,15 @@ pub struct World {
 
     /// Simulation time accumulator
     time_accumulator: f32,
+
+    /// Chunk persistence manager (None for demo levels)
+    persistence: Option<ChunkPersistence>,
+
+    /// World generator for new chunks
+    generator: WorldGenerator,
+
+    /// Maximum number of chunks to keep loaded in memory
+    loaded_chunk_limit: usize,
 }
 
 impl World {
@@ -54,6 +65,9 @@ impl World {
             player_pos: glam::Vec2::new(0.0, 100.0),
             active_chunks: Vec::new(),
             time_accumulator: 0.0,
+            persistence: None,
+            generator: WorldGenerator::new(42), // Default seed
+            loaded_chunk_limit: 100,
         };
 
         // Initialize with some test chunks
@@ -178,7 +192,10 @@ impl World {
     /// Spawn material at world coordinates with circular brush
     pub fn spawn_material(&mut self, world_x: i32, world_y: i32, material_id: u16) {
         let material_name = &self.materials.get(material_id).name;
-        log::info!("Spawning {} at world ({}, {})", material_name, world_x, world_y);
+        let (chunk_pos, _, _) = Self::world_to_chunk_coords(world_x, world_y);
+
+        log::info!("[SPAWN] Spawning {} at world ({}, {}) in chunk ({}, {})",
+                   material_name, world_x, world_y, chunk_pos.x, chunk_pos.y);
 
         let mut spawned = 0;
         for dy in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
@@ -192,7 +209,13 @@ impl World {
                 }
             }
         }
-        log::debug!("  → Spawned {} pixels", spawned);
+        log::debug!("[SPAWN] Spawned {} pixels total", spawned);
+
+        // Log chunk dirty status after spawning
+        if let Some(chunk) = self.chunks.get(&chunk_pos) {
+            log::debug!("[SPAWN] Chunk ({}, {}) dirty: {}, non-air pixels: {}",
+                       chunk_pos.x, chunk_pos.y, chunk.dirty, chunk.count_non_air());
+        }
     }
 
     /// Update simulation
@@ -545,7 +568,16 @@ impl World {
         // Set the new pixel
         let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
         if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+            let old_material_id = chunk.get_material(local_x, local_y);
             chunk.set_material(local_x, local_y, material_id);
+
+            // Log only if actually changing something (not just setting same material)
+            if old_material_id != material_id {
+                let material_name = &self.materials.get(material_id).name;
+                log::trace!("[MODIFY] Chunk ({}, {}) at local ({}, {}) world ({}, {}) set to {} (was {})",
+                           chunk_pos.x, chunk_pos.y, local_x, local_y, world_x, world_y,
+                           material_name, old_material_id);
+            }
         } else {
             log::warn!("set_pixel: chunk {:?} not loaded (world: {}, {})",
                       chunk_pos, world_x, world_y);
@@ -737,6 +769,152 @@ impl World {
         // Add physics collider for bedrock chunks
         if has_bedrock {
             self.add_bedrock_collider(pos.x, pos.y);
+        }
+    }
+
+    /// Initialize persistent world (load or generate)
+    pub fn load_persistent_world(&mut self) {
+        // Clear any existing chunks (from test world generation)
+        self.clear_all_chunks();
+
+        let persistence = ChunkPersistence::new("default")
+            .expect("Failed to create chunk persistence");
+
+        let metadata = persistence.load_metadata();
+
+        self.generator = WorldGenerator::new(metadata.seed);
+        self.player_pos = glam::Vec2::new(metadata.spawn_point.0, metadata.spawn_point.1);
+        self.persistence = Some(persistence);
+
+        // Load initial chunks around spawn
+        self.load_chunks_around_player();
+
+        log::info!("Loaded persistent world (seed: {})", metadata.seed);
+    }
+
+    /// Load chunks within active radius of player
+    fn load_chunks_around_player(&mut self) {
+        let player_chunk_x = (self.player_pos.x as i32).div_euclid(CHUNK_SIZE as i32);
+        let player_chunk_y = (self.player_pos.y as i32).div_euclid(CHUNK_SIZE as i32);
+
+        for cy in (player_chunk_y - 2)..=(player_chunk_y + 2) {
+            for cx in (player_chunk_x - 2)..=(player_chunk_x + 2) {
+                self.load_or_generate_chunk(cx, cy);
+            }
+        }
+    }
+
+    /// Load or generate a chunk at the given coordinates
+    fn load_or_generate_chunk(&mut self, chunk_x: i32, chunk_y: i32) {
+        let pos = IVec2::new(chunk_x, chunk_y);
+
+        if self.chunks.contains_key(&pos) {
+            log::trace!("[LOAD] Chunk ({}, {}) already loaded, skipping", chunk_x, chunk_y);
+            return; // Already loaded
+        }
+
+        let chunk = if let Some(persistence) = &self.persistence {
+            log::debug!("[LOAD] Requesting chunk ({}, {}) from persistence", chunk_x, chunk_y);
+            persistence.load_chunk(chunk_x, chunk_y, &self.generator)
+        } else {
+            // Demo mode: use generator without saving
+            log::debug!("[GEN] Demo mode: generating chunk ({}, {}) without persistence", chunk_x, chunk_y);
+            self.generator.generate_chunk(chunk_x, chunk_y)
+        };
+
+        let non_air = chunk.count_non_air();
+        log::info!("[LOAD] Adding chunk ({}, {}) to world - {} non-air pixels", chunk_x, chunk_y, non_air);
+
+        self.add_chunk(chunk);
+
+        // LRU eviction if too many chunks loaded
+        if self.chunks.len() > self.loaded_chunk_limit {
+            self.evict_distant_chunks();
+        }
+    }
+
+    /// Save and unload chunks far from player
+    fn evict_distant_chunks(&mut self) {
+        let player_chunk_x = (self.player_pos.x as i32).div_euclid(CHUNK_SIZE as i32);
+        let player_chunk_y = (self.player_pos.y as i32).div_euclid(CHUNK_SIZE as i32);
+
+        let mut to_evict = Vec::new();
+
+        for (pos, _chunk) in &self.chunks {
+            let dist_x = (pos.x - player_chunk_x).abs();
+            let dist_y = (pos.y - player_chunk_y).abs();
+
+            // Unload chunks >3 chunks away
+            if dist_x > 3 || dist_y > 3 {
+                to_evict.push(*pos);
+            }
+        }
+
+        for pos in to_evict {
+            if let Some(chunk) = self.chunks.remove(&pos) {
+                if chunk.dirty {
+                    if let Some(persistence) = &self.persistence {
+                        if let Err(e) = persistence.save_chunk(&chunk) {
+                            log::error!("Failed to save chunk ({}, {}): {}", pos.x, pos.y, e);
+                        } else {
+                            log::debug!("Saved and evicted chunk ({}, {})", pos.x, pos.y);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Save all dirty chunks (periodic auto-save)
+    pub fn save_dirty_chunks(&mut self) {
+        if let Some(persistence) = &self.persistence {
+            let mut saved_count = 0;
+            let total_dirty = self.chunks.values().filter(|c| c.dirty).count();
+
+            if total_dirty > 0 {
+                log::debug!("[SAVE] Starting auto-save of {} dirty chunks", total_dirty);
+            }
+
+            for chunk in self.chunks.values_mut() {
+                if chunk.dirty {
+                    let non_air = chunk.count_non_air();
+                    log::debug!("[SAVE] Saving dirty chunk ({}, {}) - {} non-air pixels", chunk.x, chunk.y, non_air);
+
+                    if let Err(e) = persistence.save_chunk(chunk) {
+                        log::error!("[SAVE] Failed to save chunk ({}, {}): {}", chunk.x, chunk.y, e);
+                    } else {
+                        chunk.dirty = false;
+                        saved_count += 1;
+                    }
+                }
+            }
+
+            if saved_count > 0 {
+                log::info!("[SAVE] Auto-saved {} dirty chunks", saved_count);
+            }
+        }
+    }
+
+    /// Save all chunks and metadata (manual save)
+    pub fn save_all_dirty_chunks(&mut self) {
+        self.save_dirty_chunks();
+
+        // Also save metadata
+        if let Some(persistence) = &self.persistence {
+            let metadata = WorldMetadata {
+                version: 1,
+                seed: self.generator.seed,
+                spawn_point: (self.player_pos.x, self.player_pos.y),
+                created_at: String::new(), // Preserved from load
+                last_played: chrono::Local::now().to_rfc3339(),
+                play_time_seconds: 0, // TODO: track play time
+            };
+
+            if let Err(e) = persistence.save_metadata(&metadata) {
+                log::error!("Failed to save world metadata: {}", e);
+            } else {
+                log::info!("Saved world metadata");
+            }
         }
     }
 

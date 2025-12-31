@@ -178,9 +178,15 @@ sunaba/
 │   │   ├── mod.rs
 │   │   ├── player.rs           # Player entity
 │   │   └── creature.rs         # AI creatures (future)
-│   └── ui/
+│   ├── ui/
+│   │   ├── mod.rs
+│   │   ├── ui_state.rs         # UI state management
+│   │   ├── stats.rs            # Debug stats panel (F1)
+│   │   ├── tooltip.rs          # Mouse hover tooltips
+│   │   └── controls_help.rs    # Help overlay (H key)
+│   └── levels/
 │       ├── mod.rs
-│       └── debug.rs            # Debug overlay (FPS, chunk info)
+│       └── demo_levels.rs      # 16 demo scenarios
 ├── assets/
 │   ├── materials.ron           # Material definitions
 │   └── reactions.ron           # Reaction definitions
@@ -199,7 +205,7 @@ sunaba/
 - [x] Camera following player
 - [x] Camera zoom controls (+/-, mouse wheel)
 
-**Note:** Material registry is fully functional with 13 materials defined in code (air, stone, sand, water, wood, fire, smoke, steam, lava, oil, acid, ice, glass, metal). RON file loading can be added later for modding support but is not blocking progression.
+**Note:** Material registry is fully functional with 15 materials defined in code (air, stone, sand, water, wood, fire, smoke, steam, lava, oil, acid, ice, glass, metal, bedrock). RON file loading can be added later for modding support but is not blocking progression.
 
 **Additional Phase 1 features implemented:**
 - Temperature simulation and state changes (melting, freezing, boiling)
@@ -209,27 +215,71 @@ sunaba/
 - Demo level system with multiple scenarios
 - Temperature overlay visualization
 
-### Phase 2: Materials & Reactions ✅ MOSTLY COMPLETED
+### Phase 2: Materials & Reactions ✅ COMPLETED*
 - [x] Temperature field + diffusion
 - [x] State changes (melt, freeze, boil)
 - [x] Fire propagation
 - [x] Gas behavior (rising, disperses - pressure field exists but not fully utilized)
 - [x] Reaction system
-- [x] More materials (oil, acid, lava, wood, ice, glass, metal - 13 total)
+- [x] More materials (oil, acid, lava, wood, ice, glass, metal, bedrock - 15 total)
 
-**Note:** Basic implementation complete. Pressure field infrastructure exists but gas pressure equalization not yet fully implemented.
+**Note:** *Gas pressure equalization infrastructure exists but is not yet utilized. This is an optional enhancement - basic gas behavior (rising/dispersing) works via cellular automata based on density.
 
-### Phase 3: Structural Integrity
-- [ ] Anchor detection
-- [ ] Disconnection check
-- [ ] Falling debris conversion
-- [ ] rapier2d integration for falling chunks
+### Phase 3: Structural Integrity ✅ COMPLETED
+- [x] Anchor detection
+- [x] Disconnection check
+- [x] Falling debris conversion
+- [x] rapier2d integration for falling chunks
 
-### Phase 4: World Persistence
-- [ ] Chunk serialization (bincode + compression)
-- [ ] Background save/load
-- [ ] World generation (biomes, caves)
-- [ ] Spawn point, respawn logic
+**Implementation Details:**
+- Event-driven structural checking (triggered when structural pixels removed)
+- Bedrock material serves as indestructible anchor
+- Flood-fill algorithm finds disconnected regions (max 64px radius)
+- Size-based debris conversion: <50 pixels → powder particles, ≥50 pixels → rigid bodies
+- Full rapier2d physics integration with debris settling and reconstruction
+- 8 dedicated demo levels (levels 9-16) for stress testing structural mechanics
+
+### Additional Features Implemented
+
+**UI System (egui):**
+- Debug stats panel (F1 key) - FPS, chunk count, temperature stats, activity metrics
+- Tooltip system - shows material name and temperature at cursor position
+- Controls help panel (H key) - keyboard reference overlay
+- UI state management for toggling overlays
+
+**Demo Level System:**
+- 16 demo scenarios showcasing different physics behaviors
+- Level navigation with N (next) and P (previous) keys
+- Levels 1-8: Physics, chemistry, thermal, and reaction demos
+- Levels 9-16: Structural integrity stress tests (bridges, towers, castles, etc.)
+- Each level demonstrates specific emergent behaviors
+
+**Visualization:**
+- Temperature overlay (T key) - GPU-accelerated heat map with color gradient
+  - Blue (frozen) → Cyan (cold) → Green (cool) → Yellow (warm) → Orange (hot) → Red (extreme)
+  - 40% opacity blend over world texture
+- Debris rendering with rotation and translation
+
+**Camera Controls:**
+- Keyboard zoom: +/- or numpad +/-
+- Mouse wheel zoom support
+- Zoom range: 0.001 (max out) to 0.5 (max in)
+- Smooth multiplicative zoom (1.1x per step)
+
+**Input System:**
+- Material selection via number keys (0-9)
+- Material spawning with left mouse click
+- Screen-to-world coordinate conversion
+- egui input filtering (prevents world interaction when UI active)
+
+### Phase 4: World Persistence ✅ COMPLETED
+- [x] Chunk serialization (bincode + lz4 compression)
+- [x] Auto-save on chunk unload + periodic (60s) + manual (F5)
+- [x] Cave generation with multi-octave Perlin noise
+- [x] Spawn point persistence in world metadata
+- [x] Command-line --regenerate flag
+- [x] Game mode separation (Persistent World vs Demo Levels)
+- [x] Level selector UI (L key) with dropdown menu
 
 ### Phase 5: Survival Mechanics
 - [ ] Inventory system
@@ -276,6 +326,30 @@ cargo fmt --check
 
 # Lint
 cargo clippy
+```
+
+## In-Game Controls
+
+```
+# Movement
+WASD           : Move player
+
+# Camera
++/-            : Zoom in/out
+Mouse Wheel    : Zoom in/out
+
+# Material Placement
+0-9            : Select material to place
+Left Click     : Place selected material
+
+# World & Levels
+L              : Open level selector
+F5             : Manual save (persistent world only)
+
+# UI Toggles
+H              : Toggle help panel
+F1             : Toggle debug stats
+T              : Toggle temperature overlay
 ```
 
 ## Key Algorithms

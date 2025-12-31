@@ -87,9 +87,9 @@ impl ControlsHelpState {
                 ui.label("H - Toggle this help");
 
                 ui.add_space(8.0);
-                ui.heading("Levels");
-                ui.label("N - Next level");
-                ui.label("P - Previous level");
+                ui.heading("World");
+                ui.label("L - Level selector");
+                ui.label("F5 - Save world");
 
                 ui.add_space(8.0);
                 ui.separator();
@@ -169,16 +169,16 @@ impl ControlsHelpState {
                 ui.label("H - Toggle this help");
 
                 ui.add_space(8.0);
-                ui.heading("Levels");
-                ui.label("N - Next level");
-                ui.label("P - Previous level");
+                ui.heading("World");
+                ui.label("L - Level selector");
+                ui.label("F5 - Save world");
 
                 ui.add_space(8.0);
                 ui.separator();
                 ui.label(egui::RichText::new(format!("Selected: {}", selected_material.name))
                     .color(egui::Color32::LIGHT_BLUE)
                     .strong());
-                ui.label(egui::RichText::new(format!("Level: {}", level_name))
+                ui.label(egui::RichText::new(format!("Mode: {}", level_name))
                     .color(egui::Color32::LIGHT_GREEN)
                     .strong());
             });

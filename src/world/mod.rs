@@ -2,6 +2,10 @@
 
 mod chunk;
 mod world;
+pub mod generation;
+pub mod persistence;
 
 pub use chunk::{Chunk, Pixel, CHUNK_SIZE, pixel_flags};
 pub use world::World;
+pub use generation::WorldGenerator;
+pub use persistence::{ChunkPersistence, WorldMetadata};

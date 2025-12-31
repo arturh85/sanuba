@@ -136,6 +136,27 @@ impl LevelManager {
         self.levels[self.current_level].description
     }
 
+    /// Get current level index
+    pub fn current_level(&self) -> usize {
+        self.current_level
+    }
+
+    /// Get all level definitions
+    pub fn levels(&self) -> &[LevelDef] {
+        &self.levels
+    }
+
+    /// Load a specific level by ID
+    pub fn load_level(&mut self, level_id: usize, world: &mut World) {
+        if level_id < self.levels.len() {
+            self.current_level = level_id;
+            self.load_current_level(world);
+            log::info!("Loaded level {}: {}", level_id, self.current_level_name());
+        } else {
+            log::warn!("Invalid level ID: {}", level_id);
+        }
+    }
+
     /// Switch to next level
     pub fn next_level(&mut self, world: &mut World) {
         self.current_level = (self.current_level + 1) % self.levels.len();

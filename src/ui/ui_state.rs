@@ -3,6 +3,8 @@
 use super::stats::StatsCollector;
 use super::tooltip::TooltipState;
 use super::controls_help::ControlsHelpState;
+use super::level_selector::LevelSelectorState;
+use std::time::Instant;
 
 /// Central UI state container
 pub struct UiState {
@@ -17,6 +19,12 @@ pub struct UiState {
 
     /// Controls help panel
     pub controls_help: ControlsHelpState,
+
+    /// Level selector panel
+    pub level_selector: LevelSelectorState,
+
+    /// Toast notification (message, shown_at)
+    pub toast_message: Option<(String, Instant)>,
 }
 
 impl UiState {
@@ -26,6 +34,8 @@ impl UiState {
             stats_visible: true,  // Start with stats visible
             tooltip: TooltipState::new(),
             controls_help: ControlsHelpState::new(),
+            level_selector: LevelSelectorState::new(),
+            toast_message: None,
         }
     }
 
@@ -39,19 +49,59 @@ impl UiState {
         self.controls_help.toggle();
     }
 
+    /// Toggle level selector visibility
+    pub fn toggle_level_selector(&mut self) {
+        self.level_selector.toggle();
+    }
+
+    /// Show a toast notification
+    pub fn show_toast(&mut self, message: &str) {
+        self.toast_message = Some((message.to_string(), Instant::now()));
+    }
+
     /// Update tooltip with world data
     pub fn update_tooltip(&mut self, world: &crate::world::World, materials: &crate::simulation::Materials, mouse_world_pos: Option<(i32, i32)>) {
         self.tooltip.update(world, materials, mouse_world_pos);
     }
 
     /// Render all UI elements
-    pub fn render(&mut self, ctx: &egui::Context, cursor_screen_pos: egui::Pos2, selected_material: u16, materials: &crate::simulation::Materials, level_name: &str) {
+    pub fn render(
+        &mut self,
+        ctx: &egui::Context,
+        cursor_screen_pos: egui::Pos2,
+        selected_material: u16,
+        materials: &crate::simulation::Materials,
+        game_mode_desc: &str,
+        in_persistent_world: bool,
+        level_manager: &crate::levels::LevelManager,
+    ) {
         if self.stats_visible {
             self.render_stats(ctx);
         }
 
-        // Render controls help with level name
-        self.controls_help.render_with_level(ctx, selected_material, materials, level_name);
+        // Render controls help with game mode description
+        self.controls_help.render_with_level(ctx, selected_material, materials, game_mode_desc);
+
+        // Render level selector
+        self.level_selector.render(ctx, level_manager, game_mode_desc, in_persistent_world);
+
+        // Render toast notifications
+        if let Some((msg, shown_at)) = &self.toast_message {
+            const TOAST_DURATION_SECS: u64 = 3;
+            if shown_at.elapsed().as_secs() < TOAST_DURATION_SECS {
+                egui::Area::new("toast_notification".into())
+                    .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
+                    .show(ctx, |ui| {
+                        ui.label(
+                            egui::RichText::new(msg)
+                                .size(20.0)
+                                .color(egui::Color32::from_rgb(100, 255, 100)),
+                        );
+                    });
+            } else {
+                self.toast_message = None;
+            }
+        }
 
         // Always render tooltip when it has valid data
         self.tooltip.render(ctx, cursor_screen_pos);

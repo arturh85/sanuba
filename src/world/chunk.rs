@@ -1,6 +1,6 @@
 //! Chunk - 64x64 region of pixels
 
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::{Serialize, Deserialize};
 use crate::simulation::MaterialId;
 
 pub const CHUNK_SIZE: usize = 64;
@@ -35,7 +35,7 @@ pub mod pixel_flags {
 }
 
 /// A 64x64 region of the world
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Chunk {
     /// Chunk coordinates (in chunk space, not pixel space)
     pub x: i32,
@@ -43,18 +43,23 @@ pub struct Chunk {
 
     /// Pixel data, row-major order
     /// Index = y * CHUNK_SIZE + x
+    #[serde(with = "serde_big_array::BigArray")]
     pixels: [Pixel; CHUNK_AREA],
 
     /// Temperature field (8x8 coarse grid)
+    #[serde(with = "serde_big_array::BigArray")]
     pub temperature: [f32; 64],
 
     /// Pressure field (8x8 coarse grid)
+    #[serde(with = "serde_big_array::BigArray")]
     pub pressure: [f32; 64],
-    
-    /// Whether chunk has been modified since last save
+
+    /// Whether chunk has been modified since last save (not persisted)
+    #[serde(skip)]
     pub dirty: bool,
 
-    /// Bounding rect of modified pixels (for efficient updates)
+    /// Bounding rect of modified pixels (not persisted)
+    #[serde(skip)]
     pub dirty_rect: Option<DirtyRect>,
 }
 
@@ -98,7 +103,20 @@ impl Chunk {
         debug_assert!(x < CHUNK_SIZE && y < CHUNK_SIZE);
         self.pixels[y * CHUNK_SIZE + x]
     }
-    
+
+    /// Get material ID at local coordinates (helper method)
+    #[inline]
+    pub fn get_material(&self, x: usize, y: usize) -> u16 {
+        self.get_pixel(x, y).material_id
+    }
+
+    /// Count non-air pixels (for debugging save/load)
+    pub fn count_non_air(&self) -> usize {
+        self.pixels.iter()
+            .filter(|p| p.material_id != crate::simulation::MaterialId::AIR)
+            .count()
+    }
+
     /// Set pixel at local coordinates
     #[inline]
     pub fn set_pixel(&mut self, x: usize, y: usize, pixel: Pixel) {
@@ -162,102 +180,6 @@ impl Chunk {
 impl Default for Chunk {
     fn default() -> Self {
         Self::new(0, 0)
-    }
-}
-
-// Custom serialization for Chunk
-impl Serialize for Chunk {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("Chunk", 5)?;
-        state.serialize_field("x", &self.x)?;
-        state.serialize_field("y", &self.y)?;
-        state.serialize_field("pixels", &self.pixels.as_slice())?;
-        state.serialize_field("temperature", &self.temperature.as_slice())?;
-        state.serialize_field("pressure", &self.pressure.as_slice())?;
-        state.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for Chunk {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-        use std::fmt;
-
-        struct ChunkVisitor;
-
-        impl<'de> Visitor<'de> for ChunkVisitor {
-            type Value = Chunk;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct Chunk")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Chunk, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut x = None;
-                let mut y = None;
-                let mut pixels: Option<Vec<Pixel>> = None;
-                let mut temperature: Option<Vec<f32>> = None;
-                let mut pressure: Option<Vec<f32>> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "x" => x = Some(map.next_value()?),
-                        "y" => y = Some(map.next_value()?),
-                        "pixels" => pixels = Some(map.next_value()?),
-                        "temperature" => temperature = Some(map.next_value()?),
-                        "pressure" => pressure = Some(map.next_value()?),
-                        _ => { let _: serde::de::IgnoredAny = map.next_value()?; }
-                    }
-                }
-
-                let x = x.ok_or_else(|| de::Error::missing_field("x"))?;
-                let y = y.ok_or_else(|| de::Error::missing_field("y"))?;
-                let pixels_vec = pixels.ok_or_else(|| de::Error::missing_field("pixels"))?;
-                let temp_vec = temperature.ok_or_else(|| de::Error::missing_field("temperature"))?;
-                let press_vec = pressure.ok_or_else(|| de::Error::missing_field("pressure"))?;
-
-                if pixels_vec.len() != CHUNK_AREA {
-                    return Err(de::Error::invalid_length(pixels_vec.len(), &"4096 pixels"));
-                }
-                if temp_vec.len() != 64 {
-                    return Err(de::Error::invalid_length(temp_vec.len(), &"64 temperature values"));
-                }
-                if press_vec.len() != 64 {
-                    return Err(de::Error::invalid_length(press_vec.len(), &"64 pressure values"));
-                }
-
-                let mut pixels_array = [Pixel::AIR; CHUNK_AREA];
-                pixels_array.copy_from_slice(&pixels_vec);
-
-                let mut temp_array = [0.0; 64];
-                temp_array.copy_from_slice(&temp_vec);
-
-                let mut press_array = [0.0; 64];
-                press_array.copy_from_slice(&press_vec);
-
-                Ok(Chunk {
-                    x,
-                    y,
-                    pixels: pixels_array,
-                    temperature: temp_array,
-                    pressure: press_array,
-                    dirty: false,
-                    dirty_rect: None,
-                })
-            }
-        }
-
-        deserializer.deserialize_struct("Chunk", &["x", "y", "pixels", "temperature", "pressure"], ChunkVisitor)
     }
 }
 

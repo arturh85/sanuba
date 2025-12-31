@@ -8,12 +8,20 @@ use winit::{
 };
 use anyhow::Result;
 use glam::Vec2;
+use std::time::{Duration, Instant};
 
 use crate::world::World;
 use crate::render::Renderer;
 use crate::simulation::MaterialId;
 use crate::ui::UiState;
 use crate::levels::LevelManager;
+
+/// Game mode: persistent world or demo level
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameMode {
+    PersistentWorld,
+    DemoLevel(usize),
+}
 
 // Zoom constants
 const ZOOM_SPEED: f32 = 1.1; // Multiplicative zoom factor per keypress
@@ -30,7 +38,8 @@ fn print_controls() {
     println!("Toggle Temperature Overlay: T");
     println!("Toggle Stats: F1");
     println!("Toggle Help: H");
-    println!("Next/Prev Level: N/P");
+    println!("Level Selector: L");
+    println!("Manual Save: F5");
     println!("======================");
 }
 
@@ -109,6 +118,8 @@ pub struct App {
     egui_state: egui_winit::State,
     ui_state: UiState,
     level_manager: LevelManager,
+    game_mode: GameMode,
+    last_autosave: Instant,
 }
 
 impl App {
@@ -122,9 +133,12 @@ impl App {
         let renderer = Renderer::new(&window).await?;
         let mut world = World::new();
 
-        // Initialize level manager and load first level
+        // Initialize level manager (but don't load a level yet)
         let level_manager = LevelManager::new();
-        level_manager.load_current_level(&mut world);
+
+        // Load persistent world instead of demo level
+        world.load_persistent_world();
+        let game_mode = GameMode::PersistentWorld;
 
         // Initialize egui
         let egui_ctx = egui::Context::default();
@@ -138,7 +152,7 @@ impl App {
 
         // Print controls to console
         print_controls();
-        log::info!("Loaded level: {}", level_manager.current_level_name());
+        log::info!("Loaded persistent world");
 
         Ok(Self {
             window,
@@ -150,11 +164,40 @@ impl App {
             egui_state,
             ui_state: UiState::new(),
             level_manager,
+            game_mode,
+            last_autosave: Instant::now(),
         })
+    }
+
+    /// Switch to a demo level (disables persistence)
+    fn switch_to_demo_level(&mut self, level_id: usize) {
+        // Save current world if in persistent mode
+        if matches!(self.game_mode, GameMode::PersistentWorld) {
+            self.world.save_all_dirty_chunks();
+        }
+
+        self.game_mode = GameMode::DemoLevel(level_id);
+        self.level_manager.load_level(level_id, &mut self.world);
+        log::info!("Switched to demo level {}: {}", level_id, self.level_manager.current_level_name());
+    }
+
+    /// Return to persistent world from demo level
+    fn return_to_persistent_world(&mut self) {
+        self.game_mode = GameMode::PersistentWorld;
+        self.world.load_persistent_world();
+        log::info!("Returned to persistent world");
+    }
+
+    /// Get a description of the current game mode
+    fn game_mode_description(&self) -> String {
+        match self.game_mode {
+            GameMode::PersistentWorld => "Persistent World".to_string(),
+            GameMode::DemoLevel(id) => format!("Demo Level {}: {}", id + 1, self.level_manager.current_level_name()),
+        }
     }
     
     pub fn run(self) -> Result<()> {
-        let Self { window, event_loop, mut renderer, mut world, mut input_state, egui_ctx, mut egui_state, mut ui_state, mut level_manager } = self;
+        let Self { window, event_loop, mut renderer, mut world, mut input_state, egui_ctx, mut egui_state, mut ui_state, mut level_manager, mut game_mode, mut last_autosave } = self;
         
         event_loop.run(move |event, elwt| {
             // Let egui handle events first
@@ -230,13 +273,17 @@ impl App {
                             KeyCode::KeyT => if pressed {
                                 renderer.toggle_temperature_overlay();
                             },
-
-                            // Level switching
-                            KeyCode::KeyN => if pressed {
-                                level_manager.next_level(&mut world);
+                            KeyCode::KeyL => if pressed {
+                                ui_state.toggle_level_selector();
                             },
-                            KeyCode::KeyP => if pressed {
-                                level_manager.prev_level(&mut world);
+
+                            // Manual save (F5)
+                            KeyCode::F5 => if pressed {
+                                if matches!(game_mode, GameMode::PersistentWorld) {
+                                    world.save_all_dirty_chunks();
+                                    ui_state.show_toast("World saved!");
+                                    log::info!("Manual save completed");
+                                }
                             },
 
                             // Zoom controls
@@ -304,6 +351,15 @@ impl App {
                     // Begin frame timing
                     ui_state.stats.begin_frame();
 
+                    // Periodic auto-save (every 60 seconds in persistent world mode)
+                    const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
+                    if matches!(game_mode, GameMode::PersistentWorld) {
+                        if last_autosave.elapsed() >= AUTOSAVE_INTERVAL {
+                            world.save_dirty_chunks();
+                            last_autosave = Instant::now();
+                        }
+                    }
+
                     // Update player from input
                     world.update_player(&input_state, 1.0 / 60.0);
 
@@ -343,8 +399,32 @@ impl App {
                     let full_output = egui_ctx.run(raw_input, |ctx| {
                         // Get cursor position from egui context
                         let cursor_pos = ctx.pointer_hover_pos().unwrap_or(egui::pos2(0.0, 0.0));
-                        ui_state.render(ctx, cursor_pos, input_state.selected_material, world.materials(), level_manager.current_level_name());
+
+                        // Get game mode description
+                        let game_mode_desc = match game_mode {
+                            GameMode::PersistentWorld => "Persistent World".to_string(),
+                            GameMode::DemoLevel(id) => format!("Demo Level {}: {}", id + 1, level_manager.current_level_name()),
+                        };
+                        let in_persistent_world = matches!(game_mode, GameMode::PersistentWorld);
+
+                        ui_state.render(ctx, cursor_pos, input_state.selected_material, world.materials(), &game_mode_desc, in_persistent_world, &level_manager);
                     });
+
+                    // Handle level selector actions
+                    if ui_state.level_selector.return_to_world {
+                        game_mode = GameMode::PersistentWorld;
+                        world.load_persistent_world();
+                        log::info!("Returned to persistent world");
+                    } else if let Some(level_id) = ui_state.level_selector.selected_level {
+                        // Save current world if in persistent mode
+                        if matches!(game_mode, GameMode::PersistentWorld) {
+                            world.save_all_dirty_chunks();
+                        }
+
+                        game_mode = GameMode::DemoLevel(level_id);
+                        level_manager.load_level(level_id, &mut world);
+                        log::info!("Switched to demo level {}: {}", level_id, level_manager.current_level_name());
+                    }
 
                     // Handle egui output
                     egui_state.handle_platform_output(&window, full_output.platform_output);

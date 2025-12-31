@@ -1,5 +1,7 @@
 # 砂場 Sunaba
 
+![sanuba.jpg](sanuba.jpg)
+
 A 2D falling-sand physics sandbox survival game, inspired by Noita and Terraria.
 
 ## Features (Planned)
