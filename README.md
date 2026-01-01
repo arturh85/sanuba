@@ -18,6 +18,8 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 ## Building
 
+### Native Builds
+
 ```bash
 # Debug build
 cargo run
@@ -25,6 +27,41 @@ cargo run
 # Release build (faster simulation)
 cargo run --release
 ```
+
+### Web Build (WASM)
+
+The game can run in browsers that support WebGPU (Chrome 113+, Edge 113+, Firefox/Safari with WebGPU enabled).
+
+```bash
+# Linux/macOS
+./build-web.sh
+
+# Windows
+build-web.bat
+
+# Test locally
+cd web && python3 -m http.server 8080
+# Then open http://localhost:8080
+```
+
+### CI/CD
+
+The project includes GitHub Actions workflows for:
+
+- **CI** (`ci.yml`): Automated builds and tests on Linux, Windows, and macOS for every push
+- **Release** (`release.yml`): Creates release binaries for all platforms when you push a version tag
+- **Pages** (`pages.yml`): Automatically deploys the web version to GitHub Pages on every push to main
+
+To create a new release:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+## Downloads
+
+- **Native Builds**: Download from [GitHub Releases](https://github.com/yourusername/sunaba/releases)
+- **Web Version**: Play at [https://yourusername.github.io/sunaba](https://yourusername.github.io/sunuba)
 
 ## Development Status
 

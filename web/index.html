@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>砂場 Sunaba - 2D Physics Sandbox Survival</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        #header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        #game-container {
+            position: relative;
+            background: #000;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+        }
+
+        #loading.hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #controls {
+            max-width: 800px;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-section {
+            margin-bottom: 15px;
+        }
+
+        .control-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        kbd {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        #error {
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            margin: 20px auto;
+            display: none;
+        }
+
+        #error.visible {
+            display: block;
+        }
+
+        .note {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            #game-container {
+                width: 95vw !important;
+                height: 60vh !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>砂場 Sunaba</h1>
+        <div class="subtitle">2D Physics Sandbox Survival</div>
+        <div class="subtitle" style="font-size: 0.9rem; opacity: 0.7;">
+            Noita-style falling sand meets Terraria-style survival
+        </div>
+    </div>
+
+    <div id="game-container" style="width: 1280px; height: 720px;">
+        <canvas id="canvas"></canvas>
+        <div id="loading">
+            <div class="spinner"></div>
+            <div>Loading Sunaba...</div>
+            <div style="font-size: 0.8rem; margin-top: 10px; opacity: 0.7;">
+                Initializing physics simulation
+            </div>
+        </div>
+    </div>
+
+    <div id="error">
+        <h3>Error Loading Game</h3>
+        <p id="error-message"></p>
+    </div>
+
+    <div id="controls">
+        <div class="control-section">
+            <h3>Movement</h3>
+            <div class="controls-grid">
+                <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> - Move player</div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Camera</h3>
+            <div class="controls-grid">
+                <div><kbd>+</kbd>/<kbd>-</kbd> - Zoom in/out</div>
+                <div><kbd>Mouse Wheel</kbd> - Zoom</div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Materials</h3>
+            <div class="controls-grid">
+                <div><kbd>0</kbd>-<kbd>9</kbd> - Select material</div>
+                <div><kbd>Left Click</kbd> - Place material</div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>World & UI</h3>
+            <div class="controls-grid">
+                <div><kbd>L</kbd> - Level selector</div>
+                <div><kbd>F5</kbd> - Manual save</div>
+                <div><kbd>H</kbd> - Toggle help</div>
+                <div><kbd>F1</kbd> - Debug stats</div>
+                <div><kbd>T</kbd> - Temperature overlay</div>
+            </div>
+        </div>
+
+        <div class="note">
+            <strong>WebGPU Required:</strong> This game uses WebGPU for rendering.
+            Make sure you're using a browser that supports WebGPU (Chrome 113+, Edge 113+, or latest Firefox/Safari with WebGPU enabled).
+            <br><br>
+            <strong>Performance:</strong> Web version may run slower than native builds.
+            For best performance, download the native version for your platform.
+        </div>
+    </div>
+
+    <script type="module">
+        async function init() {
+            try {
+                // Check for WebGPU support
+                if (!navigator.gpu) {
+                    throw new Error('WebGPU is not supported in this browser. Please use Chrome 113+, Edge 113+, or enable WebGPU in your browser flags.');
+                }
+
+                // Import the WASM module
+                const { default: init, run } = await import('./pkg/sunaba.js');
+
+                // Initialize WASM
+                await init();
+
+                // Hide loading screen
+                document.getElementById('loading').classList.add('hidden');
+
+                // Run the game
+                run();
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+                document.getElementById('loading').classList.add('hidden');
+                const errorDiv = document.getElementById('error');
+                const errorMessage = document.getElementById('error-message');
+                errorDiv.classList.add('visible');
+                errorMessage.textContent = error.message || 'Unknown error occurred';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

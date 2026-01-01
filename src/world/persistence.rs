@@ -3,6 +3,8 @@ use crate::world::generation::WorldGenerator;
 use crate::entity::player::Player;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::{Path, PathBuf};
 
 /// World metadata stored in world.meta file (RON format)
@@ -22,12 +24,24 @@ pub struct WorldMetadata {
 
 impl Default for WorldMetadata {
     fn default() -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        let (created_at, last_played) = {
+            let now = chrono::Local::now().to_rfc3339();
+            (now.clone(), now)
+        };
+
+        #[cfg(target_arch = "wasm32")]
+        let (created_at, last_played) = {
+            let now = "WASM Session".to_string();
+            (now.clone(), now)
+        };
+
         Self {
             version: 1,
             seed: rand::random(),
             spawn_point: (0.0, 100.0), // Start above ground
-            created_at: chrono::Local::now().to_rfc3339(),
-            last_played: chrono::Local::now().to_rfc3339(),
+            created_at,
+            last_played,
             play_time_seconds: 0,
             player_data: None, // Will be populated on first save
         }
@@ -36,9 +50,13 @@ impl Default for WorldMetadata {
 
 /// Manages chunk save/load operations with compression
 pub struct ChunkPersistence {
+    #[cfg(not(target_arch = "wasm32"))]
     world_dir: PathBuf,
+    #[cfg(target_arch = "wasm32")]
+    _phantom: (),
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ChunkPersistence {
     /// Create a new persistence manager for the given world name
     pub fn new(world_name: &str) -> Result<Self> {
@@ -190,10 +208,48 @@ impl ChunkPersistence {
     }
 }
 
-#[cfg(test)]
+// WASM stub implementation - no persistence in browser for now
+#[cfg(target_arch = "wasm32")]
+impl ChunkPersistence {
+    pub fn new(_world_name: &str) -> Result<Self> {
+        log::info!("[WASM] Chunk persistence disabled - chunks will be generated on demand");
+        Ok(Self { _phantom: () })
+    }
+
+    pub fn save_chunk(&self, _chunk: &Chunk) -> Result<()> {
+        // No-op in WASM
+        Ok(())
+    }
+
+    pub fn load_chunk(
+        &self,
+        chunk_x: i32,
+        chunk_y: i32,
+        generator: &WorldGenerator,
+    ) -> Chunk {
+        // Always generate in WASM
+        generator.generate_chunk(chunk_x, chunk_y)
+    }
+
+    pub fn save_metadata(&self, _meta: &WorldMetadata) -> Result<()> {
+        // No-op in WASM
+        Ok(())
+    }
+
+    pub fn load_metadata(&self) -> WorldMetadata {
+        WorldMetadata::default()
+    }
+
+    pub fn delete_world(_world_name: &str) -> Result<()> {
+        // No-op in WASM
+        Ok(())
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
-    use crate::world::chunk::{Chunk, CHUNK_SIZE};
+    use crate::world::chunk::Chunk;
 
     #[test]
     fn test_chunk_save_load_roundtrip() -> Result<()> {
@@ -235,6 +291,7 @@ mod tests {
             created_at: "2024-01-01T00:00:00Z".to_string(),
             last_played: "2024-01-02T00:00:00Z".to_string(),
             play_time_seconds: 3600,
+            player_data: None,
         };
 
         // Save and load
