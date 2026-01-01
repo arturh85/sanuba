@@ -25,7 +25,7 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 Development works on Windows, Linux and MacOS.
 
-Requires [Rust](https://www.rust-lang.org/tools/install) 1.56 or later.
+Requires [Rust](https://www.rust-lang.org/tools/install) 1.56 or later and [Just](https://github.com/casey/just/releases) as a command runner (optional).
 
 ### Native Builds
 
@@ -35,6 +35,9 @@ cargo run
 
 # Release build (faster simulation)
 cargo run --release
+
+# Using just command runner
+just start
 ```
 
 ### Web Build (WASM)
@@ -51,6 +54,18 @@ build-web.bat
 # Test locally
 cd web && python3 -m http.server 8080
 # Then open http://localhost:8080
+
+# Using just command runner
+just web
+```
+
+### Tests
+
+To run all checks and tests, run before submitting a PR:
+
+```bash
+# Using just command runner
+just test
 ```
 
 ### CI/CD
