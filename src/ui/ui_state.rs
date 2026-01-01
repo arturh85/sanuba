@@ -1,11 +1,11 @@
 //! Central UI state management
 
-use super::stats::StatsCollector;
-use super::tooltip::TooltipState;
 use super::controls_help::ControlsHelpState;
-use super::level_selector::LevelSelectorState;
 use super::hud::Hud;
 use super::inventory_ui::InventoryPanel;
+use super::level_selector::LevelSelectorState;
+use super::stats::StatsCollector;
+use super::tooltip::TooltipState;
 use std::time::Instant;
 
 /// Central UI state container
@@ -39,7 +39,7 @@ impl UiState {
     pub fn new() -> Self {
         Self {
             stats: StatsCollector::new(),
-            stats_visible: true,  // Start with stats visible
+            stats_visible: true, // Start with stats visible
             tooltip: TooltipState::new(),
             controls_help: ControlsHelpState::new(),
             level_selector: LevelSelectorState::new(),
@@ -75,8 +75,15 @@ impl UiState {
     }
 
     /// Update tooltip with world data
-    pub fn update_tooltip(&mut self, world: &crate::world::World, materials: &crate::simulation::Materials, mouse_world_pos: Option<(i32, i32)>, light_overlay_active: bool) {
-        self.tooltip.update(world, materials, mouse_world_pos, light_overlay_active);
+    pub fn update_tooltip(
+        &mut self,
+        world: &crate::world::World,
+        materials: &crate::simulation::Materials,
+        mouse_world_pos: Option<(i32, i32)>,
+        light_overlay_active: bool,
+    ) {
+        self.tooltip
+            .update(world, materials, mouse_world_pos, light_overlay_active);
     }
 
     /// Render all UI elements
@@ -93,12 +100,11 @@ impl UiState {
         player: &crate::entity::player::Player,
     ) {
         // Collect material names for UI display
-        let material_names: Vec<&str> = (0..15)
-            .map(|id| materials.get(id).name.as_str())
-            .collect();
+        let material_names: Vec<&str> = (0..15).map(|id| materials.get(id).name.as_str()).collect();
 
         // Render HUD (always visible)
-        self.hud.render(ctx, player, selected_material, &material_names);
+        self.hud
+            .render(ctx, player, selected_material, &material_names);
 
         // Render inventory panel (if open)
         self.inventory.render(ctx, player, &material_names);
@@ -108,10 +114,12 @@ impl UiState {
         }
 
         // Render controls help with game mode description
-        self.controls_help.render_with_level(ctx, selected_material, materials, game_mode_desc);
+        self.controls_help
+            .render_with_level(ctx, selected_material, materials, game_mode_desc);
 
         // Render level selector
-        self.level_selector.render(ctx, level_manager, game_mode_desc, in_persistent_world);
+        self.level_selector
+            .render(ctx, level_manager, game_mode_desc, in_persistent_world);
 
         // Render toast notifications
         if let Some((msg, shown_at)) = &self.toast_message {
@@ -156,7 +164,10 @@ impl UiState {
 
                 ui.separator();
                 ui.heading("Temperature");
-                ui.label(format!("Range: {:.0}°C - {:.0}°C", stats.min_temp, stats.max_temp));
+                ui.label(format!(
+                    "Range: {:.0}°C - {:.0}°C",
+                    stats.min_temp, stats.max_temp
+                ));
                 ui.label(format!("Average: {:.1}°C", stats.avg_temp));
 
                 ui.separator();

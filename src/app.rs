@@ -1,20 +1,20 @@
 //! Application state and main game loop
 
-use winit::{
-    event::{Event, WindowEvent, ElementState, MouseButton},
-    event_loop::EventLoop,
-    window::{Window, WindowBuilder},
-    keyboard::{KeyCode, PhysicalKey},
-};
 use anyhow::Result;
 use glam::Vec2;
 use std::time::{Duration, Instant};
+use winit::{
+    event::{ElementState, Event, MouseButton, WindowEvent},
+    event_loop::EventLoop,
+    keyboard::{KeyCode, PhysicalKey},
+    window::{Window, WindowBuilder},
+};
 
-use crate::world::World;
+use crate::levels::LevelManager;
 use crate::render::Renderer;
 use crate::simulation::MaterialId;
 use crate::ui::UiState;
-use crate::levels::LevelManager;
+use crate::world::World;
 
 /// Game mode: persistent world or demo level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +26,7 @@ pub enum GameMode {
 // Zoom constants
 const ZOOM_SPEED: f32 = 1.1; // Multiplicative zoom factor per keypress
 const MIN_ZOOM: f32 = 0.001; // Max zoom out (see more of the world)
-const MAX_ZOOM: f32 = 0.5;   // Max zoom in (closer view)
+const MAX_ZOOM: f32 = 0.5; // Max zoom in (closer view)
 
 /// Print controls to console
 fn print_controls() {
@@ -181,7 +181,11 @@ impl App {
 
         self.game_mode = GameMode::DemoLevel(level_id);
         self.level_manager.load_level(level_id, &mut self.world);
-        log::info!("Switched to demo level {}: {}", level_id, self.level_manager.current_level_name());
+        log::info!(
+            "Switched to demo level {}: {}",
+            level_id,
+            self.level_manager.current_level_name()
+        );
     }
 
     /// Return to persistent world from demo level
@@ -197,13 +201,29 @@ impl App {
     fn game_mode_description(&self) -> String {
         match self.game_mode {
             GameMode::PersistentWorld => "Persistent World".to_string(),
-            GameMode::DemoLevel(id) => format!("Demo Level {}: {}", id + 1, self.level_manager.current_level_name()),
+            GameMode::DemoLevel(id) => format!(
+                "Demo Level {}: {}",
+                id + 1,
+                self.level_manager.current_level_name()
+            ),
         }
     }
-    
+
     pub fn run(self) -> Result<()> {
-        let Self { window, event_loop, mut renderer, mut world, mut input_state, egui_ctx, mut egui_state, mut ui_state, mut level_manager, mut game_mode, mut last_autosave } = self;
-        
+        let Self {
+            window,
+            event_loop,
+            mut renderer,
+            mut world,
+            mut input_state,
+            egui_ctx,
+            mut egui_state,
+            mut ui_state,
+            mut level_manager,
+            mut game_mode,
+            mut last_autosave,
+        } = self;
+
         event_loop.run(move |event, elwt| {
             // Let egui handle events first
             if let Event::WindowEvent { ref event, .. } = event {
@@ -211,14 +231,23 @@ impl App {
             }
 
             match event {
-                Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => {
                     elwt.exit();
                 }
-                Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(size),
+                    ..
+                } => {
                     renderer.resize(size.width, size.height);
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::KeyboardInput { event: key_event, .. },
+                    event:
+                        WindowEvent::KeyboardInput {
+                            event: key_event, ..
+                        },
                     ..
                 } => {
                     // Skip input if egui wants it
@@ -227,7 +256,11 @@ impl App {
                     }
                     if let PhysicalKey::Code(code) = key_event.physical_key {
                         let pressed = key_event.state == ElementState::Pressed;
-                        log::debug!("Keyboard: {:?} {}", code, if pressed { "pressed" } else { "released" });
+                        log::debug!(
+                            "Keyboard: {:?} {}",
+                            code,
+                            if pressed { "pressed" } else { "released" }
+                        );
 
                         match code {
                             // Movement keys
@@ -237,74 +270,113 @@ impl App {
                             KeyCode::KeyD => input_state.d_pressed = pressed,
 
                             // Material selection (0-9)
-                            KeyCode::Digit0 => if pressed {
-                                input_state.selected_material = MaterialId::AIR;
-                            },
-                            KeyCode::Digit1 => if pressed {
-                                input_state.selected_material = MaterialId::STONE;
-                            },
-                            KeyCode::Digit2 => if pressed {
-                                input_state.selected_material = MaterialId::SAND;
-                            },
-                            KeyCode::Digit3 => if pressed {
-                                input_state.selected_material = MaterialId::WATER;
-                            },
-                            KeyCode::Digit4 => if pressed {
-                                input_state.selected_material = MaterialId::WOOD;
-                            },
-                            KeyCode::Digit5 => if pressed {
-                                input_state.selected_material = MaterialId::FIRE;
-                            },
-                            KeyCode::Digit6 => if pressed {
-                                input_state.selected_material = MaterialId::SMOKE;
-                            },
-                            KeyCode::Digit7 => if pressed {
-                                input_state.selected_material = MaterialId::STEAM;
-                            },
-                            KeyCode::Digit8 => if pressed {
-                                input_state.selected_material = MaterialId::LAVA;
-                            },
-                            KeyCode::Digit9 => if pressed {
-                                input_state.selected_material = MaterialId::OIL;
-                            },
+                            KeyCode::Digit0 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::AIR;
+                                }
+                            }
+                            KeyCode::Digit1 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::STONE;
+                                }
+                            }
+                            KeyCode::Digit2 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::SAND;
+                                }
+                            }
+                            KeyCode::Digit3 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::WATER;
+                                }
+                            }
+                            KeyCode::Digit4 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::WOOD;
+                                }
+                            }
+                            KeyCode::Digit5 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::FIRE;
+                                }
+                            }
+                            KeyCode::Digit6 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::SMOKE;
+                                }
+                            }
+                            KeyCode::Digit7 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::STEAM;
+                                }
+                            }
+                            KeyCode::Digit8 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::LAVA;
+                                }
+                            }
+                            KeyCode::Digit9 => {
+                                if pressed {
+                                    input_state.selected_material = MaterialId::OIL;
+                                }
+                            }
 
                             // UI toggles
-                            KeyCode::F1 => if pressed {
-                                ui_state.toggle_stats();
-                            },
-                            KeyCode::KeyH => if pressed {
-                                ui_state.toggle_help();
-                            },
-                            KeyCode::KeyT => if pressed {
-                                renderer.toggle_temperature_overlay();
-                            },
-                            KeyCode::KeyV => if pressed {
-                                renderer.toggle_light_overlay();
-                            },
-                            KeyCode::KeyL => if pressed {
-                                ui_state.toggle_level_selector();
-                            },
-                            KeyCode::KeyI => if pressed {
-                                ui_state.toggle_inventory();
-                            },
+                            KeyCode::F1 => {
+                                if pressed {
+                                    ui_state.toggle_stats();
+                                }
+                            }
+                            KeyCode::KeyH => {
+                                if pressed {
+                                    ui_state.toggle_help();
+                                }
+                            }
+                            KeyCode::KeyT => {
+                                if pressed {
+                                    renderer.toggle_temperature_overlay();
+                                }
+                            }
+                            KeyCode::KeyV => {
+                                if pressed {
+                                    renderer.toggle_light_overlay();
+                                }
+                            }
+                            KeyCode::KeyL => {
+                                if pressed {
+                                    ui_state.toggle_level_selector();
+                                }
+                            }
+                            KeyCode::KeyI => {
+                                if pressed {
+                                    ui_state.toggle_inventory();
+                                }
+                            }
 
                             // Manual save (F5)
-                            KeyCode::F5 => if pressed
-                                && matches!(game_mode, GameMode::PersistentWorld) {
-                                    world.save_all_dirty_chunks();
-                                    ui_state.show_toast("World saved!");
-                                    log::info!("Manual save completed");
-                                },
+                            KeyCode::F5 => {
+                                if pressed {
+                                    if matches!(game_mode, GameMode::PersistentWorld) {
+                                        world.save_all_dirty_chunks();
+                                        ui_state.show_toast("World saved!");
+                                        log::info!("Manual save completed");
+                                    }
+                                }
+                            }
 
                             // Zoom controls
-                            KeyCode::Equal | KeyCode::NumpadAdd => if pressed {
-                                input_state.zoom_delta *= ZOOM_SPEED;
-                                log::debug!("Zoom in: delta={:.2}", input_state.zoom_delta);
-                            },
-                            KeyCode::Minus | KeyCode::NumpadSubtract => if pressed {
-                                input_state.zoom_delta /= ZOOM_SPEED;
-                                log::debug!("Zoom out: delta={:.2}", input_state.zoom_delta);
-                            },
+                            KeyCode::Equal | KeyCode::NumpadAdd => {
+                                if pressed {
+                                    input_state.zoom_delta *= ZOOM_SPEED;
+                                    log::debug!("Zoom in: delta={:.2}", input_state.zoom_delta);
+                                }
+                            }
+                            KeyCode::Minus | KeyCode::NumpadSubtract => {
+                                if pressed {
+                                    input_state.zoom_delta /= ZOOM_SPEED;
+                                    log::debug!("Zoom out: delta={:.2}", input_state.zoom_delta);
+                                }
+                            }
 
                             _ => {}
                         }
@@ -324,25 +396,42 @@ impl App {
                         renderer.camera_zoom(),
                     );
                     input_state.mouse_world_pos = Some(world_pos);
-                    log::trace!("Mouse: screen({:.0}, {:.0}) → world({}, {})",
-                               position.x, position.y, world_pos.0, world_pos.1);
+                    log::trace!(
+                        "Mouse: screen({:.0}, {:.0}) → world({}, {})",
+                        position.x,
+                        position.y,
+                        world_pos.0,
+                        world_pos.1
+                    );
                 }
                 Event::WindowEvent {
                     event: WindowEvent::MouseInput { state, button, .. },
                     ..
-                } => {
-                    match button {
-                        MouseButton::Left => {
-                            input_state.left_mouse_pressed = state == ElementState::Pressed;
-                            log::debug!("Left mouse: {}", if state == ElementState::Pressed { "pressed" } else { "released" });
-                        }
-                        MouseButton::Right => {
-                            input_state.right_mouse_pressed = state == ElementState::Pressed;
-                            log::debug!("Right mouse: {}", if state == ElementState::Pressed { "pressed" } else { "released" });
-                        }
-                        _ => {}
+                } => match button {
+                    MouseButton::Left => {
+                        input_state.left_mouse_pressed = state == ElementState::Pressed;
+                        log::debug!(
+                            "Left mouse: {}",
+                            if state == ElementState::Pressed {
+                                "pressed"
+                            } else {
+                                "released"
+                            }
+                        );
                     }
-                }
+                    MouseButton::Right => {
+                        input_state.right_mouse_pressed = state == ElementState::Pressed;
+                        log::debug!(
+                            "Right mouse: {}",
+                            if state == ElementState::Pressed {
+                                "pressed"
+                            } else {
+                                "released"
+                            }
+                        );
+                    }
+                    _ => {}
+                },
                 Event::WindowEvent {
                     event: WindowEvent::MouseWheel { delta, .. },
                     ..
@@ -362,20 +451,28 @@ impl App {
                     // Zoom in/out based on scroll direction
                     let zoom_factor = 1.0 + (scroll_amount * 0.1);
                     input_state.zoom_delta *= zoom_factor;
-                    log::debug!("Mouse wheel: scroll={:.2}, zoom_delta={:.2}", scroll_amount, input_state.zoom_delta);
+                    log::debug!(
+                        "Mouse wheel: scroll={:.2}, zoom_delta={:.2}",
+                        scroll_amount,
+                        input_state.zoom_delta
+                    );
                 }
-                Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+                Event::WindowEvent {
+                    event: WindowEvent::RedrawRequested,
+                    ..
+                } => {
                     // Begin frame timing
                     ui_state.stats.begin_frame();
 
                     // Periodic auto-save (every 60 seconds in persistent world mode)
                     const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
                     if matches!(game_mode, GameMode::PersistentWorld)
-                        && last_autosave.elapsed() >= AUTOSAVE_INTERVAL {
-                            world.save_all_dirty_chunks(); // Save chunks AND player data
-                            last_autosave = Instant::now();
-                            log::info!("Auto-saved world and player data");
-                        }
+                        && last_autosave.elapsed() >= AUTOSAVE_INTERVAL
+                    {
+                        world.save_all_dirty_chunks(); // Save chunks AND player data
+                        last_autosave = Instant::now();
+                        log::info!("Auto-saved world and player data");
+                    }
 
                     // Update player from input
                     world.update_player(&input_state, 1.0 / 60.0);
@@ -387,9 +484,15 @@ impl App {
                     use std::sync::atomic::{AtomicU32, Ordering};
                     static FRAME_COUNT: AtomicU32 = AtomicU32::new(0);
                     let frame = FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
-                    if frame.is_multiple_of(120) {  // Every 2 seconds at 60fps
-                        log::info!("Frame {}: player_pos={:?}, zoom={:.2}, selected_material={}",
-                                   frame, world.player.position, renderer.camera_zoom(), input_state.selected_material);
+                    if frame.is_multiple_of(120) {
+                        // Every 2 seconds at 60fps
+                        log::info!(
+                            "Frame {}: player_pos={:?}, zoom={:.2}, selected_material={}",
+                            frame,
+                            world.player.position,
+                            renderer.camera_zoom(),
+                            input_state.selected_material
+                        );
                     }
 
                     // Mining with right mouse button
@@ -402,7 +505,11 @@ impl App {
                     // Placing material from inventory with left mouse button
                     if input_state.left_mouse_pressed {
                         if let Some((wx, wy)) = input_state.mouse_world_pos {
-                            world.place_material_from_inventory(wx, wy, input_state.selected_material);
+                            world.place_material_from_inventory(
+                                wx,
+                                wy,
+                                input_state.selected_material,
+                            );
                         }
                     }
 
@@ -415,7 +522,12 @@ impl App {
                     ui_state.stats.collect_world_stats(&world);
 
                     // Update tooltip with world data
-                    ui_state.update_tooltip(&world, world.materials(), input_state.mouse_world_pos, renderer.is_light_overlay_enabled());
+                    ui_state.update_tooltip(
+                        &world,
+                        world.materials(),
+                        input_state.mouse_world_pos,
+                        renderer.is_light_overlay_enabled(),
+                    );
 
                     // Prepare egui frame
                     let raw_input = egui_state.take_egui_input(&window);
@@ -426,11 +538,24 @@ impl App {
                         // Get game mode description
                         let game_mode_desc = match game_mode {
                             GameMode::PersistentWorld => "Persistent World".to_string(),
-                            GameMode::DemoLevel(id) => format!("Demo Level {}: {}", id + 1, level_manager.current_level_name()),
+                            GameMode::DemoLevel(id) => format!(
+                                "Demo Level {}: {}",
+                                id + 1,
+                                level_manager.current_level_name()
+                            ),
                         };
                         let in_persistent_world = matches!(game_mode, GameMode::PersistentWorld);
 
-                        ui_state.render(ctx, cursor_pos, input_state.selected_material, world.materials(), &game_mode_desc, in_persistent_world, &level_manager, &world.player);
+                        ui_state.render(
+                            ctx,
+                            cursor_pos,
+                            input_state.selected_material,
+                            world.materials(),
+                            &game_mode_desc,
+                            in_persistent_world,
+                            &level_manager,
+                            &world.player,
+                        );
                     });
 
                     // Handle level selector actions
@@ -446,7 +571,11 @@ impl App {
 
                         game_mode = GameMode::DemoLevel(level_id);
                         level_manager.load_level(level_id, &mut world);
-                        log::info!("Switched to demo level {}: {}", level_id, level_manager.current_level_name());
+                        log::info!(
+                            "Switched to demo level {}: {}",
+                            level_id,
+                            level_manager.current_level_name()
+                        );
                     }
 
                     // Handle egui output
@@ -457,7 +586,12 @@ impl App {
                     renderer.update_light_overlay(&world);
 
                     // Render world + UI
-                    if let Err(e) = renderer.render(&world, &egui_ctx, full_output.textures_delta, full_output.shapes) {
+                    if let Err(e) = renderer.render(
+                        &world,
+                        &egui_ctx,
+                        full_output.textures_delta,
+                        full_output.shapes,
+                    ) {
                         log::error!("Render error: {e}");
                     }
 
@@ -470,7 +604,7 @@ impl App {
                 _ => {}
             }
         })?;
-        
+
         Ok(())
     }
 }

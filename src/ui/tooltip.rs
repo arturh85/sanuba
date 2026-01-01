@@ -1,7 +1,7 @@
 //! Mouseover tooltip showing pixel information
 
-use crate::world::World;
 use crate::simulation::Materials;
+use crate::world::World;
 
 /// Tooltip state for displaying pixel information at cursor
 pub struct TooltipState {
@@ -12,9 +12,9 @@ pub struct TooltipState {
     // Growth-related data (simplified)
     light_level: u8,
     has_nearby_water: bool,
-    growth_status: String,  // Single simplified message
+    growth_status: String, // Single simplified message
     // Light overlay state
-    light_overlay_active: bool,  // Show light level guide when true
+    light_overlay_active: bool, // Show light level guide when true
 }
 
 impl TooltipState {
@@ -32,7 +32,13 @@ impl TooltipState {
     }
 
     /// Update tooltip with information from world at mouse position
-    pub fn update(&mut self, world: &World, materials: &Materials, mouse_world_pos: Option<(i32, i32)>, light_overlay_active: bool) {
+    pub fn update(
+        &mut self,
+        world: &World,
+        materials: &Materials,
+        mouse_world_pos: Option<(i32, i32)>,
+        light_overlay_active: bool,
+    ) {
         use crate::simulation::MaterialId;
 
         self.light_overlay_active = light_overlay_active;
@@ -88,7 +94,8 @@ impl TooltipState {
                             // Growing - show time-based progress
                             let progress = world.get_growth_progress_percent();
                             let seconds = progress / 10.0;
-                            self.growth_status = format!("Growing: {:.0}% ({:.1}s)", progress, seconds);
+                            self.growth_status =
+                                format!("Growing: {:.0}% ({:.1}s)", progress, seconds);
                         }
                     } else {
                         // Not a plant - clear growth fields
@@ -127,23 +134,34 @@ impl TooltipState {
                 shadow: egui::epaint::Shadow::NONE,
             })
             .show(ctx, |ui| {
-                ui.label(egui::RichText::new(&self.material_name)
-                    .color(egui::Color32::WHITE)
-                    .strong());
-                ui.label(egui::RichText::new(format!("Temp: {:.0}°C", self.temperature))
-                    .color(egui::Color32::LIGHT_GRAY)
-                    .size(12.0));
-                ui.label(egui::RichText::new(format!("Pos: ({}, {})", self.world_pos.0, self.world_pos.1))
+                ui.label(
+                    egui::RichText::new(&self.material_name)
+                        .color(egui::Color32::WHITE)
+                        .strong(),
+                );
+                ui.label(
+                    egui::RichText::new(format!("Temp: {:.0}°C", self.temperature))
+                        .color(egui::Color32::LIGHT_GRAY)
+                        .size(12.0),
+                );
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Pos: ({}, {})",
+                        self.world_pos.0, self.world_pos.1
+                    ))
                     .color(egui::Color32::DARK_GRAY)
-                    .size(11.0));
+                    .size(11.0),
+                );
 
                 // Show light level guide when overlay is active
                 if self.light_overlay_active {
                     ui.separator();
-                    ui.label(egui::RichText::new("Light Level Guide:")
-                        .color(egui::Color32::WHITE)
-                        .strong()
-                        .size(11.0));
+                    ui.label(
+                        egui::RichText::new("Light Level Guide:")
+                            .color(egui::Color32::WHITE)
+                            .strong()
+                            .size(11.0),
+                    );
 
                     ui.horizontal(|ui| {
                         ui.colored_label(egui::Color32::from_rgb(0, 0, 0), "■");
@@ -178,10 +196,12 @@ impl TooltipState {
                         egui::Color32::GREEN // Growing
                     };
 
-                    ui.label(egui::RichText::new(&self.growth_status)
-                        .color(status_color)
-                        .size(12.0)
-                        .strong());
+                    ui.label(
+                        egui::RichText::new(&self.growth_status)
+                            .color(status_color)
+                            .size(12.0)
+                            .strong(),
+                    );
                 }
             });
     }

@@ -1,5 +1,5 @@
-use egui::{Color32, Context, Pos2, Rect, Rounding, Stroke, Vec2};
 use crate::entity::player::Player;
+use egui::{Color32, Context, Pos2, Rect, Rounding, Stroke, Vec2};
 
 /// Full inventory panel (opened with I key)
 pub struct InventoryPanel {
@@ -31,15 +31,22 @@ impl InventoryPanel {
 
                 // Player stats section
                 ui.horizontal(|ui| {
-                    ui.label(format!("Health: {:.0}/{:.0}", player.health.current, player.health.max));
+                    ui.label(format!(
+                        "Health: {:.0}/{:.0}",
+                        player.health.current, player.health.max
+                    ));
                     ui.separator();
-                    ui.label(format!("Hunger: {:.0}/{:.0}", player.hunger.current, player.hunger.max));
+                    ui.label(format!(
+                        "Hunger: {:.0}/{:.0}",
+                        player.hunger.current, player.hunger.max
+                    ));
                 });
 
                 ui.add_space(10.0);
 
                 // Inventory usage
-                ui.label(format!("Using {}/{} slots",
+                ui.label(format!(
+                    "Using {}/{} slots",
                     player.inventory.used_slot_count(),
                     player.inventory.max_slots
                 ));
@@ -90,10 +97,7 @@ impl InventoryPanel {
     ) {
         let slot_data = player.inventory.get_slot(slot_index);
 
-        let (response, painter) = ui.allocate_painter(
-            Vec2::new(size, size),
-            egui::Sense::hover()
-        );
+        let (response, painter) = ui.allocate_painter(Vec2::new(size, size), egui::Sense::hover());
 
         let rect = response.rect;
 
@@ -113,10 +117,7 @@ impl InventoryPanel {
         if let Some(Some(stack)) = slot_data {
             // Material color indicator (top bar)
             let material_color = self.get_material_color(stack.material_id);
-            let color_bar = Rect::from_min_size(
-                rect.min,
-                Vec2::new(size, 8.0)
-            );
+            let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
             painter.rect_filled(color_bar, Rounding::same(2.0), material_color);
 
             // Material name (truncated)
@@ -126,10 +127,7 @@ impl InventoryPanel {
                 "Unknown"
             };
 
-            let text_pos = Pos2::new(
-                rect.center().x,
-                rect.min.y + 18.0
-            );
+            let text_pos = Pos2::new(rect.center().x, rect.min.y + 18.0);
 
             painter.text(
                 text_pos,
@@ -146,10 +144,7 @@ impl InventoryPanel {
                 stack.count.to_string()
             };
 
-            let count_pos = Pos2::new(
-                rect.center().x,
-                rect.max.y - 10.0
-            );
+            let count_pos = Pos2::new(rect.center().x, rect.max.y - 10.0);
 
             painter.text(
                 count_pos,
@@ -181,7 +176,11 @@ impl InventoryPanel {
 
         let border_width = if is_selected { 2.0 } else { 1.0 };
 
-        painter.rect_stroke(rect, Rounding::same(4.0), Stroke::new(border_width, border_color));
+        painter.rect_stroke(
+            rect,
+            Rounding::same(4.0),
+            Stroke::new(border_width, border_color),
+        );
 
         // Tooltip on hover
         if response.hovered() {
@@ -194,9 +193,7 @@ impl InventoryPanel {
 
                 response.on_hover_text(format!(
                     "{}\nCount: {}\nID: {}",
-                    name,
-                    stack.count,
-                    stack.material_id
+                    name, stack.count, stack.material_id
                 ));
             } else if slot_index < 10 {
                 response.on_hover_text(format!("Hotbar slot {} (empty)", (slot_index + 1) % 10));
@@ -208,22 +205,22 @@ impl InventoryPanel {
         // Simple color mapping based on material ID
         // This should ideally come from the actual material definitions
         match material_id {
-            0 => Color32::from_rgb(0, 0, 0),       // Air (shouldn't appear)
-            1 => Color32::from_rgb(128, 128, 128), // Stone
-            2 => Color32::from_rgb(128, 128, 128), // Stone (duplicate ID?)
-            3 => Color32::from_rgb(194, 178, 128), // Sand
-            4 => Color32::from_rgb(50, 100, 200),  // Water
-            5 => Color32::from_rgb(139, 90, 43),   // Wood
-            6 => Color32::from_rgb(255, 100, 0),   // Fire
-            7 => Color32::from_rgb(100, 100, 100), // Smoke
-            8 => Color32::from_rgb(200, 200, 255), // Steam
-            9 => Color32::from_rgb(255, 69, 0),    // Lava
-            10 => Color32::from_rgb(50, 50, 50),   // Oil
-            11 => Color32::from_rgb(0, 255, 0),    // Acid
-            12 => Color32::from_rgb(180, 220, 255),// Ice
-            13 => Color32::from_rgb(200, 220, 220),// Glass
-            14 => Color32::from_rgb(180, 180, 180),// Metal
-            _ => Color32::from_rgb(150, 150, 150), // Default
+            0 => Color32::from_rgb(0, 0, 0),        // Air (shouldn't appear)
+            1 => Color32::from_rgb(128, 128, 128),  // Stone
+            2 => Color32::from_rgb(128, 128, 128),  // Stone (duplicate ID?)
+            3 => Color32::from_rgb(194, 178, 128),  // Sand
+            4 => Color32::from_rgb(50, 100, 200),   // Water
+            5 => Color32::from_rgb(139, 90, 43),    // Wood
+            6 => Color32::from_rgb(255, 100, 0),    // Fire
+            7 => Color32::from_rgb(100, 100, 100),  // Smoke
+            8 => Color32::from_rgb(200, 200, 255),  // Steam
+            9 => Color32::from_rgb(255, 69, 0),     // Lava
+            10 => Color32::from_rgb(50, 50, 50),    // Oil
+            11 => Color32::from_rgb(0, 255, 0),     // Acid
+            12 => Color32::from_rgb(180, 220, 255), // Ice
+            13 => Color32::from_rgb(200, 220, 220), // Glass
+            14 => Color32::from_rgb(180, 180, 180), // Metal
+            _ => Color32::from_rgb(150, 150, 150),  // Default
         }
     }
 }

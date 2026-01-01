@@ -2,4 +2,4 @@
 
 mod rigid_body;
 
-pub use rigid_body::{PhysicsWorld, FallingDebris, DebrisRenderData};
+pub use rigid_body::{DebrisRenderData, FallingDebris, PhysicsWorld};

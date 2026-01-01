@@ -5,8 +5,8 @@
 //! to neighboring cells over time.
 
 use crate::world::Chunk;
-use std::collections::HashMap;
 use glam::IVec2;
+use std::collections::HashMap;
 
 /// Temperature simulator with 30fps throttling
 pub struct TemperatureSimulator {
@@ -16,9 +16,7 @@ pub struct TemperatureSimulator {
 
 impl TemperatureSimulator {
     pub fn new() -> Self {
-        Self {
-            update_counter: 0,
-        }
+        Self { update_counter: 0 }
     }
 
     /// Update temperature diffusion for all chunks

@@ -1,7 +1,7 @@
 //! Chunk - 64x64 region of pixels
 
-use serde::{Serialize, Deserialize};
 use crate::simulation::MaterialId;
+use serde::{Deserialize, Serialize};
 
 pub const CHUNK_SIZE: usize = 64;
 pub const CHUNK_AREA: usize = CHUNK_SIZE * CHUNK_SIZE;
@@ -16,12 +16,18 @@ pub struct Pixel {
 }
 
 impl Pixel {
-    pub const AIR: Pixel = Pixel { material_id: 0, flags: 0 };
-    
+    pub const AIR: Pixel = Pixel {
+        material_id: 0,
+        flags: 0,
+    };
+
     pub fn new(material_id: u16) -> Self {
-        Self { material_id, flags: 0 }
+        Self {
+            material_id,
+            flags: 0,
+        }
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.material_id == MaterialId::AIR
     }
@@ -29,9 +35,9 @@ impl Pixel {
 
 /// Flag bits for pixel state
 pub mod pixel_flags {
-    pub const UPDATED: u16 = 1 << 0;      // Already updated this frame
-    pub const BURNING: u16 = 1 << 1;      // Currently on fire
-    pub const FALLING: u16 = 1 << 2;      // In free-fall
+    pub const UPDATED: u16 = 1 << 0; // Already updated this frame
+    pub const BURNING: u16 = 1 << 1; // Currently on fire
+    pub const FALLING: u16 = 1 << 2; // In free-fall
 }
 
 /// A 64x64 region of the world
@@ -81,9 +87,14 @@ pub struct DirtyRect {
 
 impl DirtyRect {
     pub fn new(x: usize, y: usize) -> Self {
-        Self { min_x: x, min_y: y, max_x: x, max_y: y }
+        Self {
+            min_x: x,
+            min_y: y,
+            max_x: x,
+            max_y: y,
+        }
     }
-    
+
     pub fn expand(&mut self, x: usize, y: usize) {
         self.min_x = self.min_x.min(x);
         self.min_y = self.min_y.min(y);
@@ -98,15 +109,15 @@ impl Chunk {
             x,
             y,
             pixels: [Pixel::AIR; CHUNK_AREA],
-            temperature: [20.0; 64],  // Room temperature (Celsius)
-            pressure: [1.0; 64],       // Atmospheric pressure
+            temperature: [20.0; 64],       // Room temperature (Celsius)
+            pressure: [1.0; 64],           // Atmospheric pressure
             light_levels: [0; CHUNK_AREA], // Start dark, will be calculated
-            light_dirty: true,         // Needs initial light calculation
+            light_dirty: true,             // Needs initial light calculation
             dirty: false,
             dirty_rect: None,
         }
     }
-    
+
     /// Get pixel at local coordinates (0-63, 0-63)
     #[inline]
     pub fn get_pixel(&self, x: usize, y: usize) -> Pixel {
@@ -122,7 +133,8 @@ impl Chunk {
 
     /// Count non-air pixels (for debugging save/load)
     pub fn count_non_air(&self) -> usize {
-        self.pixels.iter()
+        self.pixels
+            .iter()
             .filter(|p| p.material_id != crate::simulation::MaterialId::AIR)
             .count()
     }
@@ -134,13 +146,13 @@ impl Chunk {
         self.pixels[y * CHUNK_SIZE + x] = pixel;
         self.mark_dirty(x, y);
     }
-    
+
     /// Set pixel by material ID
     #[inline]
     pub fn set_material(&mut self, x: usize, y: usize, material_id: u16) {
         self.set_pixel(x, y, Pixel::new(material_id));
     }
-    
+
     /// Swap two pixels (useful for falling simulation)
     #[inline]
     pub fn swap_pixels(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) {
@@ -179,29 +191,29 @@ impl Chunk {
             None => self.dirty_rect = Some(DirtyRect::new(x, y)),
         }
     }
-    
+
     /// Clear dirty flags for new frame
     pub fn clear_dirty_rect(&mut self) {
         self.dirty_rect = None;
     }
-    
+
     /// Clear all "updated this frame" flags from pixels
     pub fn clear_update_flags(&mut self) {
         for pixel in &mut self.pixels {
             pixel.flags &= !pixel_flags::UPDATED;
         }
     }
-    
+
     /// Get raw pixel slice for rendering
     pub fn pixels(&self) -> &[Pixel] {
         &self.pixels
     }
-    
+
     /// Get temperature at coarse grid position
     pub fn get_temperature(&self, cx: usize, cy: usize) -> f32 {
         self.temperature[cy * 8 + cx]
     }
-    
+
     /// Set temperature at coarse grid position  
     pub fn set_temperature(&mut self, cx: usize, cy: usize, temp: f32) {
         self.temperature[cy * 8 + cx] = temp;
@@ -217,27 +229,27 @@ impl Default for Chunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pixel_access() {
         let mut chunk = Chunk::new(0, 0);
-        
+
         chunk.set_material(10, 20, 5);
         assert_eq!(chunk.get_pixel(10, 20).material_id, 5);
-        
+
         chunk.set_material(0, 0, 1);
         chunk.set_material(63, 63, 2);
         assert_eq!(chunk.get_pixel(0, 0).material_id, 1);
         assert_eq!(chunk.get_pixel(63, 63).material_id, 2);
     }
-    
+
     #[test]
     fn test_dirty_rect() {
         let mut chunk = Chunk::new(0, 0);
-        
+
         chunk.set_material(10, 10, 1);
         chunk.set_material(50, 50, 1);
-        
+
         let rect = chunk.dirty_rect.unwrap();
         assert_eq!(rect.min_x, 10);
         assert_eq!(rect.min_y, 10);

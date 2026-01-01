@@ -1,5 +1,5 @@
-use egui::{Color32, Context, Rect, Rounding, Stroke, Vec2};
 use crate::entity::player::Player;
+use egui::{Color32, Context, Rect, Rounding, Stroke, Vec2};
 
 /// Heads-up display showing player health, hunger, and hotbar
 pub struct Hud {
@@ -17,7 +17,13 @@ impl Hud {
     }
 
     /// Render the HUD overlay
-    pub fn render(&self, ctx: &Context, player: &Player, selected_material: u16, material_names: &[&str]) {
+    pub fn render(
+        &self,
+        ctx: &Context,
+        player: &Player,
+        selected_material: u16,
+        material_names: &[&str],
+    ) {
         if !self.show {
             return;
         }
@@ -33,8 +39,8 @@ impl Hud {
                     "Health",
                     player.health.current,
                     player.health.max,
-                    Color32::from_rgb(220, 50, 50),   // Red
-                    Color32::from_rgb(100, 20, 20),   // Dark red background
+                    Color32::from_rgb(220, 50, 50), // Red
+                    Color32::from_rgb(100, 20, 20), // Dark red background
                 );
 
                 ui.add_space(5.0);
@@ -58,7 +64,8 @@ impl Hud {
                 ui.add_space(5.0);
 
                 // Inventory summary
-                ui.label(format!("Inventory: {}/{} slots",
+                ui.label(format!(
+                    "Inventory: {}/{} slots",
                     player.inventory.used_slot_count(),
                     player.inventory.max_slots
                 ));
@@ -66,9 +73,9 @@ impl Hud {
                 // Show selected material
                 if (selected_material as usize) < material_names.len() {
                     let count = player.inventory.count_item(selected_material);
-                    ui.label(format!("Selected: {} ({})",
-                        material_names[selected_material as usize],
-                        count
+                    ui.label(format!(
+                        "Selected: {} ({})",
+                        material_names[selected_material as usize], count
                     ));
                 }
 
@@ -98,10 +105,8 @@ impl Hud {
             let bar_width = 200.0;
             let bar_height = 20.0;
 
-            let (response, painter) = ui.allocate_painter(
-                Vec2::new(bar_width, bar_height),
-                egui::Sense::hover()
-            );
+            let (response, painter) =
+                ui.allocate_painter(Vec2::new(bar_width, bar_height), egui::Sense::hover());
 
             let rect = response.rect;
 
@@ -110,10 +115,7 @@ impl Hud {
 
             // Fill
             let fill_width = bar_width * percentage;
-            let fill_rect = Rect::from_min_size(
-                rect.min,
-                Vec2::new(fill_width, bar_height)
-            );
+            let fill_rect = Rect::from_min_size(rect.min, Vec2::new(fill_width, bar_height));
             painter.rect_filled(fill_rect, Rounding::same(4.0), fill_color);
 
             // Border

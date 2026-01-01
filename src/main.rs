@@ -1,6 +1,6 @@
 use clap::Parser;
-use sunaba::App;
 use std::path::PathBuf;
+use sunaba::App;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

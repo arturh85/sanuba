@@ -6,8 +6,8 @@
 //! - Boiling (liquid → gas)
 //! - Condensing (gas → liquid)
 
-use crate::world::Pixel;
 use crate::simulation::materials::MaterialDef;
+use crate::world::Pixel;
 
 /// System for checking and applying state changes
 pub struct StateChangeSystem;
@@ -16,11 +16,7 @@ impl StateChangeSystem {
     /// Check if a pixel should change state based on temperature
     ///
     /// Returns true if the pixel was transformed to a different material
-    pub fn check_state_change(
-        pixel: &mut Pixel,
-        material: &MaterialDef,
-        temperature: f32,
-    ) -> bool {
+    pub fn check_state_change(pixel: &mut Pixel, material: &MaterialDef, temperature: f32) -> bool {
         // Check melting (solid → liquid, e.g., ice → water)
         if let Some(melt_temp) = material.melting_point {
             if temperature >= melt_temp {
@@ -75,7 +71,9 @@ mod tests {
         let mut pixel = Pixel::new(MaterialId::ICE);
 
         // Below melting point - no change
-        assert!(!StateChangeSystem::check_state_change(&mut pixel, &ice, -10.0));
+        assert!(!StateChangeSystem::check_state_change(
+            &mut pixel, &ice, -10.0
+        ));
         assert_eq!(pixel.material_id, MaterialId::ICE);
 
         // At melting point - should melt
@@ -98,11 +96,15 @@ mod tests {
         let mut pixel = Pixel::new(MaterialId::WATER);
 
         // Below boiling point - no change
-        assert!(!StateChangeSystem::check_state_change(&mut pixel, &water, 50.0));
+        assert!(!StateChangeSystem::check_state_change(
+            &mut pixel, &water, 50.0
+        ));
         assert_eq!(pixel.material_id, MaterialId::WATER);
 
         // At boiling point - should boil
-        assert!(StateChangeSystem::check_state_change(&mut pixel, &water, 100.0));
+        assert!(StateChangeSystem::check_state_change(
+            &mut pixel, &water, 100.0
+        ));
         assert_eq!(pixel.material_id, MaterialId::STEAM);
     }
 
@@ -121,11 +123,15 @@ mod tests {
         let mut pixel = Pixel::new(MaterialId::WATER);
 
         // Above freezing point - no change
-        assert!(!StateChangeSystem::check_state_change(&mut pixel, &water, 10.0));
+        assert!(!StateChangeSystem::check_state_change(
+            &mut pixel, &water, 10.0
+        ));
         assert_eq!(pixel.material_id, MaterialId::WATER);
 
         // At freezing point - should freeze
-        assert!(StateChangeSystem::check_state_change(&mut pixel, &water, 0.0));
+        assert!(StateChangeSystem::check_state_change(
+            &mut pixel, &water, 0.0
+        ));
         assert_eq!(pixel.material_id, MaterialId::ICE);
     }
 }

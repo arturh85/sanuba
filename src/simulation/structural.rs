@@ -1,9 +1,9 @@
 //! Structural integrity checking and falling debris conversion
 
-use std::collections::{HashSet, VecDeque};
-use glam::IVec2;
+use crate::simulation::{MaterialId, MaterialType};
 use crate::world::World;
-use crate::simulation::{MaterialType, MaterialId};
+use glam::IVec2;
+use std::collections::{HashSet, VecDeque};
 
 /// Maximum distance to check for structural support
 const MAX_FLOOD_FILL_RADIUS: i32 = 64;
@@ -59,10 +59,10 @@ impl StructuralIntegritySystem {
 
         // Get the pixel that was removed - check all 4 neighbors
         let neighbors = [
-            (world_x, world_y + 1),  // Above
-            (world_x + 1, world_y),  // Right
-            (world_x, world_y - 1),  // Below
-            (world_x - 1, world_y),  // Left
+            (world_x, world_y + 1), // Above
+            (world_x + 1, world_y), // Right
+            (world_x, world_y - 1), // Below
+            (world_x - 1, world_y), // Left
         ];
 
         for (nx, ny) in neighbors {
@@ -79,7 +79,12 @@ impl StructuralIntegritySystem {
 
                 // Perform flood fill to find connected region
                 let region = Self::flood_fill_structural(world, nx, ny);
-                log::debug!("Structural: Flood fill from ({}, {}): found {} pixels", nx, ny, region.len());
+                log::debug!(
+                    "Structural: Flood fill from ({}, {}): found {} pixels",
+                    nx,
+                    ny,
+                    region.len()
+                );
 
                 // Check if region is anchored (connected to bedrock)
                 let is_anchored = Self::is_region_anchored(world, &region);
@@ -88,11 +93,17 @@ impl StructuralIntegritySystem {
                 if !is_anchored {
                     // Convert based on size
                     if region.len() < SMALL_DEBRIS_THRESHOLD {
-                        log::info!("Structural: Converting {} pixels to sand particles", region.len());
+                        log::info!(
+                            "Structural: Converting {} pixels to sand particles",
+                            region.len()
+                        );
                         Self::convert_to_particles(world, region);
                     } else {
                         // Large debris - create rigid body
-                        log::info!("Structural: Converting {} pixels to rigid body", region.len());
+                        log::info!(
+                            "Structural: Converting {} pixels to rigid body",
+                            region.len()
+                        );
                         Self::convert_to_rigid_body(world, region);
                     }
                 }

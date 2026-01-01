@@ -1,6 +1,6 @@
 //! Material definitions and registry
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Built-in material IDs
 pub struct MaterialId;
@@ -90,13 +90,13 @@ pub struct MaterialDef {
     pub id: u16,
     pub name: String,
     pub material_type: MaterialType,
-    
+
     /// Base color (RGBA)
     pub color: [u8; 4],
-    
+
     /// Density (g/cm³) - affects sinking/floating
     pub density: f32,
-    
+
     // Physical properties
     /// Mining/breaking resistance (None = unbreakable)
     pub hardness: Option<u8>,
@@ -104,7 +104,7 @@ pub struct MaterialDef {
     pub friction: f32,
     /// Flow speed (liquids)
     pub viscosity: f32,
-    
+
     // Thermal properties
     /// Temperature at which this melts (Celsius)
     pub melting_point: Option<f32>,
@@ -116,7 +116,7 @@ pub struct MaterialDef {
     pub ignition_temp: Option<f32>,
     /// Heat conductivity (0.0 - 1.0)
     pub heat_conductivity: f32,
-    
+
     // State transitions
     /// What this becomes when melted
     pub melts_to: Option<u16>,
@@ -128,7 +128,7 @@ pub struct MaterialDef {
     pub burns_to: Option<u16>,
     /// How fast this burns (0.0 - 1.0)
     pub burn_rate: f32,
-    
+
     // Flags
     pub flammable: bool,
     /// Can support other solid pixels
@@ -197,7 +197,7 @@ impl Materials {
         materials.register_defaults();
         materials
     }
-    
+
     fn register_defaults(&mut self) {
         // Air (empty space)
         self.register(MaterialDef {
@@ -209,7 +209,7 @@ impl Materials {
             hardness: None,
             ..Default::default()
         });
-        
+
         // Stone
         self.register(MaterialDef {
             id: MaterialId::STONE,
@@ -223,7 +223,7 @@ impl Materials {
             melts_to: Some(MaterialId::LAVA),
             ..Default::default()
         });
-        
+
         // Sand
         self.register(MaterialDef {
             id: MaterialId::SAND,
@@ -237,7 +237,7 @@ impl Materials {
             melts_to: Some(MaterialId::GLASS),
             ..Default::default()
         });
-        
+
         // Water
         self.register(MaterialDef {
             id: MaterialId::WATER,
@@ -254,7 +254,7 @@ impl Materials {
             heat_conductivity: 0.6,
             ..Default::default()
         });
-        
+
         // Wood
         self.register(MaterialDef {
             id: MaterialId::WOOD,
@@ -272,7 +272,7 @@ impl Materials {
             tags: vec![MaterialTag::Organic, MaterialTag::Fuel],
             ..Default::default()
         });
-        
+
         // Fire
         self.register(MaterialDef {
             id: MaterialId::FIRE,
@@ -283,7 +283,7 @@ impl Materials {
             hardness: None,
             ..Default::default()
         });
-        
+
         // Smoke
         self.register(MaterialDef {
             id: MaterialId::SMOKE,
@@ -294,7 +294,7 @@ impl Materials {
             hardness: None,
             ..Default::default()
         });
-        
+
         // Steam
         self.register(MaterialDef {
             id: MaterialId::STEAM,
@@ -307,7 +307,7 @@ impl Materials {
             freezes_to: Some(MaterialId::WATER),
             ..Default::default()
         });
-        
+
         // Lava
         self.register(MaterialDef {
             id: MaterialId::LAVA,
@@ -322,7 +322,7 @@ impl Materials {
             heat_conductivity: 0.8,
             ..Default::default()
         });
-        
+
         // Oil
         self.register(MaterialDef {
             id: MaterialId::OIL,
@@ -338,7 +338,7 @@ impl Materials {
             burn_rate: 0.05,
             ..Default::default()
         });
-        
+
         // Acid
         self.register(MaterialDef {
             id: MaterialId::ACID,
@@ -350,7 +350,7 @@ impl Materials {
             viscosity: 0.2,
             ..Default::default()
         });
-        
+
         // Ice
         self.register(MaterialDef {
             id: MaterialId::ICE,
@@ -364,7 +364,7 @@ impl Materials {
             melts_to: Some(MaterialId::WATER),
             ..Default::default()
         });
-        
+
         // Glass
         self.register(MaterialDef {
             id: MaterialId::GLASS,
@@ -378,7 +378,7 @@ impl Materials {
             melts_to: Some(MaterialId::LAVA), // Molten glass
             ..Default::default()
         });
-        
+
         // Metal
         self.register(MaterialDef {
             id: MaterialId::METAL,
@@ -455,7 +455,7 @@ impl Materials {
             hardness: Some(1),
             friction: 0.2,
             nutritional_value: Some(40.0), // High calories
-            hardness_multiplier: 0.1, // Almost instant harvest
+            hardness_multiplier: 0.1,      // Almost instant harvest
             tags: vec![MaterialTag::Organic, MaterialTag::Edible],
             ..Default::default()
         });
@@ -667,7 +667,7 @@ impl Materials {
             flammable: true,
             ignition_temp: Some(150.0),
             burns_to: Some(MaterialId::SMOKE),
-            burn_rate: 0.9, // Burns VERY fast (explosion)
+            burn_rate: 0.9,         // Burns VERY fast (explosion)
             fuel_value: Some(50.0), // High energy
             tags: vec![MaterialTag::Fuel],
             ..Default::default()
@@ -699,23 +699,25 @@ impl Materials {
             ..Default::default()
         });
     }
-    
+
     fn register(&mut self, material: MaterialDef) {
         let id = material.id as usize;
-        
+
         // Ensure vec is large enough
         if self.materials.len() <= id {
             self.materials.resize(id + 1, MaterialDef::default());
         }
-        
+
         self.materials[id] = material;
     }
-    
+
     /// Get material definition by ID
     pub fn get(&self, id: u16) -> &MaterialDef {
-        self.materials.get(id as usize).unwrap_or(&self.materials[0])
+        self.materials
+            .get(id as usize)
+            .unwrap_or(&self.materials[0])
     }
-    
+
     /// Get color for a material
     pub fn get_color(&self, id: u16) -> [u8; 4] {
         self.get(id).color

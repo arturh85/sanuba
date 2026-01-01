@@ -3,21 +3,21 @@
 //! A survival game where every pixel is simulated with material properties.
 
 pub mod app;
-pub mod world;
-pub mod simulation;
+pub mod entity;
+pub mod levels;
 pub mod physics;
 pub mod render;
+pub mod simulation;
 pub mod ui;
-pub mod levels;
-pub mod entity;
+pub mod world;
 
 pub use app::App;
 
 /// Common imports for internal use
 pub mod prelude {
-    pub use crate::world::{Chunk, World, Pixel, CHUNK_SIZE};
-    pub use crate::simulation::{Materials, MaterialId, MaterialType};
-    pub use glam::{Vec2, IVec2};
+    pub use crate::simulation::{MaterialId, MaterialType, Materials};
+    pub use crate::world::{Chunk, Pixel, World, CHUNK_SIZE};
+    pub use glam::{IVec2, Vec2};
 }
 
 // WASM entry point

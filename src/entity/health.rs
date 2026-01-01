@@ -10,10 +10,7 @@ pub struct Health {
 impl Health {
     /// Create a new health component with the specified max health
     pub fn new(max: f32) -> Self {
-        Health {
-            current: max,
-            max,
-        }
+        Health { current: max, max }
     }
 
     /// Deal damage to this entity
@@ -77,7 +74,7 @@ impl Default for Health {
 pub struct Hunger {
     pub current: f32,
     pub max: f32,
-    pub drain_rate: f32,       // Units per second
+    pub drain_rate: f32,        // Units per second
     pub starvation_damage: f32, // Damage per second when starving
 }
 

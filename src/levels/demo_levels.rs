@@ -1,7 +1,7 @@
 //! Demo level generators
 
-use crate::world::{World, Chunk, CHUNK_SIZE};
 use crate::simulation::MaterialId;
+use crate::world::{Chunk, World, CHUNK_SIZE};
 
 /// Level 1: Basic Physics Playground
 /// Sand pile (left), water pool (right), stone platforms
@@ -388,10 +388,9 @@ pub fn generate_level_8_volcano(world: &mut World) {
                             }
                         }
 
-                        if right_x < CHUNK_SIZE && y < CHUNK_SIZE
-                            && dx >= 4 {
-                                chunk.set_material(right_x, y, MaterialId::STONE);
-                            }
+                        if right_x < CHUNK_SIZE && y < CHUNK_SIZE && dx >= 4 {
+                            chunk.set_material(right_x, y, MaterialId::STONE);
+                        }
 
                         // Inner chamber (lava)
                         if dx < 4 && y < 44 {
@@ -1668,9 +1667,20 @@ pub fn generate_level_21_day_night_cycle(world: &mut World) {
 
                 // Plant seeds around water
                 let plant_positions = [
-                    (26, 34), (27, 34), (28, 34), (29, 34), (30, 34),
-                    (33, 34), (34, 34), (35, 34), (36, 34), (37, 34),
-                    (26, 35), (27, 35), (37, 35), (38, 35),
+                    (26, 34),
+                    (27, 34),
+                    (28, 34),
+                    (29, 34),
+                    (30, 34),
+                    (33, 34),
+                    (34, 34),
+                    (35, 34),
+                    (36, 34),
+                    (37, 34),
+                    (26, 35),
+                    (27, 35),
+                    (37, 35),
+                    (38, 35),
                 ];
                 for (x, y) in plant_positions {
                     chunk.set_material(x, y, MaterialId::PLANT_MATTER);
@@ -1699,10 +1709,8 @@ pub fn generate_level_21_day_night_cycle(world: &mut World) {
                 chunk.set_material(50, 16, MaterialId::WATER);
 
                 // Plants in underground (will grow with fire light)
-                let underground_plants = [
-                    (46, 17), (47, 17), (48, 17),
-                    (51, 17), (52, 17), (53, 17),
-                ];
+                let underground_plants =
+                    [(46, 17), (47, 17), (48, 17), (51, 17), (52, 17), (53, 17)];
                 for (x, y) in underground_plants {
                     chunk.set_material(x, y, MaterialId::PLANT_MATTER);
                 }

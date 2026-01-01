@@ -3,8 +3,8 @@
 //! Handles interactions between different materials when they come into contact.
 //! Examples: water + lava → steam + stone, acid + metal → air + air (corrosion)
 
-use serde::{Serialize, Deserialize};
 use crate::simulation::MaterialId;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Definition of a chemical reaction between two materials
@@ -287,7 +287,7 @@ impl ReactionRegistry {
             catalyst: None,
             output_a: MaterialId::SMOKE,
             output_b: MaterialId::SMOKE,
-            probability: 0.9, // Very rapid
+            probability: 0.9,       // Very rapid
             energy_released: 100.0, // Highly exothermic
         });
 
@@ -326,7 +326,7 @@ impl ReactionRegistry {
             catalyst: None,
             output_a: MaterialId::PLANT_MATTER,
             output_b: MaterialId::PLANT_MATTER,
-            probability: 0.0005, // Very slow growth
+            probability: 0.0005,   // Very slow growth
             energy_released: -3.0, // Endothermic (photosynthesis)
         });
 
@@ -520,7 +520,13 @@ impl ReactionRegistry {
     ///
     /// Returns the first matching reaction, or None if no reaction possible
     /// O(1) HashMap lookup + O(k) where k = reactions for this material pair (typically 1-3)
-    pub fn find_reaction(&self, mat_a: u16, mat_b: u16, temp: f32, light_level: u8) -> Option<&Reaction> {
+    pub fn find_reaction(
+        &self,
+        mat_a: u16,
+        mat_b: u16,
+        temp: f32,
+        light_level: u8,
+    ) -> Option<&Reaction> {
         // Normalize material order for HashMap key
         let key = if mat_a <= mat_b {
             (mat_a, mat_b)
@@ -548,7 +554,7 @@ impl ReactionRegistry {
             // Check light condition (Phase 5)
             if let Some(min_light) = reaction.requires_light {
                 if light_level < min_light {
-                    continue;  // Insufficient light
+                    continue; // Insufficient light
                 }
             }
 
@@ -618,16 +624,18 @@ mod tests {
     fn test_get_outputs() {
         let registry = ReactionRegistry::new();
 
-        let reaction = registry.find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0).unwrap();
+        let reaction = registry
+            .find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0)
+            .unwrap();
 
         // Water + Lava
         let (out_a, out_b) = registry.get_outputs(reaction, MaterialId::WATER, MaterialId::LAVA);
-        assert_eq!(out_a, MaterialId::STEAM);  // Water → Steam
-        assert_eq!(out_b, MaterialId::STONE);  // Lava → Stone
+        assert_eq!(out_a, MaterialId::STEAM); // Water → Steam
+        assert_eq!(out_b, MaterialId::STONE); // Lava → Stone
 
         // Lava + Water (swapped)
         let (out_a, out_b) = registry.get_outputs(reaction, MaterialId::LAVA, MaterialId::WATER);
-        assert_eq!(out_a, MaterialId::STONE);  // Lava → Stone
-        assert_eq!(out_b, MaterialId::STEAM);  // Water → Steam
+        assert_eq!(out_a, MaterialId::STONE); // Lava → Stone
+        assert_eq!(out_b, MaterialId::STEAM); // Water → Steam
     }
 }

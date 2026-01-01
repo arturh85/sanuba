@@ -1,7 +1,11 @@
 use glam::Vec2;
 use serde::{Deserialize, Serialize};
 
-use super::{EntityId, inventory::Inventory, health::{Health, Hunger}};
+use super::{
+    health::{Health, Hunger},
+    inventory::Inventory,
+    EntityId,
+};
 
 /// The player entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,8 +36,8 @@ impl Player {
         // Using material IDs from simulation/materials.rs
         player.inventory.add_item(2, 100); // Stone
         player.inventory.add_item(3, 100); // Sand
-        player.inventory.add_item(4, 50);  // Water
-        player.inventory.add_item(5, 50);  // Wood
+        player.inventory.add_item(4, 50); // Water
+        player.inventory.add_item(5, 50); // Wood
 
         player
     }

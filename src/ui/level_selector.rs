@@ -81,41 +81,40 @@ impl LevelSelectorState {
                 ui.add_space(5.0);
 
                 // Scrollable list of demo levels
-                egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
-                    let levels = level_manager.levels();
-                    for (idx, level) in levels.iter().enumerate() {
-                        let is_current = !in_persistent_world
-                            && level_manager.current_level() == idx;
+                egui::ScrollArea::vertical()
+                    .max_height(400.0)
+                    .show(ui, |ui| {
+                        let levels = level_manager.levels();
+                        for (idx, level) in levels.iter().enumerate() {
+                            let is_current =
+                                !in_persistent_world && level_manager.current_level() == idx;
 
-                        let mut button_text = format!("{}. {}", idx + 1, level.name);
-                        if is_current {
-                            button_text.push_str(" ◄");
+                            let mut button_text = format!("{}. {}", idx + 1, level.name);
+                            if is_current {
+                                button_text.push_str(" ◄");
+                            }
+
+                            let button = egui::Button::new(&button_text);
+                            let mut response = ui.add(button);
+
+                            if is_current {
+                                response = response.highlight();
+                            }
+
+                            if response.on_hover_text(level.description).clicked() {
+                                self.selected_level = Some(idx);
+                                self.visible = false;
+                            }
+
+                            // Show description below button
+                            ui.label(
+                                egui::RichText::new(format!("   {}", level.description))
+                                    .size(11.0)
+                                    .color(egui::Color32::GRAY),
+                            );
+                            ui.add_space(5.0);
                         }
-
-                        let button = egui::Button::new(&button_text);
-                        let mut response = ui.add(button);
-
-                        if is_current {
-                            response = response.highlight();
-                        }
-
-                        if response
-                            .on_hover_text(level.description)
-                            .clicked()
-                        {
-                            self.selected_level = Some(idx);
-                            self.visible = false;
-                        }
-
-                        // Show description below button
-                        ui.label(
-                            egui::RichText::new(format!("   {}", level.description))
-                                .size(11.0)
-                                .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(5.0);
-                    }
-                });
+                    });
 
                 ui.separator();
                 ui.label(

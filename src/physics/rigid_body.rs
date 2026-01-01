@@ -1,8 +1,8 @@
 //! Rigid body physics for falling debris
 
-use std::collections::HashMap;
 use glam::{IVec2, Vec2};
 use rapier2d::prelude::*;
+use std::collections::HashMap;
 
 /// Falling debris tracked as a rigid body
 pub struct FallingDebris {
@@ -81,20 +81,24 @@ impl PhysicsWorld {
 
         // IMPORTANT: Create static ground plane below world to stop infinite falling
         // Bedrock ends at y=-57, so ground at y=-200 is safely below
-        let ground_half_width = 5000.0;  // Wide enough for any debris
-        let ground_half_height = 50.0;   // Thick enough to be solid
-        let ground_y = -200.0;           // Well below bedrock
+        let ground_half_width = 5000.0; // Wide enough for any debris
+        let ground_half_height = 50.0; // Thick enough to be solid
+        let ground_y = -200.0; // Well below bedrock
 
         let ground = ColliderBuilder::cuboid(ground_half_width, ground_half_height)
             .translation(vector![0.0, ground_y])
-            .friction(0.8)       // High friction so debris don't slide much
-            .restitution(0.1)    // Low bounce
+            .friction(0.8) // High friction so debris don't slide much
+            .restitution(0.1) // Low bounce
             .build();
 
         collider_set.insert(ground);
 
-        log::info!("Physics: Created ground plane at y={} ({}x{} pixels)",
-                   ground_y, ground_half_width * 2.0, ground_half_height * 2.0);
+        log::info!(
+            "Physics: Created ground plane at y={} ({}x{} pixels)",
+            ground_y,
+            ground_half_width * 2.0,
+            ground_half_height * 2.0
+        );
 
         // Optional: Add side walls to prevent debris from flying off-screen
         let wall_half_width = 50.0;
@@ -113,7 +117,7 @@ impl PhysicsWorld {
 
         Self {
             rigid_body_set: RigidBodySet::new(),
-            collider_set,  // Use the collider_set with ground plane and walls
+            collider_set, // Use the collider_set with ground plane and walls
             pipeline: PhysicsPipeline::new(),
             integration_parameters,
             island_manager: IslandManager::new(),
@@ -129,15 +133,16 @@ impl PhysicsWorld {
 
     /// Create falling debris from a pixel region
     /// Returns the rigid body handle
-    pub fn create_debris(
-        &mut self,
-        pixels: HashMap<IVec2, u16>,
-    ) -> RigidBodyHandle {
+    pub fn create_debris(&mut self, pixels: HashMap<IVec2, u16>) -> RigidBodyHandle {
         // Calculate center of mass from absolute coords
         let center = self.calculate_center_of_mass(&pixels);
 
-        log::info!("Physics: Creating rigid body debris: {} pixels at center ({:.1}, {:.1})",
-                   pixels.len(), center.x, center.y);
+        log::info!(
+            "Physics: Creating rigid body debris: {} pixels at center ({:.1}, {:.1})",
+            pixels.len(),
+            center.x,
+            center.y
+        );
 
         // Convert pixels to relative coordinates (offset from center)
         let mut relative_pixels = HashMap::new();
@@ -156,18 +161,16 @@ impl PhysicsWorld {
 
         // Create collider from pixel shape (use relative pixels)
         let collider = self.create_collider_from_pixels(&relative_pixels, Vec2::ZERO);
-        let collider_handle = self.collider_set.insert_with_parent(
-            collider,
-            body_handle,
-            &mut self.rigid_body_set,
-        );
+        let collider_handle =
+            self.collider_set
+                .insert_with_parent(collider, body_handle, &mut self.rigid_body_set);
 
         // Store debris data
         let debris = FallingDebris {
             body_handle,
             collider_handle,
-            pixels: relative_pixels,  // Store relative coords
-            original_center: center,   // For debugging
+            pixels: relative_pixels, // Store relative coords
+            original_center: center, // For debugging
         };
 
         self.debris.insert(body_handle, debris);
@@ -214,8 +217,11 @@ impl PhysicsWorld {
 
             if velocity_magnitude < 5.0 {
                 // Settled - not moving much
-                log::info!("Physics: Debris settled: handle={:?}, velocity={:.2} px/s",
-                           handle, velocity_magnitude);
+                log::info!(
+                    "Physics: Debris settled: handle={:?}, velocity={:.2} px/s",
+                    handle,
+                    velocity_magnitude
+                );
                 settled.push(*handle);
             }
         }
@@ -287,8 +293,11 @@ impl PhysicsWorld {
         let height = (max.y - min.y + 1) as f32;
         let half_extents = vector![width * 0.5, height * 0.5];
 
-        log::debug!("Physics: Created collider {}x{} pixels, density=2.0",
-                   width, height);
+        log::debug!(
+            "Physics: Created collider {}x{} pixels, density=2.0",
+            width,
+            height
+        );
 
         ColliderBuilder::cuboid(half_extents.x, half_extents.y)
             .density(2.0) // Average material density
@@ -323,7 +332,7 @@ impl PhysicsWorld {
     /// This creates a physics collision box for a chunk to prevent debris from falling through
     pub fn add_bedrock_collider(&mut self, chunk_x: i32, chunk_y: i32) {
         // Create a static cuboid for this chunk
-        const CHUNK_SIZE: f32 = 64.0;  // Must match world::CHUNK_SIZE
+        const CHUNK_SIZE: f32 = 64.0; // Must match world::CHUNK_SIZE
         let world_x = (chunk_x as f32 * CHUNK_SIZE) + (CHUNK_SIZE / 2.0);
         let world_y = (chunk_y as f32 * CHUNK_SIZE) + (CHUNK_SIZE / 2.0);
 
@@ -335,7 +344,11 @@ impl PhysicsWorld {
 
         self.collider_set.insert(collider);
 
-        log::debug!("Physics: Added bedrock collider at chunk ({}, {})", chunk_x, chunk_y);
+        log::debug!(
+            "Physics: Added bedrock collider at chunk ({}, {})",
+            chunk_x,
+            chunk_y
+        );
     }
 }
 

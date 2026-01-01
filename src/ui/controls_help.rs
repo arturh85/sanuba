@@ -8,7 +8,7 @@ pub struct ControlsHelpState {
 impl ControlsHelpState {
     pub fn new() -> Self {
         Self {
-            visible: false,  // Start hidden
+            visible: false, // Start hidden
         }
     }
 
@@ -18,7 +18,12 @@ impl ControlsHelpState {
     }
 
     /// Render controls help panel
-    pub fn render(&self, ctx: &egui::Context, selected_material_id: u16, materials: &crate::simulation::Materials) {
+    pub fn render(
+        &self,
+        ctx: &egui::Context,
+        selected_material_id: u16,
+        materials: &crate::simulation::Materials,
+    ) {
         if !self.visible {
             return;
         }
@@ -68,9 +73,11 @@ impl ControlsHelpState {
 
                     if mat_id == selected_material_id {
                         // Highlight selected material
-                        ui.label(egui::RichText::new(text)
-                            .color(egui::Color32::YELLOW)
-                            .strong());
+                        ui.label(
+                            egui::RichText::new(text)
+                                .color(egui::Color32::YELLOW)
+                                .strong(),
+                        );
                     } else {
                         ui.label(text);
                     }
@@ -93,14 +100,22 @@ impl ControlsHelpState {
 
                 ui.add_space(8.0);
                 ui.separator();
-                ui.label(egui::RichText::new(format!("Selected: {}", selected_material.name))
-                    .color(egui::Color32::LIGHT_BLUE)
-                    .strong());
+                ui.label(
+                    egui::RichText::new(format!("Selected: {}", selected_material.name))
+                        .color(egui::Color32::LIGHT_BLUE)
+                        .strong(),
+                );
             });
     }
 
     /// Render controls help panel with level name
-    pub fn render_with_level(&self, ctx: &egui::Context, selected_material_id: u16, materials: &crate::simulation::Materials, level_name: &str) {
+    pub fn render_with_level(
+        &self,
+        ctx: &egui::Context,
+        selected_material_id: u16,
+        materials: &crate::simulation::Materials,
+        level_name: &str,
+    ) {
         if !self.visible {
             return;
         }
@@ -150,9 +165,11 @@ impl ControlsHelpState {
 
                     if mat_id == selected_material_id {
                         // Highlight selected material
-                        ui.label(egui::RichText::new(text)
-                            .color(egui::Color32::YELLOW)
-                            .strong());
+                        ui.label(
+                            egui::RichText::new(text)
+                                .color(egui::Color32::YELLOW)
+                                .strong(),
+                        );
                     } else {
                         ui.label(text);
                     }
@@ -175,12 +192,16 @@ impl ControlsHelpState {
 
                 ui.add_space(8.0);
                 ui.separator();
-                ui.label(egui::RichText::new(format!("Selected: {}", selected_material.name))
-                    .color(egui::Color32::LIGHT_BLUE)
-                    .strong());
-                ui.label(egui::RichText::new(format!("Mode: {}", level_name))
-                    .color(egui::Color32::LIGHT_GREEN)
-                    .strong());
+                ui.label(
+                    egui::RichText::new(format!("Selected: {}", selected_material.name))
+                        .color(egui::Color32::LIGHT_BLUE)
+                        .strong(),
+                );
+                ui.label(
+                    egui::RichText::new(format!("Mode: {}", level_name))
+                        .color(egui::Color32::LIGHT_GREEN)
+                        .strong(),
+                );
             });
     }
 }

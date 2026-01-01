@@ -1,6 +1,6 @@
+use crate::entity::player::Player;
 use crate::world::chunk::Chunk;
 use crate::world::generation::WorldGenerator;
-use crate::entity::player::Player;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -74,12 +74,16 @@ impl ChunkPersistence {
         let path = self.chunk_path(chunk.x, chunk.y);
         let non_air = chunk.count_non_air();
 
-        log::info!("[SAVE] Chunk ({}, {}) - {} non-air pixels - {:?}",
-                   chunk.x, chunk.y, non_air, path);
+        log::info!(
+            "[SAVE] Chunk ({}, {}) - {} non-air pixels - {:?}",
+            chunk.x,
+            chunk.y,
+            non_air,
+            path
+        );
 
         // Serialize with bincode
-        let serialized =
-            bincode::serialize(chunk).context("Failed to serialize chunk")?;
+        let serialized = bincode::serialize(chunk).context("Failed to serialize chunk")?;
 
         // Compress with lz4
         let compressed = lz4_flex::compress_prepend_size(&serialized);
@@ -87,31 +91,38 @@ impl ChunkPersistence {
 
         // Atomic write: write to temp file, then rename
         let temp_path = path.with_extension("tmp");
-        std::fs::write(&temp_path, compressed)
-            .context("Failed to write chunk temp file")?;
+        std::fs::write(&temp_path, compressed).context("Failed to write chunk temp file")?;
         std::fs::rename(temp_path, &path).context("Failed to rename chunk file")?;
 
-        log::info!("[SAVE] Chunk ({}, {}) saved successfully ({} bytes compressed)",
-                   chunk.x, chunk.y, compressed_size);
+        log::info!(
+            "[SAVE] Chunk ({}, {}) saved successfully ({} bytes compressed)",
+            chunk.x,
+            chunk.y,
+            compressed_size
+        );
 
         Ok(())
     }
 
     /// Load a chunk from disk, or generate if missing
-    pub fn load_chunk(
-        &self,
-        chunk_x: i32,
-        chunk_y: i32,
-        generator: &WorldGenerator,
-    ) -> Chunk {
+    pub fn load_chunk(&self, chunk_x: i32, chunk_y: i32, generator: &WorldGenerator) -> Chunk {
         let path = self.chunk_path(chunk_x, chunk_y);
 
         if !path.exists() {
             // Generate new chunk
-            log::info!("[GEN] Chunk ({}, {}) - file doesn't exist, generating", chunk_x, chunk_y);
+            log::info!(
+                "[GEN] Chunk ({}, {}) - file doesn't exist, generating",
+                chunk_x,
+                chunk_y
+            );
             let chunk = generator.generate_chunk(chunk_x, chunk_y);
             let non_air = chunk.count_non_air();
-            log::info!("[GEN] Chunk ({}, {}) generated - {} non-air pixels", chunk_x, chunk_y, non_air);
+            log::info!(
+                "[GEN] Chunk ({}, {}) generated - {} non-air pixels",
+                chunk_x,
+                chunk_y,
+                non_air
+            );
             return chunk;
         }
 
@@ -119,7 +130,12 @@ impl ChunkPersistence {
         match self.load_chunk_file(&path) {
             Ok(chunk) => {
                 let non_air = chunk.count_non_air();
-                log::info!("[LOAD] Chunk ({}, {}) from disk - {} non-air pixels", chunk_x, chunk_y, non_air);
+                log::info!(
+                    "[LOAD] Chunk ({}, {}) from disk - {} non-air pixels",
+                    chunk_x,
+                    chunk_y,
+                    non_air
+                );
                 chunk
             }
             Err(e) => {
@@ -131,7 +147,12 @@ impl ChunkPersistence {
                 );
                 let chunk = generator.generate_chunk(chunk_x, chunk_y);
                 let non_air = chunk.count_non_air();
-                log::info!("[GEN] Chunk ({}, {}) regenerated after load failure - {} non-air pixels", chunk_x, chunk_y, non_air);
+                log::info!(
+                    "[GEN] Chunk ({}, {}) regenerated after load failure - {} non-air pixels",
+                    chunk_x,
+                    chunk_y,
+                    non_air
+                );
                 chunk
             }
         }
@@ -145,11 +166,10 @@ impl ChunkPersistence {
             .context("Failed to decompress chunk")?;
         log::debug!("Decompressed to {} bytes", serialized.len());
 
-        let chunk: Chunk = bincode::deserialize(&serialized)
-            .map_err(|e| {
-                log::error!("Bincode deserialization error: {:?}", e);
-                anyhow::anyhow!("Failed to deserialize chunk: {:?}", e)
-            })?;
+        let chunk: Chunk = bincode::deserialize(&serialized).map_err(|e| {
+            log::error!("Bincode deserialization error: {:?}", e);
+            anyhow::anyhow!("Failed to deserialize chunk: {:?}", e)
+        })?;
         log::debug!("Successfully deserialized chunk");
         Ok(chunk)
     }
@@ -200,8 +220,7 @@ impl ChunkPersistence {
     pub fn delete_world(world_name: &str) -> Result<()> {
         let world_dir = PathBuf::from("worlds").join(world_name);
         if world_dir.exists() {
-            std::fs::remove_dir_all(&world_dir)
-                .context("Failed to delete world directory")?;
+            std::fs::remove_dir_all(&world_dir).context("Failed to delete world directory")?;
             log::info!("Deleted world: {}", world_name);
         }
         Ok(())
@@ -221,12 +240,7 @@ impl ChunkPersistence {
         Ok(())
     }
 
-    pub fn load_chunk(
-        &self,
-        chunk_x: i32,
-        chunk_y: i32,
-        generator: &WorldGenerator,
-    ) -> Chunk {
+    pub fn load_chunk(&self, chunk_x: i32, chunk_y: i32, generator: &WorldGenerator) -> Chunk {
         // Always generate in WASM
         generator.generate_chunk(chunk_x, chunk_y)
     }

@@ -1,9 +1,9 @@
-pub mod inventory;
 pub mod health;
+pub mod inventory;
 pub mod player;
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Unique identifier for entities in the world
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

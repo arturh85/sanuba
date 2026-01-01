@@ -1,12 +1,12 @@
 //! World management - chunks, loading, saving
 
 mod chunk;
-#[allow(clippy::module_inception)]
-mod world;
 pub mod generation;
 pub mod persistence;
+#[allow(clippy::module_inception)]
+mod world;
 
-pub use chunk::{Chunk, Pixel, CHUNK_SIZE, pixel_flags};
-pub use world::World;
+pub use chunk::{pixel_flags, Chunk, Pixel, CHUNK_SIZE};
 pub use generation::WorldGenerator;
 pub use persistence::{ChunkPersistence, WorldMetadata};
+pub use world::World;

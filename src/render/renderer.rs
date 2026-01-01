@@ -1,11 +1,11 @@
 //! wgpu-based renderer for pixel world
 
-use std::iter;
 use anyhow::Result;
+use std::iter;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
-use crate::world::{World, Chunk, CHUNK_SIZE};
+use crate::world::{Chunk, World, CHUNK_SIZE};
 
 /// Vertex for fullscreen quad
 #[repr(C)]
@@ -20,7 +20,7 @@ impl Vertex {
         0 => Float32x2,
         1 => Float32x2,
     ];
-    
+
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -32,10 +32,22 @@ impl Vertex {
 
 // Fullscreen quad vertices
 const QUAD_VERTICES: &[Vertex] = &[
-    Vertex { position: [-1.0, -1.0], tex_coords: [0.0, 1.0] },
-    Vertex { position: [ 1.0, -1.0], tex_coords: [1.0, 1.0] },
-    Vertex { position: [ 1.0,  1.0], tex_coords: [1.0, 0.0] },
-    Vertex { position: [-1.0,  1.0], tex_coords: [0.0, 0.0] },
+    Vertex {
+        position: [-1.0, -1.0],
+        tex_coords: [0.0, 1.0],
+    },
+    Vertex {
+        position: [1.0, -1.0],
+        tex_coords: [1.0, 1.0],
+    },
+    Vertex {
+        position: [1.0, 1.0],
+        tex_coords: [1.0, 0.0],
+    },
+    Vertex {
+        position: [-1.0, 1.0],
+        tex_coords: [0.0, 0.0],
+    },
 ];
 
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 3, 0];
@@ -93,21 +105,21 @@ pub struct Renderer {
     light_sampler: wgpu::Sampler,
     overlay_uniform_buffer: wgpu::Buffer,
     overlay_bind_group: wgpu::BindGroup,
-    overlay_type: u32,  // 0=none, 1=temperature, 2=light
+    overlay_type: u32, // 0=none, 1=temperature, 2=light
 }
 
 impl Renderer {
     const WORLD_TEXTURE_SIZE: u32 = 512; // 8x8 chunks visible
-    
+
     pub async fn new(window: &Window) -> Result<Self> {
         let size = window.inner_size();
-        
+
         // Create instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
-        
+
         // Create surface
         // SAFETY: The window must outlive the surface. This is ensured by the App struct
         // owning both the window and the renderer, with the renderer field appearing after
@@ -117,7 +129,7 @@ impl Renderer {
                 .map_err(|e| anyhow::anyhow!("Failed to create surface target: {:?}", e))?;
             instance.create_surface_unsafe(target)?
         };
-        
+
         // Request adapter
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -127,7 +139,7 @@ impl Renderer {
             })
             .await
             .ok_or_else(|| anyhow::anyhow!("Failed to find suitable GPU adapter"))?;
-        
+
         // Create device and queue
         let (device, queue) = adapter
             .request_device(
@@ -139,7 +151,7 @@ impl Renderer {
                 None,
             )
             .await?;
-        
+
         // Configure surface
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -148,7 +160,7 @@ impl Renderer {
             .find(|f| f.is_srgb())
             .copied()
             .unwrap_or(surface_caps.formats[0]);
-        
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -160,7 +172,7 @@ impl Renderer {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
-        
+
         // Create world texture
         let world_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("world_texture"),
@@ -176,9 +188,9 @@ impl Renderer {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        
+
         let world_texture_view = world_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         let world_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -188,30 +200,31 @@ impl Renderer {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-        
+
         // Texture bind group layout
-        let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("texture_bind_group_layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("texture_bind_group_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-        
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
         let world_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("world_bind_group"),
             layout: &texture_bind_group_layout,
@@ -226,34 +239,35 @@ impl Renderer {
                 },
             ],
         });
-        
+
         // Camera uniform
         let camera = CameraUniform {
             position: [0.0, 0.0],
             zoom: 0.015, // Lower = zoomed out more (world_width = 2 * aspect / zoom)
             aspect: size.width as f32 / size.height as f32,
         };
-        
+
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camera_buffer"),
             contents: bytemuck::cast_slice(&[camera]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        
-        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("camera_bind_group_layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("camera_bind_group_layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("camera_bind_group"),
             layout: &camera_bind_group_layout,
@@ -262,7 +276,7 @@ impl Renderer {
                 resource: camera_buffer.as_entire_binding(),
             }],
         });
-        
+
         // Temperature overlay texture (40x40 for 5x5 chunks × 8x8 cells)
         const TEMP_TEXTURE_SIZE: u32 = 40;
         let temp_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -330,58 +344,59 @@ impl Renderer {
         });
 
         // Debug overlay bind group layout (temperature and light)
-        let overlay_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("overlay_bind_group_layout"),
-            entries: &[
-                // Binding 0: Temperature texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+        let overlay_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("overlay_bind_group_layout"),
+                entries: &[
+                    // Binding 0: Temperature texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                // Binding 1: Temperature sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-                // Binding 2: Light texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+                    // Binding 1: Temperature sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
                     },
-                    count: None,
-                },
-                // Binding 3: Light sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-                // Binding 4: Overlay uniform (overlay_type)
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    // Binding 2: Light texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-            ],
-        });
+                    // Binding 3: Light sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                    // Binding 4: Overlay uniform (overlay_type)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
 
         let overlay_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("overlay_bind_group"),
@@ -417,12 +432,17 @@ impl Renderer {
         });
 
         // Pipeline layout
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("render_pipeline_layout"),
-            bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout, &overlay_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-        
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("render_pipeline_layout"),
+                bind_group_layouts: &[
+                    &texture_bind_group_layout,
+                    &camera_bind_group_layout,
+                    &overlay_bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
+
         // Render pipeline
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("render_pipeline"),
@@ -460,33 +480,33 @@ impl Renderer {
             },
             multiview: None,
         });
-        
+
         // Vertex and index buffers
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex_buffer"),
             contents: bytemuck::cast_slice(QUAD_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        
+
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("index_buffer"),
             contents: bytemuck::cast_slice(QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
-        
+
         // Pixel buffer for CPU rendering
-        let pixel_buffer = vec![0u8; (Self::WORLD_TEXTURE_SIZE * Self::WORLD_TEXTURE_SIZE * 4) as usize];
+        let pixel_buffer =
+            vec![0u8; (Self::WORLD_TEXTURE_SIZE * Self::WORLD_TEXTURE_SIZE * 4) as usize];
 
         // Initialize egui renderer
-        let egui_renderer = egui_wgpu::Renderer::new(
-            &device,
-            config.format,
-            None,
-            1,
-        );
+        let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, None, 1);
 
         // Initialize overlay as disabled (32 bytes: enabled + padding)
-        queue.write_buffer(&overlay_uniform_buffer, 0, bytemuck::cast_slice(&[0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]));
+        queue.write_buffer(
+            &overlay_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]),
+        );
 
         Ok(Self {
             surface,
@@ -514,23 +534,24 @@ impl Renderer {
             light_sampler,
             overlay_uniform_buffer,
             overlay_bind_group,
-            overlay_type: 0,  // 0 = no overlay
+            overlay_type: 0, // 0 = no overlay
         })
     }
-    
+
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.size = winit::dpi::PhysicalSize::new(width, height);
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
-            
+
             // Update camera aspect ratio
             self.camera.aspect = width as f32 / height as f32;
-            self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera]));
+            self.queue
+                .write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera]));
         }
     }
-    
+
     pub fn render(
         &mut self,
         world: &World,
@@ -538,8 +559,12 @@ impl Renderer {
         textures_delta: egui::TexturesDelta,
         shapes: Vec<egui::epaint::ClippedShape>,
     ) -> Result<()> {
-        log::trace!("Render frame: camera pos=({:.1}, {:.1}), zoom={:.2}",
-                   self.camera.position[0], self.camera.position[1], self.camera.zoom);
+        log::trace!(
+            "Render frame: camera pos=({:.1}, {:.1}), zoom={:.2}",
+            self.camera.position[0],
+            self.camera.position[1],
+            self.camera.zoom
+        );
 
         // Update pixel buffer from world chunks
         self.update_pixel_buffer(world);
@@ -567,19 +592,25 @@ impl Renderer {
 
         // Update camera position to follow player
         self.camera.position = [world.player.position.x, world.player.position.y];
-        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera]));
+        self.queue
+            .write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera]));
 
         // Get output texture
         let output = self.surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("render_encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("render_encoder"),
+            });
 
         // Update egui textures
         for (id, image_delta) in &textures_delta.set {
-            self.egui_renderer.update_texture(&self.device, &self.queue, *id, image_delta);
+            self.egui_renderer
+                .update_texture(&self.device, &self.queue, *id, image_delta);
         }
 
         // Prepare egui primitives
@@ -589,7 +620,13 @@ impl Renderer {
         };
 
         let primitives = egui_ctx.tessellate(shapes, 1.0);
-        self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &primitives, &screen_descriptor);
+        self.egui_renderer.update_buffers(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &primitives,
+            &screen_descriptor,
+        );
 
         // Render world
         {
@@ -637,7 +674,8 @@ impl Renderer {
                 ..Default::default()
             });
 
-            self.egui_renderer.render(&mut render_pass, &primitives, &screen_descriptor);
+            self.egui_renderer
+                .render(&mut render_pass, &primitives, &screen_descriptor);
         }
 
         // Free egui textures
@@ -650,13 +688,13 @@ impl Renderer {
 
         Ok(())
     }
-    
+
     fn update_pixel_buffer(&mut self, world: &World) {
         // Clear buffer with background color
         for pixel in self.pixel_buffer.chunks_mut(4) {
-            pixel[0] = 40;  // R
-            pixel[1] = 44;  // G
-            pixel[2] = 52;  // B
+            pixel[0] = 40; // R
+            pixel[1] = 44; // G
+            pixel[2] = 52; // B
             pixel[3] = 255; // A
         }
 
@@ -675,7 +713,7 @@ impl Renderer {
             self.render_debris_to_buffer(debris_data, world.materials());
         }
     }
-    
+
     fn render_chunk_to_buffer(&mut self, chunk: &Chunk, world: &World) {
         // Calculate chunk position in texture
         // Center of texture is world origin
@@ -697,11 +735,14 @@ impl Renderer {
                 let tex_y = tex_origin_y + y as i32;
 
                 // Bounds check
-                if tex_x >= 0 && tex_x < Self::WORLD_TEXTURE_SIZE as i32
-                    && tex_y >= 0 && tex_y < Self::WORLD_TEXTURE_SIZE as i32
+                if tex_x >= 0
+                    && tex_x < Self::WORLD_TEXTURE_SIZE as i32
+                    && tex_y >= 0
+                    && tex_y < Self::WORLD_TEXTURE_SIZE as i32
                 {
                     // Don't flip here - shader handles Y-flip
-                    let idx = ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
+                    let idx =
+                        ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
 
                     self.pixel_buffer[idx] = color[0];
                     self.pixel_buffer[idx + 1] = color[1];
@@ -713,8 +754,14 @@ impl Renderer {
         }
 
         if pixels_written > 0 {
-            log::trace!("Chunk ({:2}, {:2}): rendered {} pixels at tex ({}, {})",
-                       chunk.x, chunk.y, pixels_written, tex_origin_x, tex_origin_y);
+            log::trace!(
+                "Chunk ({:2}, {:2}): rendered {} pixels at tex ({}, {})",
+                chunk.x,
+                chunk.y,
+                pixels_written,
+                tex_origin_x,
+                tex_origin_y
+            );
         }
     }
 
@@ -754,8 +801,11 @@ impl Renderer {
             let tex_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + world_y;
 
             // Bounds check
-            if tex_x >= 0 && tex_x < Self::WORLD_TEXTURE_SIZE as i32 &&
-               tex_y >= 0 && tex_y < Self::WORLD_TEXTURE_SIZE as i32 {
+            if tex_x >= 0
+                && tex_x < Self::WORLD_TEXTURE_SIZE as i32
+                && tex_y >= 0
+                && tex_y < Self::WORLD_TEXTURE_SIZE as i32
+            {
                 // Write pixel to buffer
                 let idx = ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
                 let color = materials.get_color(*material_id);
@@ -797,8 +847,10 @@ impl Renderer {
                 for cell_y in 0..CELLS_PER_CHUNK {
                     for cell_x in 0..CELLS_PER_CHUNK {
                         // World coordinates of this cell
-                        let world_x = chunk_x * CHUNK_SIZE as i32 + (cell_x * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
-                        let world_y = chunk_y * CHUNK_SIZE as i32 + (cell_y * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
+                        let world_x = chunk_x * CHUNK_SIZE as i32
+                            + (cell_x * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
+                        let world_y = chunk_y * CHUNK_SIZE as i32
+                            + (cell_y * CHUNK_SIZE / CELLS_PER_CHUNK) as i32;
 
                         // Texture coordinates (40x40)
                         // Linear mapping to match shader (no Y-flip needed)
@@ -865,7 +917,10 @@ impl Renderer {
             0,
             bytemuck::cast_slice(&[self.overlay_type, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]),
         );
-        log::info!("Temperature overlay: {}", if self.overlay_type == 1 { "ON" } else { "OFF" });
+        log::info!(
+            "Temperature overlay: {}",
+            if self.overlay_type == 1 { "ON" } else { "OFF" }
+        );
     }
 
     /// Toggle light overlay (for V key)
@@ -876,7 +931,10 @@ impl Renderer {
             0,
             bytemuck::cast_slice(&[self.overlay_type, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32]),
         );
-        log::info!("Light overlay: {}", if self.overlay_type == 2 { "ON" } else { "OFF" });
+        log::info!(
+            "Light overlay: {}",
+            if self.overlay_type == 2 { "ON" } else { "OFF" }
+        );
     }
 
     /// Check if temperature overlay is enabled
@@ -910,13 +968,21 @@ impl Renderer {
                 for sample_y in 0..SAMPLES_PER_CHUNK {
                     for sample_x in 0..SAMPLES_PER_CHUNK {
                         // World coordinates of this sample (center of 8x8 pixel block)
-                        let world_x = chunk_x * CHUNK_SIZE as i32 + (sample_x * CHUNK_SIZE / SAMPLES_PER_CHUNK + CHUNK_SIZE / (SAMPLES_PER_CHUNK * 2)) as i32;
-                        let world_y = chunk_y * CHUNK_SIZE as i32 + (sample_y * CHUNK_SIZE / SAMPLES_PER_CHUNK + CHUNK_SIZE / (SAMPLES_PER_CHUNK * 2)) as i32;
+                        let world_x = chunk_x * CHUNK_SIZE as i32
+                            + (sample_x * CHUNK_SIZE / SAMPLES_PER_CHUNK
+                                + CHUNK_SIZE / (SAMPLES_PER_CHUNK * 2))
+                                as i32;
+                        let world_y = chunk_y * CHUNK_SIZE as i32
+                            + (sample_y * CHUNK_SIZE / SAMPLES_PER_CHUNK
+                                + CHUNK_SIZE / (SAMPLES_PER_CHUNK * 2))
+                                as i32;
 
                         // Texture coordinates (40x40)
                         // Linear mapping to match shader (no Y-flip needed)
-                        let tex_x = ((cx + 2) * SAMPLES_PER_CHUNK as i32 + sample_x as i32) as usize;
-                        let tex_y = ((cy + 2) * SAMPLES_PER_CHUNK as i32 + sample_y as i32) as usize;
+                        let tex_x =
+                            ((cx + 2) * SAMPLES_PER_CHUNK as i32 + sample_x as i32) as usize;
+                        let tex_y =
+                            ((cy + 2) * SAMPLES_PER_CHUNK as i32 + sample_y as i32) as usize;
 
                         // Get light level at this world position
                         let light = world.get_light_at(world_x, world_y).unwrap_or(0) as f32;

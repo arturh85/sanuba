@@ -1,8 +1,8 @@
 //! Performance and simulation statistics tracking
 
+use crate::world::World;
 use std::collections::VecDeque;
 use std::time::Instant;
-use crate::world::World;
 
 /// Simulation statistics
 #[derive(Clone, Debug)]
@@ -77,7 +77,8 @@ impl StatsCollector {
 
         // Calculate FPS from rolling average
         if !self.frame_times.is_empty() {
-            let avg_frame_time: f32 = self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32;
+            let avg_frame_time: f32 =
+                self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32;
             self.stats.fps = if avg_frame_time > 0.0 {
                 1000.0 / avg_frame_time
             } else {

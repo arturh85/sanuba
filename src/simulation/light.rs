@@ -3,8 +3,8 @@
 //! Implements flood-fill light propagation with material-based transmission.
 //! Light levels range from 0 (dark) to 15 (full light).
 
-use crate::world::CHUNK_SIZE;
 use crate::simulation::{MaterialType, Materials};
+use crate::world::CHUNK_SIZE;
 use std::collections::VecDeque;
 
 /// Light sources and their intensities
@@ -154,10 +154,10 @@ impl LightPropagation {
         materials: &Materials,
     ) {
         const NEIGHBORS: [(i32, i32); 4] = [
-            (0, 1),   // Down
-            (0, -1),  // Up
-            (1, 0),   // Right
-            (-1, 0),  // Left
+            (0, 1),  // Down
+            (0, -1), // Up
+            (1, 0),  // Right
+            (-1, 0), // Left
         ];
 
         while let Some((wx, wy, light)) = self.queue.pop_front() {
