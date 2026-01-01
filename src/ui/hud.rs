@@ -1,5 +1,5 @@
 use crate::entity::player::Player;
-use egui::{Color32, Context, Rect, Rounding, Stroke, Vec2};
+use egui::{Color32, Context, CornerRadius, Rect, Stroke, StrokeKind, Vec2};
 
 /// Heads-up display showing player health, hunger, and hotbar
 pub struct Hud {
@@ -111,15 +111,20 @@ impl Hud {
             let rect = response.rect;
 
             // Background
-            painter.rect_filled(rect, Rounding::same(4.0), bg_color);
+            painter.rect_filled(rect, CornerRadius::same(4), bg_color);
 
             // Fill
             let fill_width = bar_width * percentage;
             let fill_rect = Rect::from_min_size(rect.min, Vec2::new(fill_width, bar_height));
-            painter.rect_filled(fill_rect, Rounding::same(4.0), fill_color);
+            painter.rect_filled(fill_rect, CornerRadius::same(4), fill_color);
 
             // Border
-            painter.rect_stroke(rect, Rounding::same(4.0), Stroke::new(1.5, Color32::BLACK));
+            painter.rect_stroke(
+                rect,
+                CornerRadius::same(4),
+                Stroke::new(1.5, Color32::BLACK),
+                StrokeKind::Outside, // egui 0.33+ requires StrokeKind
+            );
 
             // Text overlay
             let text = format!("{:.0}/{:.0}", current, max);

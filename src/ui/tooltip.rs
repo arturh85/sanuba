@@ -128,9 +128,9 @@ impl TooltipState {
             .frame(egui::Frame {
                 fill: egui::Color32::from_rgba_unmultiplied(0, 0, 0, 200),
                 stroke: egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 100, 100)),
-                inner_margin: egui::Margin::same(8.0),
-                outer_margin: egui::Margin::same(0.0),
-                rounding: egui::Rounding::same(4.0),
+                inner_margin: egui::Margin::same(8),
+                outer_margin: egui::Margin::same(0),
+                corner_radius: egui::CornerRadius::same(4),
                 shadow: egui::epaint::Shadow::NONE,
             })
             .show(ctx, |ui| {

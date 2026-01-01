@@ -16,6 +16,11 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 - **Persistent World**: Changes persist across sessions
 - **Survival Gameplay**: Crafting, building, exploration, creature management
 
+## Downloads
+
+- **Native Builds**: Download from [GitHub Releases](https://github.com/arturh85/sunaba/releases/)
+- **Web Version**: Play at [https://arturh85.github.io/sunaba](https://arturh85.github.io/sunaba/)
+
 ## Building
 
 ### Native Builds
@@ -57,11 +62,6 @@ To create a new release:
 git tag v0.1.0
 git push origin v0.1.0
 ```
-
-## Downloads
-
-- **Native Builds**: Download from [GitHub Releases](https://github.com/arturh85/sunaba/releases/)
-- **Web Version**: Play at [https://arturh85.github.io/sunaba](https://arturh85.github.io/sunaba/)
 
 ## Name
 

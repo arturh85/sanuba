@@ -1,5 +1,5 @@
 use crate::entity::player::Player;
-use egui::{Color32, Context, Pos2, Rect, Rounding, Stroke, Vec2};
+use egui::{Color32, Context, CornerRadius, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
 /// Full inventory panel (opened with I key)
 pub struct InventoryPanel {
@@ -111,14 +111,14 @@ impl InventoryPanel {
             Color32::from_rgb(40, 40, 40)
         };
 
-        painter.rect_filled(rect, Rounding::same(4.0), bg_color);
+        painter.rect_filled(rect, CornerRadius::same(4), bg_color);
 
         // If slot has items, render them
         if let Some(Some(stack)) = slot_data {
             // Material color indicator (top bar)
             let material_color = self.get_material_color(stack.material_id);
             let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
-            painter.rect_filled(color_bar, Rounding::same(2.0), material_color);
+            painter.rect_filled(color_bar, CornerRadius::same(2), material_color);
 
             // Material name (truncated)
             let name = if (stack.material_id as usize) < material_names.len() {
@@ -178,8 +178,9 @@ impl InventoryPanel {
 
         painter.rect_stroke(
             rect,
-            Rounding::same(4.0),
+            CornerRadius::same(4),
             Stroke::new(border_width, border_color),
+            StrokeKind::Outside, // egui 0.33+ requires StrokeKind
         );
 
         // Tooltip on hover

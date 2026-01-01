@@ -117,7 +117,7 @@ impl Renderer {
         let size = window.inner_size();
 
         // Create instance
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
@@ -133,39 +133,29 @@ impl Renderer {
         };
 
         // Request adapter
+        // wgpu 27+ returns Result instead of Option
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Failed to find suitable GPU adapter"))?;
+            .await?;
 
         // Create device and queue
-        // Use adapter's limits for WASM, but exclude removed maxInterStageShaderComponents
-        #[cfg(target_arch = "wasm32")]
-        let limits = {
-            let mut adapter_limits = adapter.limits();
-            // WebGPU removed maxInterStageShaderComponents in favor of maxInterStageShaderVariables
-            // Set to 0 to avoid requesting this obsolete limit
-            adapter_limits.max_inter_stage_shader_components = 0;
-            adapter_limits
-        };
-
-        #[cfg(not(target_arch = "wasm32"))]
+        // In wgpu 27+, max_inter_stage_shader_components was removed (fixed in v23)
         let limits = wgpu::Limits::default();
 
+        // wgpu 27+ request_device takes only descriptor, no separate trace parameter
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: limits,
-                    label: Some("device"),
-                    memory_hints: wgpu::MemoryHints::default(), // New field in wgpu 22+
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::empty(),
+                required_limits: limits,
+                label: Some("device"),
+                memory_hints: wgpu::MemoryHints::default(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(), // New in wgpu 27
+                trace: wgpu::Trace::Off, // New in wgpu 27
+            })
             .await?;
 
         // Configure surface
@@ -465,13 +455,13 @@ impl Renderer {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"), // wgpu 27+ expects Option<&str>
                 buffers: &[Vertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"), // wgpu 27+ expects Option<&str>
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -516,7 +506,9 @@ impl Renderer {
             vec![0u8; (Self::WORLD_TEXTURE_SIZE * Self::WORLD_TEXTURE_SIZE * 4) as usize];
 
         // Initialize egui renderer
-        let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, None, 1, false);
+        // egui-wgpu 0.33+ takes 3 arguments: device, format, RendererOptions
+        let egui_renderer =
+            egui_wgpu::Renderer::new(&device, config.format, egui_wgpu::RendererOptions::default());
 
         // Initialize overlay as disabled (32 bytes: enabled + padding)
         queue.write_buffer(
@@ -588,14 +580,14 @@ impl Renderer {
 
         // Upload to GPU
         self.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &self.world_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             &self.pixel_buffer,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(Self::WORLD_TEXTURE_SIZE * 4),
                 rows_per_image: Some(Self::WORLD_TEXTURE_SIZE),
@@ -652,6 +644,7 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None, // New in wgpu 27
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.1,
@@ -682,6 +675,7 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None, // New in wgpu 27
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
@@ -891,14 +885,14 @@ impl Renderer {
 
         // Upload to GPU
         self.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &self.temp_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             bytemuck::cast_slice(&temp_data),
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(TEMP_TEXTURE_SIZE * 4), // 4 bytes per f32
                 rows_per_image: Some(TEMP_TEXTURE_SIZE),
@@ -1018,14 +1012,14 @@ impl Renderer {
 
         // Upload to GPU
         self.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &self.light_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             bytemuck::cast_slice(&light_data),
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(LIGHT_TEXTURE_SIZE * 4), // 4 bytes per f32
                 rows_per_image: Some(LIGHT_TEXTURE_SIZE),
