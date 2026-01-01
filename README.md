@@ -1,4 +1,4 @@
-# 砂場 Sunaba
+# Sunaba 砂場（すなば）
 
 ![sunaba.jpg](sunaba.jpg)
 
@@ -69,7 +69,12 @@ git push origin v0.1.0
 
 ## Name
 
-砂場 (Sunaba) literally means “sandbox” in Japanese—砂 (sand) and 場 (place)—a space where simple elements are poured together and allowed to interact freely. The name reflects the core philosophy of the game: a world built from tiny, simulated pieces where complex, emergent behaviors arise from basic rules. Like a real sandbox, 砂場 is a place for experimentation, play, and unexpected discovery, where physics, chemistry, and evolving life forms shape stories without a fixed script.
+砂場 (Sunaba) is traditionally written as “sand + place,” meaning sandbox in Japanese. 
+In this project, the name is intentionally layered: while the reading remains Sunaba (すなば), 
+the second kanji may shift between 庭 (garden), 生 (life), and 層 (stratum), each offering a different lens on the same world. 
+Together, they reflect a space where simple particles form ecosystems, life emerges from matter, and deep layers of simulation accumulate over time. 
+Like a sandbox in the truest sense, 砂場 is a place for experimentation and discovery, 
+where complex behavior arises naturally from fundamental rules rather than scripted design.
 
 ## Development Status
 

@@ -1,3 +1,9 @@
+start:
+    RUST_LOG=info cargo run --release -- --regenerate
+
+load:
+    RUST_LOG=info cargo run --release
+
 test:
     cargo fmt --all
     cargo fmt --all -- --check
@@ -6,10 +12,6 @@ test:
     cargo build --release
     ./build-web.sh
 
-start:
-    RUST_LOG=info cargo run --release
-
 web:
     ./build-web.sh
     cd web && python3 -m http.server 8080
-

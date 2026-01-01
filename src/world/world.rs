@@ -57,6 +57,9 @@ pub struct World {
     /// Which chunks are currently active (being simulated)
     active_chunks: Vec<IVec2>,
 
+    /// Last player chunk position for dynamic chunk loading
+    last_load_chunk_pos: Option<IVec2>,
+
     /// Simulation time accumulator
     time_accumulator: f32,
 
@@ -95,6 +98,7 @@ impl World {
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             active_chunks: Vec::new(),
+            last_load_chunk_pos: None,
             time_accumulator: 0.0,
             light_time_accumulator: 0.0,
             day_night_time: 600.0, // Start at noon (midpoint of 0-1200)
@@ -382,16 +386,34 @@ impl World {
         self.player.move_by(final_movement);
     }
 
-    /// Remove chunks outside active radius from simulation
-    fn cull_distant_active_chunks(&mut self) {
+    /// Update active chunks: remove distant chunks and re-activate nearby loaded chunks
+    fn update_active_chunks(&mut self) {
         let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
         let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
 
+        // 1. Remove distant chunks from active list
         self.active_chunks.retain(|pos| {
             let dist_x = (pos.x - player_chunk_x).abs();
             let dist_y = (pos.y - player_chunk_y).abs();
             dist_x <= Self::ACTIVE_CHUNK_RADIUS && dist_y <= Self::ACTIVE_CHUNK_RADIUS
         });
+
+        // 2. Add nearby loaded chunks that aren't currently active
+        // Only check chunks within active radius (7×7 grid = 49 chunks max)
+        for cy in (player_chunk_y - Self::ACTIVE_CHUNK_RADIUS)
+            ..=(player_chunk_y + Self::ACTIVE_CHUNK_RADIUS)
+        {
+            for cx in (player_chunk_x - Self::ACTIVE_CHUNK_RADIUS)
+                ..=(player_chunk_x + Self::ACTIVE_CHUNK_RADIUS)
+            {
+                let pos = IVec2::new(cx, cy);
+
+                // If chunk is loaded but not active, add it to active list
+                if self.chunks.contains_key(&pos) && !self.active_chunks.contains(&pos) {
+                    self.active_chunks.push(pos);
+                }
+            }
+        }
     }
 
     /// Get the tool registry
@@ -702,8 +724,19 @@ impl World {
     fn step_simulation(&mut self, stats: &mut crate::ui::StatsCollector) {
         const LIGHT_TIMESTEP: f32 = 1.0 / 15.0; // 15fps for light propagation
 
-        // 0. Cull distant chunks from active simulation (performance optimization)
-        self.cull_distant_active_chunks();
+        // 0. Update active chunks (remove distant, re-activate nearby)
+        self.update_active_chunks();
+
+        // 0.5. Dynamic chunk loading when player enters new chunk
+        let current_chunk = IVec2::new(
+            (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32),
+            (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32),
+        );
+
+        if self.last_load_chunk_pos != Some(current_chunk) {
+            self.load_nearby_chunks();
+            self.last_load_chunk_pos = Some(current_chunk);
+        }
 
         // 1. Clear update flags
         for pos in &self.active_chunks {
@@ -1439,6 +1472,21 @@ impl World {
 
         for cy in (player_chunk_y - 8)..=(player_chunk_y + 8) {
             for cx in (player_chunk_x - 8)..=(player_chunk_x + 8) {
+                self.load_or_generate_chunk(cx, cy);
+            }
+        }
+    }
+
+    /// Load nearby chunks dynamically as player moves (called when entering new chunk)
+    fn load_nearby_chunks(&mut self) {
+        let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
+        let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
+
+        // Load chunks within 8-chunk radius (same as initial load)
+        const LOAD_RADIUS: i32 = 8;
+
+        for cy in (player_chunk_y - LOAD_RADIUS)..=(player_chunk_y + LOAD_RADIUS) {
+            for cx in (player_chunk_x - LOAD_RADIUS)..=(player_chunk_x + LOAD_RADIUS) {
                 self.load_or_generate_chunk(cx, cy);
             }
         }
