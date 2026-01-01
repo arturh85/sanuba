@@ -40,7 +40,8 @@ impl ControlsHelpState {
             .collapsible(true)
             .show(ctx, |ui| {
                 ui.heading("Movement");
-                ui.label("W/A/S/D - Move camera");
+                ui.label("W/A/S/D - Move player");
+                ui.label("Space - Jump");
 
                 ui.add_space(8.0);
                 ui.heading("Camera");
@@ -86,6 +87,7 @@ impl ControlsHelpState {
                 ui.add_space(8.0);
                 ui.heading("Actions");
                 ui.label("Left Click - Spawn material");
+                ui.label("G - Spawn creature");
 
                 ui.add_space(8.0);
                 ui.heading("UI");
@@ -132,7 +134,8 @@ impl ControlsHelpState {
             .collapsible(true)
             .show(ctx, |ui| {
                 ui.heading("Movement");
-                ui.label("W/A/S/D - Move camera");
+                ui.label("W/A/S/D - Move player");
+                ui.label("Space - Jump");
 
                 ui.add_space(8.0);
                 ui.heading("Camera");
@@ -178,6 +181,7 @@ impl ControlsHelpState {
                 ui.add_space(8.0);
                 ui.heading("Actions");
                 ui.label("Left Click - Spawn material");
+                ui.label("G - Spawn creature");
 
                 ui.add_space(8.0);
                 ui.heading("UI");

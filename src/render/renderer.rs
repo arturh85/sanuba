@@ -729,6 +729,38 @@ impl Renderer {
         for debris_data in &debris_list {
             self.render_debris_to_buffer(debris_data, world.materials());
         }
+
+        // Draw player as cyan 8×16 rectangle
+        use crate::entity::player::Player;
+
+        // Convert world coordinates to texture coordinates
+        let tex_origin_x = (Self::WORLD_TEXTURE_SIZE / 2) as i32;
+        let tex_origin_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32;
+
+        let player_x = tex_origin_x + world.player.position.x as i32;
+        let player_y = tex_origin_y + world.player.position.y as i32;
+
+        let half_width = (Player::WIDTH / 2.0) as i32;
+        let half_height = (Player::HEIGHT / 2.0) as i32;
+
+        let player_color = [0, 255, 255, 255]; // Cyan (RGB: 0, 255, 255)
+
+        // Draw rectangle centered on player position
+        for dy in -half_height..=half_height {
+            for dx in -half_width..=half_width {
+                let px = player_x + dx;
+                let py = player_y + dy;
+
+                // Bounds check
+                if px >= 0 && px < Self::WORLD_TEXTURE_SIZE as i32 &&
+                   py >= 0 && py < Self::WORLD_TEXTURE_SIZE as i32 {
+                    let idx = ((py as u32 * Self::WORLD_TEXTURE_SIZE + px as u32) * 4) as usize;
+                    if idx + 3 < self.pixel_buffer.len() {
+                        self.pixel_buffer[idx..idx+4].copy_from_slice(&player_color);
+                    }
+                }
+            }
+        }
     }
 
     fn render_chunk_to_buffer(&mut self, chunk: &Chunk, world: &World) {

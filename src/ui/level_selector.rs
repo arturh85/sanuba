@@ -20,6 +20,12 @@ impl LevelSelectorState {
         self.visible = !self.visible;
     }
 
+    /// Reset all action flags (call after processing them in app.rs)
+    pub fn reset_flags(&mut self) {
+        self.return_to_world = false;
+        self.selected_level = None;
+    }
+
     /// Render the level selector window
     pub fn render(
         &mut self,
@@ -28,10 +34,7 @@ impl LevelSelectorState {
         game_mode_desc: &str,
         in_persistent_world: bool,
     ) {
-        // Reset selection flags at start of frame
-        self.selected_level = None;
-        self.return_to_world = false;
-
+        // Note: Flags reset in app.rs after processing, not here
         if !self.visible {
             return;
         }

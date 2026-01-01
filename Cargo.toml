@@ -59,6 +59,16 @@ noise = "0.9"
 # Time handling (cross-platform, WASM-compatible)
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 
+# ML and Neural Networks (for creature AI)
+burn = { version = "0.18", features = ["std", "ndarray"] }
+burn-ndarray = "0.18"
+
+# Graph processing (for GNN and CPPN)
+petgraph = "0.6"
+
+# Fast hashing (for NEAT innovation tracking)
+ahash = "0.8"
+
 [features]
 default = ["native"]
 native = []

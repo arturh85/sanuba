@@ -48,6 +48,9 @@ pub struct World {
     /// Physics world for rigid bodies
     physics_world: PhysicsWorld,
 
+    /// Creature manager (spawning, AI, behavior)
+    pub creature_manager: crate::creature::spawning::CreatureManager,
+
     /// The player entity
     pub player: Player,
 
@@ -89,6 +92,7 @@ impl World {
             light_propagation: LightPropagation::new(),
             regeneration_system: RegenerationSystem::new(),
             physics_world: PhysicsWorld::new(),
+            creature_manager: crate::creature::spawning::CreatureManager::new(200),  // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             active_chunks: Vec::new(),
             time_accumulator: 0.0,
@@ -97,7 +101,7 @@ impl World {
             growth_timer: 0.0,
             persistence: None,
             generator: WorldGenerator::new(42), // Default seed
-            loaded_chunk_limit: 100,
+            loaded_chunk_limit: 3000,  // ~19MB max memory
         };
 
         // Initialize with some test chunks
@@ -106,6 +110,29 @@ impl World {
         // Initialize light levels before first CA update
         world.initialize_light();
 
+        // Spawn 3 test creatures near spawn point with spacing
+        use crate::creature::genome::CreatureGenome;
+
+        world.creature_manager.spawn_creature(
+            CreatureGenome::test_biped(),
+            glam::Vec2::new(-20.0, 100.0),
+            &mut world.physics_world,
+        );
+
+        world.creature_manager.spawn_creature(
+            CreatureGenome::test_quadruped(),
+            glam::Vec2::new(0.0, 100.0),
+            &mut world.physics_world,
+        );
+
+        world.creature_manager.spawn_creature(
+            CreatureGenome::test_worm(),
+            glam::Vec2::new(20.0, 100.0),
+            &mut world.physics_world,
+        );
+
+        log::info!("Spawned 3 test creatures at startup");
+
         world
     }
 
@@ -113,9 +140,9 @@ impl World {
     fn generate_test_world(&mut self) {
         let mut total_pixels = 0;
 
-        // Create a 5x5 grid of chunks around origin
-        for cy in -2..=2 {
-            for cx in -2..=2 {
+        // Create a 15x15 grid of chunks around origin (225 chunks, ~1.4MB)
+        for cy in -7..=7 {
+            for cx in -7..=7 {
                 let mut chunk = Chunk::new(cx, cy);
                 let mut chunk_pixels = 0;
 
@@ -199,38 +226,166 @@ impl World {
     /// Player movement speed in pixels per second
     const PLAYER_SPEED: f32 = 200.0;
 
-    /// Update player position based on input
-    pub fn update_player(&mut self, input: &crate::app::InputState, dt: f32) {
-        let mut velocity = glam::Vec2::ZERO;
+    /// Active chunk simulation radius (chunks from player)
+    const ACTIVE_CHUNK_RADIUS: i32 = 3; // 7×7 grid = 49 chunks
 
-        if input.w_pressed {
-            velocity.y += 1.0;
+    /// Check if a rectangle collides with solid materials
+    fn check_solid_collision(&self, x: f32, y: f32, width: f32, height: f32) -> bool {
+        use crate::simulation::MaterialType;
+
+        // Check 8 points around hitbox
+        let check_points = [
+            (x - width/2.0, y - height/2.0),  // Bottom-left
+            (x + width/2.0, y - height/2.0),  // Bottom-right
+            (x - width/2.0, y + height/2.0),  // Top-left
+            (x + width/2.0, y + height/2.0),  // Top-right
+            (x, y - height/2.0),              // Bottom-center
+            (x, y + height/2.0),              // Top-center
+            (x - width/2.0, y),               // Left-center
+            (x + width/2.0, y),               // Right-center
+        ];
+
+        for (px, py) in check_points {
+            if let Some(pixel) = self.get_pixel(px as i32, py as i32) {
+                if !pixel.is_empty() {
+                    let material = self.materials.get(pixel.material_id);
+                    // Collide only with solid materials
+                    if material.material_type == MaterialType::Solid {
+                        return true;
+                    }
+                }
+            }
         }
-        if input.s_pressed {
-            velocity.y -= 1.0;
+        false
+    }
+
+    /// Check if player is standing on ground
+    fn is_player_grounded(&self) -> bool {
+        use crate::simulation::MaterialType;
+
+        // Check 3 points just below player's feet
+        let check_y = self.player.position.y - (crate::entity::player::Player::HEIGHT / 2.0) - 1.0;
+        let check_points = [
+            (self.player.position.x - crate::entity::player::Player::WIDTH / 4.0, check_y),  // Left
+            (self.player.position.x, check_y),                                                // Center
+            (self.player.position.x + crate::entity::player::Player::WIDTH / 4.0, check_y),  // Right
+        ];
+
+        for (px, py) in check_points {
+            if let Some(pixel) = self.get_pixel(px as i32, py as i32) {
+                if !pixel.is_empty() {
+                    let material = self.materials.get(pixel.material_id);
+                    if material.material_type == MaterialType::Solid {
+                        return true;
+                    }
+                }
+            }
         }
+        false
+    }
+
+    /// Update player position based on input with gravity and jump
+    pub fn update_player(&mut self, input: &crate::app::InputState, dt: f32) {
+        use crate::entity::player::Player;
+
+        // 1. Check if grounded
+        self.player.grounded = self.is_player_grounded();
+
+        // 2. Update coyote time (grace period for jumping after leaving ground)
+        if self.player.grounded {
+            self.player.coyote_time = Player::COYOTE_TIME;
+        } else {
+            self.player.coyote_time = (self.player.coyote_time - dt).max(0.0);
+        }
+
+        // 3. Update jump buffer (allows jump input slightly before landing)
+        if input.jump_pressed {
+            self.player.jump_buffer = Player::JUMP_BUFFER;
+        } else {
+            self.player.jump_buffer = (self.player.jump_buffer - dt).max(0.0);
+        }
+
+        // 4. Horizontal movement (A/D keys)
+        let mut horizontal_velocity = 0.0;
         if input.a_pressed {
-            velocity.x -= 1.0;
+            horizontal_velocity -= 1.0;
         }
         if input.d_pressed {
-            velocity.x += 1.0;
+            horizontal_velocity += 1.0;
+        }
+        self.player.velocity.x = horizontal_velocity * Self::PLAYER_SPEED;
+
+        // 5. Vertical movement (gravity + jump)
+        if self.player.jump_buffer > 0.0 && self.player.coyote_time > 0.0 {
+            // Jump!
+            self.player.velocity.y = Player::JUMP_VELOCITY;
+            self.player.jump_buffer = 0.0;
+            self.player.coyote_time = 0.0;
+            log::debug!("Player jumped!");
+        } else if !self.player.grounded {
+            // Apply gravity when airborne
+            self.player.velocity.y -= Player::GRAVITY * dt;
+            self.player.velocity.y = self.player.velocity.y.max(-Player::MAX_FALL_SPEED);
+        } else {
+            // Grounded and not jumping - reset vertical velocity
+            self.player.velocity.y = 0.0;
         }
 
-        // Normalize diagonal movement
-        if velocity.length() > 0.0 {
-            velocity = velocity.normalize() * Self::PLAYER_SPEED;
-            let movement = velocity * dt;
-            log::debug!(
-                "Player: {:?} → {:?} (velocity: {:?})",
-                self.player.position,
-                self.player.position + movement,
-                velocity
-            );
-            self.player.move_by(movement);
-            self.player.set_velocity(velocity);
-        } else {
-            self.player.set_velocity(glam::Vec2::ZERO);
+        // 6. Integrate velocity into position with collision
+        let movement = self.player.velocity * dt;
+
+        // Check collision separately for X and Y
+        let new_x = self.player.position.x + movement.x;
+        let new_y = self.player.position.y + movement.y;
+
+        let can_move_x = !self.check_solid_collision(
+            new_x,
+            self.player.position.y,
+            Player::WIDTH,
+            Player::HEIGHT
+        );
+
+        let can_move_y = !self.check_solid_collision(
+            self.player.position.x,
+            new_y,
+            Player::WIDTH,
+            Player::HEIGHT
+        );
+
+        // Apply movement only on non-colliding axes
+        let final_movement = glam::Vec2::new(
+            if can_move_x { movement.x } else { 0.0 },
+            if can_move_y { movement.y } else { 0.0 },
+        );
+
+        // Stop vertical velocity if hit ceiling/floor
+        if !can_move_y {
+            self.player.velocity.y = 0.0;
         }
+
+        if final_movement.length() > 0.0 {
+            log::trace!(
+                "Player: {:?} → {:?} (vel: {:?}, grounded: {})",
+                self.player.position,
+                self.player.position + final_movement,
+                self.player.velocity,
+                self.player.grounded
+            );
+        }
+
+        self.player.move_by(final_movement);
+    }
+
+    /// Remove chunks outside active radius from simulation
+    fn cull_distant_active_chunks(&mut self) {
+        let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
+        let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
+
+        self.active_chunks.retain(|pos| {
+            let dist_x = (pos.x - player_chunk_x).abs();
+            let dist_y = (pos.y - player_chunk_y).abs();
+            dist_x <= Self::ACTIVE_CHUNK_RADIUS && dist_y <= Self::ACTIVE_CHUNK_RADIUS
+        });
     }
 
     /// Get the tool registry
@@ -279,6 +434,15 @@ impl World {
                 chunk.count_non_air()
             );
         }
+    }
+
+    /// Spawn creature at player's current position
+    pub fn spawn_creature_at_player(&mut self, genome: crate::creature::genome::CreatureGenome) -> crate::entity::EntityId {
+        self.creature_manager.spawn_creature(
+            genome,
+            self.player.position,
+            &mut self.physics_world
+        )
     }
 
     /// Mine a single pixel and add it to player's inventory
@@ -532,6 +696,9 @@ impl World {
     fn step_simulation(&mut self, stats: &mut crate::ui::StatsCollector) {
         const LIGHT_TIMESTEP: f32 = 1.0 / 15.0; // 15fps for light propagation
 
+        // 0. Cull distant chunks from active simulation (performance optimization)
+        self.cull_distant_active_chunks();
+
         // 1. Clear update flags
         for pos in &self.active_chunks {
             if let Some(chunk) = self.chunks.get_mut(pos) {
@@ -542,7 +709,8 @@ impl World {
         // 2. CA updates (movement)
         // TODO: Implement Noita-style checkerboard update pattern
         // For now, simple sequential update
-        for pos in self.active_chunks.clone() {
+        for i in 0..self.active_chunks.len() {
+            let pos = self.active_chunks[i];
             self.update_chunk_ca(pos, stats);
         }
 
@@ -559,8 +727,9 @@ impl World {
         }
 
         // 5. State changes based on temperature
-        for pos in &self.active_chunks.clone() {
-            self.check_chunk_state_changes(*pos, stats);
+        for i in 0..self.active_chunks.len() {
+            let pos = self.active_chunks[i];
+            self.check_chunk_state_changes(pos, stats);
         }
 
         // 6. Process structural integrity checks
@@ -582,6 +751,26 @@ impl World {
         // 9. Resource regeneration (fruit spawning)
         self.regeneration_system
             .update(&mut self.chunks, &self.active_chunks, 1.0 / 60.0);
+
+        // 10. Update creatures (sensing, planning, neural control)
+        // Temporarily take creature_manager and physics_world to avoid borrow checker issues
+        let mut creature_manager = std::mem::replace(
+            &mut self.creature_manager,
+            crate::creature::spawning::CreatureManager::new(0) // Dummy placeholder
+        );
+        let mut physics_world = std::mem::replace(
+            &mut self.physics_world,
+            crate::physics::PhysicsWorld::empty() // Lightweight placeholder
+        );
+
+        creature_manager.update(1.0 / 60.0, self, &mut physics_world);
+
+        // 11. Execute creature actions (eat, mine, build)
+        creature_manager.execute_actions(self, 1.0 / 60.0);
+
+        // Put them back
+        self.creature_manager = creature_manager;
+        self.physics_world = physics_world;
     }
 
     /// Calculate sky light level based on day/night cycle (0-15)
@@ -1185,7 +1374,9 @@ impl World {
         // Add to active chunks if within range of player
         let dist_x = (pos.x - (self.player.position.x as i32 / CHUNK_SIZE as i32)).abs();
         let dist_y = (pos.y - (self.player.position.y as i32 / CHUNK_SIZE as i32)).abs();
-        if dist_x <= 2 && dist_y <= 2 && !self.active_chunks.contains(&pos) {
+        if dist_x <= Self::ACTIVE_CHUNK_RADIUS && dist_y <= Self::ACTIVE_CHUNK_RADIUS
+            && !self.active_chunks.contains(&pos)
+        {
             self.active_chunks.push(pos);
         }
 
@@ -1234,13 +1425,13 @@ impl World {
         log::info!("Loaded persistent world (seed: {})", metadata.seed);
     }
 
-    /// Load chunks within active radius of player
+    /// Load chunks within active radius of player (17x17 = 289 chunks)
     fn load_chunks_around_player(&mut self) {
         let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
         let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
 
-        for cy in (player_chunk_y - 2)..=(player_chunk_y + 2) {
-            for cx in (player_chunk_x - 2)..=(player_chunk_x + 2) {
+        for cy in (player_chunk_y - 8)..=(player_chunk_y + 8) {
+            for cx in (player_chunk_x - 8)..=(player_chunk_x + 8) {
                 self.load_or_generate_chunk(cx, cy);
             }
         }
@@ -1303,8 +1494,8 @@ impl World {
             let dist_x = (pos.x - player_chunk_x).abs();
             let dist_y = (pos.y - player_chunk_y).abs();
 
-            // Unload chunks >3 chunks away
-            if dist_x > 3 || dist_y > 3 {
+            // Unload chunks >10 chunks away
+            if dist_x > 10 || dist_y > 10 {
                 to_evict.push(*pos);
             }
         }

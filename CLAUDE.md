@@ -573,6 +573,7 @@ cargo clippy
 ```
 # Movement
 WASD           : Move player
+Space          : Jump
 
 # Camera
 +/-            : Zoom in/out

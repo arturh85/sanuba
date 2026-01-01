@@ -93,7 +93,7 @@ impl PhysicsWorld {
 
         collider_set.insert(ground);
 
-        log::info!(
+        log::debug!(
             "Physics: Created ground plane at y={} ({}x{} pixels)",
             ground_y,
             ground_half_width * 2.0,
@@ -118,6 +118,31 @@ impl PhysicsWorld {
         Self {
             rigid_body_set: RigidBodySet::new(),
             collider_set, // Use the collider_set with ground plane and walls
+            pipeline: PhysicsPipeline::new(),
+            integration_parameters,
+            island_manager: IslandManager::new(),
+            broad_phase: BroadPhase::new(),
+            narrow_phase: NarrowPhase::new(),
+            impulse_joint_set: ImpulseJointSet::new(),
+            multibody_joint_set: MultibodyJointSet::new(),
+            ccd_solver: CCDSolver::new(),
+            query_pipeline: QueryPipeline::new(),
+            debris: HashMap::new(),
+        }
+    }
+
+    /// Create an empty physics world for use as a temporary placeholder
+    /// This avoids the overhead of creating ground planes and walls when
+    /// we just need a dummy value for std::mem::replace
+    pub fn empty() -> Self {
+        let integration_parameters = IntegrationParameters {
+            dt: 1.0 / 60.0,
+            ..Default::default()
+        };
+
+        Self {
+            rigid_body_set: RigidBodySet::new(),
+            collider_set: ColliderSet::new(),
             pipeline: PhysicsPipeline::new(),
             integration_parameters,
             island_manager: IslandManager::new(),
@@ -349,6 +374,69 @@ impl PhysicsWorld {
             chunk_x,
             chunk_y
         );
+    }
+
+    // ===== Multibody/Creature Physics Methods =====
+
+    /// Get mutable access to multibody joint set (for creature articulated bodies)
+    pub fn multibody_joint_set_mut(&mut self) -> &mut MultibodyJointSet {
+        &mut self.multibody_joint_set
+    }
+
+    /// Get reference to rigid body set
+    pub fn rigid_body_set(&self) -> &RigidBodySet {
+        &self.rigid_body_set
+    }
+
+    /// Get mutable reference to rigid body set
+    pub fn rigid_body_set_mut(&mut self) -> &mut RigidBodySet {
+        &mut self.rigid_body_set
+    }
+
+    /// Get mutable reference to collider set
+    pub fn collider_set_mut(&mut self) -> &mut ColliderSet {
+        &mut self.collider_set
+    }
+
+    /// Get mutable reference to island manager
+    pub fn island_manager_mut(&mut self) -> &mut IslandManager {
+        &mut self.island_manager
+    }
+
+    /// Remove a multibody (for creature cleanup)
+    pub fn remove_multibody(&mut self, handle: MultibodyJointHandle) {
+        self.multibody_joint_set.remove(handle, true);
+    }
+
+    /// Get multibody root position
+    pub fn get_multibody_position(&self, handle: MultibodyJointHandle) -> Option<Vec2> {
+        // For now, return None as we're using placeholder handles
+        // This will be properly implemented when we use real multibody joints
+        let _ = handle;
+        None
+    }
+
+    /// Remove a rigid body (helper for creatures)
+    pub fn remove_rigid_body(&mut self, handle: RigidBodyHandle) {
+        let mut impulse_joints = Default::default();
+        self.rigid_body_set.remove(
+            handle,
+            &mut self.island_manager,
+            &mut self.collider_set,
+            &mut impulse_joints,
+            &mut self.multibody_joint_set,
+            false,
+        );
+    }
+
+    /// Add collider with parent (helper for creatures)
+    pub fn add_collider_with_parent(
+        &mut self,
+        collider: Collider,
+        parent_handle: RigidBodyHandle,
+    ) -> ColliderHandle {
+        self.collider_set
+            .insert_with_parent(collider, parent_handle, &mut self.rigid_body_set)
     }
 }
 

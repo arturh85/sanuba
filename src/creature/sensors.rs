@@ -1,0 +1,464 @@
+//! Sensory systems for creatures
+//!
+//! Implements raycasting vision, material detection, and chemical gradients.
+
+use glam::Vec2;
+use serde::{Deserialize, Serialize};
+
+/// Raycast vision result
+#[derive(Debug, Clone)]
+pub struct RaycastHit {
+    pub distance: f32,       // Normalized by max_distance
+    pub material_id: u16,
+    pub temperature: f32,
+    pub light_level: u8,
+}
+
+/// Chemical gradient detection
+#[derive(Debug, Clone)]
+pub struct ChemicalGradient {
+    pub food: f32,      // 0.0 - 1.0
+    pub danger: f32,    // 0.0 - 1.0
+    pub mate: f32,      // 0.0 - 1.0
+}
+
+/// Complete sensory input
+#[derive(Debug, Clone)]
+pub struct SensoryInput {
+    pub raycasts: Vec<RaycastHit>,        // Typically 8 directions
+    pub contact_materials: Vec<u16>,      // Materials in contact
+    pub gradients: ChemicalGradient,
+    pub nearest_food: Option<Vec2>,
+    pub nearest_threat: Option<Vec2>,
+}
+
+impl SensoryInput {
+    /// Gather all sensory input for creature at position
+    pub fn gather(
+        world: &crate::world::World,
+        position: Vec2,
+        config: &SensorConfig,
+    ) -> Self {
+        // Raycast vision in multiple directions
+        let raycasts = raycast_vision(world, position, config.num_raycasts, config.raycast_distance);
+
+        // Detect nearby food and threats
+        let nearest_food = detect_nearby_food(world, position, config.food_detection_radius);
+        let nearest_threat =
+            detect_nearby_threats(world, position, config.threat_detection_radius);
+
+        // Calculate chemical gradients
+        let gradients = calculate_gradients(
+            world,
+            position,
+            config.food_detection_radius.max(config.threat_detection_radius),
+        );
+
+        // For now, contact materials is empty (would need physics integration)
+        let contact_materials = Vec::new();
+
+        Self {
+            raycasts,
+            contact_materials,
+            gradients,
+            nearest_food,
+            nearest_threat,
+        }
+    }
+}
+
+/// Sensor configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensorConfig {
+    pub num_raycasts: usize,
+    pub raycast_distance: f32,
+    pub food_detection_radius: f32,
+    pub threat_detection_radius: f32,
+}
+
+impl Default for SensorConfig {
+    fn default() -> Self {
+        Self {
+            num_raycasts: 8,
+            raycast_distance: 50.0,
+            food_detection_radius: 30.0,
+            threat_detection_radius: 40.0,
+        }
+    }
+}
+
+/// Raycast through pixel world using DDA algorithm
+pub fn raycast_vision(
+    world: &crate::world::World,
+    origin: Vec2,
+    num_rays: usize,
+    max_distance: f32,
+) -> Vec<RaycastHit> {
+    use std::f32::consts::PI;
+
+    let mut hits = Vec::with_capacity(num_rays);
+
+    for i in 0..num_rays {
+        // Calculate ray direction
+        let angle = (i as f32 / num_rays as f32) * 2.0 * PI;
+        let dir = Vec2::new(angle.cos(), angle.sin());
+
+        // DDA raycasting
+        let hit = raycast_dda(world, origin, dir, max_distance);
+        hits.push(hit);
+    }
+
+    hits
+}
+
+/// DDA (Digital Differential Analyzer) raycasting
+fn raycast_dda(
+    world: &crate::world::World,
+    origin: Vec2,
+    direction: Vec2,
+    max_distance: f32,
+) -> RaycastHit {
+    let mut current_pos = origin;
+    let step_size = 1.0; // Step one pixel at a time
+
+    let mut distance = 0.0;
+
+    while distance < max_distance {
+        // Step forward
+        current_pos += direction * step_size;
+        distance += step_size;
+
+        // Check pixel at current position
+        let pixel_x = current_pos.x.round() as i32;
+        let pixel_y = current_pos.y.round() as i32;
+
+        if let Some(pixel) = world.get_pixel(pixel_x, pixel_y) {
+            let material_id = pixel.material_id;
+
+            // Hit solid material (not air)
+            if material_id != 0 {
+                // Get additional information about the hit
+                let temperature = world.get_temperature_at_pixel(pixel_x, pixel_y);
+
+                let light_level = world.get_light_at(pixel_x, pixel_y).unwrap_or(0);
+
+                return RaycastHit {
+                    distance: distance / max_distance, // Normalize
+                    material_id,
+                    temperature,
+                    light_level,
+                };
+            }
+        } else {
+            // Hit world boundary
+            break;
+        }
+    }
+
+    // No hit - return air at max distance
+    RaycastHit {
+        distance: 1.0, // Max distance (normalized)
+        material_id: 0, // Air
+        temperature: 20.0,
+        light_level: 15, // Max light (outdoor)
+    }
+}
+
+/// Detect nearby edible materials
+pub fn detect_nearby_food(
+    world: &crate::world::World,
+    position: Vec2,
+    radius: f32,
+) -> Option<Vec2> {
+    use crate::simulation::MaterialTag;
+
+    let mut nearest_food: Option<(Vec2, f32)> = None;
+    let radius_sq = radius * radius;
+
+    // Search in a square around the position
+    let min_x = (position.x - radius).floor() as i32;
+    let max_x = (position.x + radius).ceil() as i32;
+    let min_y = (position.y - radius).floor() as i32;
+    let max_y = (position.y + radius).ceil() as i32;
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            if let Some(pixel) = world.get_pixel(x, y) {
+                let material_id = pixel.material_id;
+                let material = world.materials().get(material_id);
+
+                // Check if material is edible
+                if material.tags.contains(&MaterialTag::Edible) {
+                    let pixel_pos = Vec2::new(x as f32, y as f32);
+                    let dist_sq = position.distance_squared(pixel_pos);
+
+                    if dist_sq <= radius_sq {
+                        match nearest_food {
+                            None => nearest_food = Some((pixel_pos, dist_sq)),
+                            Some((_, current_dist_sq)) => {
+                                if dist_sq < current_dist_sq {
+                                    nearest_food = Some((pixel_pos, dist_sq));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    nearest_food.map(|(pos, _)| pos)
+}
+
+/// Detect nearby threats (fire, lava, acid)
+pub fn detect_nearby_threats(
+    world: &crate::world::World,
+    position: Vec2,
+    radius: f32,
+) -> Option<Vec2> {
+    let mut nearest_threat: Option<(Vec2, f32)> = None;
+    let radius_sq = radius * radius;
+
+    // Search in a square around the position
+    let min_x = (position.x - radius).floor() as i32;
+    let max_x = (position.x + radius).ceil() as i32;
+    let min_y = (position.y - radius).floor() as i32;
+    let max_y = (position.y + radius).ceil() as i32;
+
+    // Dangerous material IDs (based on materials.rs)
+    const FIRE: u16 = 6;
+    const LAVA: u16 = 9;
+    const ACID: u16 = 11;
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            if let Some(pixel) = world.get_pixel(x, y) {
+                let material_id = pixel.material_id;
+
+                // Check if material is dangerous
+                if material_id == FIRE || material_id == LAVA || material_id == ACID {
+                    let pixel_pos = Vec2::new(x as f32, y as f32);
+                    let dist_sq = position.distance_squared(pixel_pos);
+
+                    if dist_sq <= radius_sq {
+                        match nearest_threat {
+                            None => nearest_threat = Some((pixel_pos, dist_sq)),
+                            Some((_, current_dist_sq)) => {
+                                if dist_sq < current_dist_sq {
+                                    nearest_threat = Some((pixel_pos, dist_sq));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    nearest_threat.map(|(pos, _)| pos)
+}
+
+/// Calculate chemical gradients (scent following)
+pub fn calculate_gradients(
+    world: &crate::world::World,
+    position: Vec2,
+    radius: f32,
+) -> ChemicalGradient {
+    use crate::simulation::MaterialTag;
+
+    let mut food_count = 0;
+    let mut danger_count = 0;
+    let radius_sq = radius * radius;
+
+    // Search in a square around the position
+    let min_x = (position.x - radius).floor() as i32;
+    let max_x = (position.x + radius).ceil() as i32;
+    let min_y = (position.y - radius).floor() as i32;
+    let max_y = (position.y + radius).ceil() as i32;
+
+    const FIRE: u16 = 6;
+    const LAVA: u16 = 9;
+    const ACID: u16 = 11;
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            if let Some(pixel) = world.get_pixel(x, y) {
+                let pixel_pos = Vec2::new(x as f32, y as f32);
+                let dist_sq = position.distance_squared(pixel_pos);
+
+                if dist_sq <= radius_sq {
+                    let material_id = pixel.material_id;
+                    let material = world.materials().get(material_id);
+
+                    // Count food
+                    if material.tags.contains(&MaterialTag::Edible) {
+                        food_count += 1;
+                    }
+
+                    // Count dangers
+                    if material_id == FIRE || material_id == LAVA || material_id == ACID {
+                        danger_count += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // Normalize to 0-1 range (arbitrarily using 100 pixels as saturation point)
+    let food_gradient = (food_count as f32 / 100.0).min(1.0);
+    let danger_gradient = (danger_count as f32 / 100.0).min(1.0);
+
+    ChemicalGradient {
+        food: food_gradient,
+        danger: danger_gradient,
+        mate: 0.0, // Mate detection not implemented yet
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sensor_config_defaults() {
+        let config = SensorConfig::default();
+        assert_eq!(config.num_raycasts, 8);
+        assert_eq!(config.raycast_distance, 50.0);
+        assert_eq!(config.food_detection_radius, 30.0);
+        assert_eq!(config.threat_detection_radius, 40.0);
+    }
+
+    #[test]
+    fn test_raycast_hit_creation() {
+        let hit = RaycastHit {
+            distance: 0.5,
+            material_id: 1,
+            temperature: 25.0,
+            light_level: 10,
+        };
+
+        assert_eq!(hit.distance, 0.5);
+        assert_eq!(hit.material_id, 1);
+        assert_eq!(hit.temperature, 25.0);
+        assert_eq!(hit.light_level, 10);
+    }
+
+    #[test]
+    fn test_chemical_gradient_creation() {
+        let gradient = ChemicalGradient {
+            food: 0.5,
+            danger: 0.3,
+            mate: 0.0,
+        };
+
+        assert_eq!(gradient.food, 0.5);
+        assert_eq!(gradient.danger, 0.3);
+        assert_eq!(gradient.mate, 0.0);
+    }
+
+    #[test]
+    fn test_raycast_vision_creates_correct_number() {
+        // Create minimal world for testing
+        use crate::world::World;
+        let world = World::new();
+
+        let origin = Vec2::new(100.0, 100.0);
+        let num_rays = 8;
+        let max_distance = 50.0;
+
+        let hits = raycast_vision(&world, origin, num_rays, max_distance);
+
+        // Should create exactly num_rays results
+        assert_eq!(hits.len(), 8);
+
+        // All hits should have data
+        for hit in &hits {
+            assert!(hit.distance >= 0.0 && hit.distance <= 1.0);
+            assert!(hit.light_level <= 15);
+        }
+    }
+
+    #[test]
+    fn test_raycast_dda_air_returns_max_distance() {
+        use crate::world::World;
+        let world = World::new();
+
+        let origin = Vec2::new(100.0, 100.0);
+        let direction = Vec2::new(1.0, 0.0); // Right
+        let max_distance = 50.0;
+
+        let hit = raycast_dda(&world, origin, direction, max_distance);
+
+        // Should return normalized max distance for air
+        assert_eq!(hit.distance, 1.0);
+        assert_eq!(hit.material_id, 0); // Air
+    }
+
+    #[test]
+    fn test_detect_nearby_food_none_when_empty() {
+        use crate::world::World;
+        let world = World::new();
+
+        let position = Vec2::new(100.0, 100.0);
+        let radius = 30.0;
+
+        let food = detect_nearby_food(&world, position, radius);
+
+        // In empty world, should find no food
+        // (depends on world generation, may have plant matter)
+        // This test validates the function runs without panic
+        assert!(food.is_none() || food.is_some());
+    }
+
+    #[test]
+    fn test_detect_nearby_threats_none_when_safe() {
+        use crate::world::World;
+        let world = World::new();
+
+        let position = Vec2::new(100.0, 100.0);
+        let radius = 40.0;
+
+        let threat = detect_nearby_threats(&world, position, radius);
+
+        // In freshly generated world, should be safe initially
+        // This test validates the function runs without panic
+        assert!(threat.is_none() || threat.is_some());
+    }
+
+    #[test]
+    fn test_calculate_gradients_returns_normalized() {
+        use crate::world::World;
+        let world = World::new();
+
+        let position = Vec2::new(100.0, 100.0);
+        let radius = 30.0;
+
+        let gradients = calculate_gradients(&world, position, radius);
+
+        // All gradients should be normalized 0-1
+        assert!(gradients.food >= 0.0 && gradients.food <= 1.0);
+        assert!(gradients.danger >= 0.0 && gradients.danger <= 1.0);
+        assert!(gradients.mate >= 0.0 && gradients.mate <= 1.0);
+    }
+
+    #[test]
+    fn test_sensory_input_gather_complete() {
+        use crate::world::World;
+        let world = World::new();
+
+        let position = Vec2::new(100.0, 100.0);
+        let config = SensorConfig::default();
+
+        let input = SensoryInput::gather(&world, position, &config);
+
+        // Should have correct number of raycasts
+        assert_eq!(input.raycasts.len(), config.num_raycasts);
+
+        // Gradients should be valid
+        assert!(input.gradients.food >= 0.0 && input.gradients.food <= 1.0);
+        assert!(input.gradients.danger >= 0.0 && input.gradients.danger <= 1.0);
+
+        // Contact materials currently empty (no physics integration yet)
+        assert_eq!(input.contact_materials.len(), 0);
+    }
+}

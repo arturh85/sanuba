@@ -11,6 +11,7 @@ pub struct WorldGenerator {
     iron_noise: Perlin,
     copper_noise: Perlin,
     gold_noise: Perlin,
+    plant_noise: Perlin,  // For surface plant matter distribution
 }
 
 impl WorldGenerator {
@@ -27,6 +28,7 @@ impl WorldGenerator {
         let iron_noise = Perlin::new((seed + 2) as u32);
         let copper_noise = Perlin::new((seed + 3) as u32);
         let gold_noise = Perlin::new((seed + 4) as u32);
+        let plant_noise = Perlin::new((seed + 5) as u32);
 
         Self {
             seed,
@@ -35,6 +37,7 @@ impl WorldGenerator {
             iron_noise,
             copper_noise,
             gold_noise,
+            plant_noise,
         }
     }
 
@@ -71,6 +74,19 @@ impl WorldGenerator {
         // Air above surface
         if world_y > SURFACE_LEVEL {
             return MaterialId::AIR;
+        }
+
+        // Plant matter on surface (20-30% coverage)
+        if world_y == SURFACE_LEVEL {
+            let plant_value = self.plant_noise.get([
+                world_x as f64 * 0.05,
+                world_y as f64 * 0.05
+            ]);
+
+            // Threshold 0.5 = ~25% coverage (medium density)
+            if plant_value > 0.5 {
+                return MaterialId::PLANT_MATTER;
+            }
         }
 
         // Underground: Use cave noise to carve out caves

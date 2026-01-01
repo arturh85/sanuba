@@ -33,9 +33,11 @@ const MAX_ZOOM: f32 = 0.5; // Max zoom in (closer view)
 fn print_controls() {
     println!("=== Sunaba Controls ===");
     println!("Movement: WASD");
+    println!("Jump: Space");
     println!("Zoom: +/- or Mouse Wheel");
     println!("Materials: 1-9 (Stone, Sand, Water, Wood, Fire, Smoke, Steam, Lava, Oil)");
     println!("Spawn: Left Click");
+    println!("Spawn Creature: G");
     println!("Toggle Temperature Overlay: T");
     println!("Toggle Stats: F1");
     println!("Toggle Help: H");
@@ -76,6 +78,7 @@ pub struct InputState {
     pub a_pressed: bool,
     pub s_pressed: bool,
     pub d_pressed: bool,
+    pub jump_pressed: bool, // Space bar for jumping
 
     // Material selection (1-9 map to material IDs)
     pub selected_material: u16,
@@ -96,6 +99,7 @@ impl InputState {
             a_pressed: false,
             s_pressed: false,
             d_pressed: false,
+            jump_pressed: false,
             selected_material: MaterialId::SAND, // Start with sand
             mouse_world_pos: None,
             left_mouse_pressed: false,
@@ -445,6 +449,7 @@ impl App {
         if self.ui_state.level_selector.return_to_world {
             self.game_mode = GameMode::PersistentWorld;
             self.world.load_persistent_world();
+            self.ui_state.level_selector.reset_flags(); // Reset flag after processing
             log::info!("Returned to persistent world");
         } else if let Some(level_id) = self.ui_state.level_selector.selected_level {
             // Save current world if in persistent mode
@@ -454,6 +459,7 @@ impl App {
 
             self.game_mode = GameMode::DemoLevel(level_id);
             self.level_manager.load_level(level_id, &mut self.world);
+            self.ui_state.level_selector.reset_flags(); // Reset flag after processing
             log::info!(
                 "Switched to demo level {}: {}",
                 level_id,
@@ -526,6 +532,7 @@ impl ApplicationHandler for App {
                         KeyCode::KeyA => self.input_state.a_pressed = pressed,
                         KeyCode::KeyS => self.input_state.s_pressed = pressed,
                         KeyCode::KeyD => self.input_state.d_pressed = pressed,
+                        KeyCode::Space => self.input_state.jump_pressed = pressed,
 
                         // Hotbar selection (0-9) - select inventory slot and equip/unequip tools
                         KeyCode::Digit0 => {
@@ -613,6 +620,26 @@ impl ApplicationHandler for App {
                         KeyCode::KeyC => {
                             if pressed {
                                 self.ui_state.toggle_crafting();
+                            }
+                        }
+                        KeyCode::KeyG => {
+                            if pressed {
+                                use crate::creature::genome::CreatureGenome;
+
+                                // Check population limit
+                                if self.world.creature_manager.can_spawn() {
+                                    // Randomly select genome
+                                    let genome = match rand::random::<u8>() % 3 {
+                                        0 => CreatureGenome::test_biped(),
+                                        1 => CreatureGenome::test_quadruped(),
+                                        _ => CreatureGenome::test_worm(),
+                                    };
+
+                                    let id = self.world.spawn_creature_at_player(genome);
+                                    log::info!("Spawned creature {} at player position", id);
+                                } else {
+                                    log::warn!("Cannot spawn: population limit reached");
+                                }
                             }
                         }
 
