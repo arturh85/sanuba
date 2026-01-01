@@ -1247,12 +1247,17 @@ impl World {
 
         // Also save metadata with player data
         if let Some(persistence) = &self.persistence {
+            #[cfg(not(target_arch = "wasm32"))]
+            let last_played = chrono::Local::now().to_rfc3339();
+            #[cfg(target_arch = "wasm32")]
+            let last_played = "WASM Session".to_string();
+
             let metadata = WorldMetadata {
                 version: 1,
                 seed: self.generator.seed,
                 spawn_point: (self.player.position.x, self.player.position.y),
                 created_at: String::new(), // Preserved from load
-                last_played: chrono::Local::now().to_rfc3339(),
+                last_played,
                 play_time_seconds: 0,                   // TODO: track play time
                 player_data: Some(self.player.clone()), // Save player inventory, health, hunger
             };

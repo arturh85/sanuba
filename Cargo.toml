@@ -10,6 +10,11 @@ repository = "https://github.com/yourusername/sunaba"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "sunaba"
+path = "src/main.rs"
+required-features = ["native"]
+
 [dependencies]
 # Graphics
 wgpu = "0.20"
@@ -19,7 +24,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 # UI
 egui = "0.28"
 egui-wgpu = "0.28"
-egui-winit = "0.28"
+# egui-winit is configured per-target below (clipboard feature doesn't work on WASM)
 
 # Physics (rigid bodies)
 rapier2d = "0.18"
@@ -51,6 +56,10 @@ pollster = "0.3"  # Simple async executor for wgpu init
 # Noise generation for procedural terrain
 noise = "0.9"
 
+[features]
+default = ["native"]
+native = []
+
 # Platform-specific dependencies
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -58,6 +67,7 @@ clap = { version = "4.4", features = ["derive"] }
 rayon = "1.8"
 lz4_flex = "0.11"
 chrono = "0.4"
+egui-winit = { version = "0.28", features = ["clipboard"] }
 
 # WASM-specific dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -68,6 +78,7 @@ console_error_panic_hook = "0.1"
 console_log = "1.0"
 getrandom = { version = "0.2", features = ["js"] }
 instant = { version = "0.1", features = ["wasm-bindgen"] }
+egui-winit = { version = "0.28", default-features = false }
 
 [dev-dependencies]
 criterion = "0.5"  # Benchmarking

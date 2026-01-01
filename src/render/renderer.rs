@@ -101,7 +101,9 @@ pub struct Renderer {
     #[allow(dead_code)]
     temp_sampler: wgpu::Sampler,
     light_texture: wgpu::Texture,
+    #[allow(dead_code)]
     light_texture_view: wgpu::TextureView,
+    #[allow(dead_code)]
     light_sampler: wgpu::Sampler,
     overlay_uniform_buffer: wgpu::Buffer,
     overlay_bind_group: wgpu::BindGroup,
