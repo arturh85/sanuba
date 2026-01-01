@@ -23,6 +23,10 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 ## Building
 
+Development works on Windows, Linux and MacOS.
+
+Requires [Rust](https://www.rust-lang.org/tools/install) 1.56 or later.
+
 ### Native Builds
 
 ```bash

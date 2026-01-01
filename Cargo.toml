@@ -2,10 +2,10 @@
 name = "sunaba"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <you@example.com>"]
+authors = ["Artur Hallmann <arturh@arturh.de>"]
 description = "A 2D falling-sand physics sandbox survival game"
 license = "MIT"
-repository = "https://github.com/yourusername/sunaba"
+repository = "https://github.com/arturh85/sunaba"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

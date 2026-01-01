@@ -29,7 +29,7 @@ impl ControlsHelpState {
         }
 
         // Position on right side of screen
-        let screen_rect = ctx.screen_rect();
+        let screen_rect = ctx.content_rect();
         let panel_width = 280.0;
         let panel_x = screen_rect.max.x - panel_width - 20.0;
 
@@ -121,7 +121,7 @@ impl ControlsHelpState {
         }
 
         // Position on right side of screen
-        let screen_rect = ctx.screen_rect();
+        let screen_rect = ctx.content_rect();
         let panel_width = 280.0;
         let panel_x = screen_rect.max.x - panel_width - 20.0;
 
