@@ -1,42 +1,107 @@
 use crate::simulation::MaterialId;
+use crate::world::biome::{select_biome, BiomeRegistry, BiomeType};
 use crate::world::chunk::{Chunk, CHUNK_SIZE};
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 
-/// World generator using multi-octave Perlin noise for cave generation
+// World dimension constants
+pub const SURFACE_Y: i32 = 0; // Sea level baseline
+pub const SKY_HEIGHT: i32 = 1000; // Top of atmosphere
+pub const BEDROCK_Y: i32 = -3500; // Bedrock layer starts here
+pub const MAX_UNDERGROUND: i32 = -3500; // Bottom before bedrock
+
+// Underground layer boundaries
+pub const SHALLOW_UNDERGROUND: i32 = -500; // Common ores, shallow caves
+pub const DEEP_UNDERGROUND: i32 = -1500; // Better ores, larger caves
+pub const CAVERN_LAYER: i32 = -2500; // Rare ores, huge caverns, lava
+
+/// World generator using multi-octave Perlin noise for biome-based generation
 pub struct WorldGenerator {
     pub seed: u64,
-    cave_noise: Fbm<Perlin>,
-    // Separate noise layers for different ore types
+
+    // Biome definitions
+    biome_registry: BiomeRegistry,
+
+    // Large-scale (biome selection) - very low frequency
+    temperature_noise: Fbm<Perlin>, // 2 octaves, freq=0.0003
+    moisture_noise: Fbm<Perlin>,    // 2 octaves, freq=0.0003
+
+    // Medium-scale (terrain features) - low frequency
+    terrain_height_noise: Fbm<Perlin>, // 4 octaves, freq=0.001
+
+    // Small-scale (cave details) - medium frequency
+    cave_noise_large: Fbm<Perlin>, // 3 octaves, freq=0.01 (big caverns)
+    cave_noise_small: Fbm<Perlin>, // 4 octaves, freq=0.02 (tunnels)
+
+    // Per-ore noise layers
     coal_noise: Perlin,
     iron_noise: Perlin,
     copper_noise: Perlin,
     gold_noise: Perlin,
-    plant_noise: Perlin, // For surface plant matter distribution
+
+    // Vegetation placement
+    tree_noise: Perlin,
+    plant_noise: Perlin,
 }
 
 impl WorldGenerator {
     pub fn new(seed: u64) -> Self {
-        // Configure multi-octave noise for natural-looking caves
-        let cave_noise = Fbm::<Perlin>::new(seed as u32)
-            .set_octaves(4) // Detail levels
-            .set_frequency(0.02) // Cave scale (~50 pixel wavelength)
-            .set_lacunarity(2.0) // Octave frequency multiplier
-            .set_persistence(0.5); // Octave amplitude multiplier
+        // Large-scale biome selection noise (very low frequency for large regions)
+        let temperature_noise = Fbm::<Perlin>::new(seed as u32)
+            .set_octaves(2)
+            .set_frequency(0.0003) // Very large biome regions (~3000 pixel wavelength)
+            .set_lacunarity(2.0)
+            .set_persistence(0.5);
 
-        // Separate noise layers for each ore type (different seeds for variety)
-        let coal_noise = Perlin::new((seed + 1) as u32);
-        let iron_noise = Perlin::new((seed + 2) as u32);
-        let copper_noise = Perlin::new((seed + 3) as u32);
-        let gold_noise = Perlin::new((seed + 4) as u32);
-        let plant_noise = Perlin::new((seed + 5) as u32);
+        let moisture_noise = Fbm::<Perlin>::new((seed + 1) as u32)
+            .set_octaves(2)
+            .set_frequency(0.0003)
+            .set_lacunarity(2.0)
+            .set_persistence(0.5);
+
+        // Medium-scale terrain height variation (hills and valleys)
+        let terrain_height_noise = Fbm::<Perlin>::new((seed + 2) as u32)
+            .set_octaves(4)
+            .set_frequency(0.001) // ~1000 pixel wavelength for rolling hills
+            .set_lacunarity(2.0)
+            .set_persistence(0.5);
+
+        // Large cave systems (big caverns)
+        let cave_noise_large = Fbm::<Perlin>::new((seed + 3) as u32)
+            .set_octaves(3)
+            .set_frequency(0.01) // ~100 pixel wavelength
+            .set_lacunarity(2.0)
+            .set_persistence(0.5);
+
+        // Small cave tunnels
+        let cave_noise_small = Fbm::<Perlin>::new((seed + 4) as u32)
+            .set_octaves(4)
+            .set_frequency(0.02) // ~50 pixel wavelength
+            .set_lacunarity(2.0)
+            .set_persistence(0.5);
+
+        // Ore placement noise (different seeds for variety)
+        let coal_noise = Perlin::new((seed + 5) as u32);
+        let iron_noise = Perlin::new((seed + 6) as u32);
+        let copper_noise = Perlin::new((seed + 7) as u32);
+        let gold_noise = Perlin::new((seed + 8) as u32);
+
+        // Vegetation placement
+        let tree_noise = Perlin::new((seed + 9) as u32);
+        let plant_noise = Perlin::new((seed + 10) as u32);
 
         Self {
             seed,
-            cave_noise,
+            biome_registry: BiomeRegistry::new(),
+            temperature_noise,
+            moisture_noise,
+            terrain_height_noise,
+            cave_noise_large,
+            cave_noise_small,
             coal_noise,
             iron_noise,
             copper_noise,
             gold_noise,
+            tree_noise,
             plant_noise,
         }
     }
@@ -60,99 +125,142 @@ impl WorldGenerator {
         chunk
     }
 
-    /// Determine material at a world coordinate using noise sampling
+    /// Determine material at a world coordinate using biome-based generation
     fn get_material_at(&self, world_x: i32, world_y: i32) -> u16 {
-        // Vertical layer constants
-        const SURFACE_LEVEL: i32 = 32; // y=32 is ground level
-        const BEDROCK_LEVEL: i32 = -96; // y=-96 is indestructible floor
-
         // Bedrock layer (indestructible floor)
-        if world_y <= BEDROCK_LEVEL {
+        if world_y <= BEDROCK_Y {
             return MaterialId::BEDROCK;
         }
 
-        // Air above surface
-        if world_y > SURFACE_LEVEL {
-            return MaterialId::AIR;
-        }
+        // Step 1: Sample biome noise to determine biome type
+        let temperature = self.temperature_noise.get([world_x as f64, 0.0]);
+        let moisture = self.moisture_noise.get([world_x as f64, 0.0]);
+        let biome_type = select_biome(temperature, moisture);
+        let biome = self.biome_registry.get(biome_type);
 
-        // Plant matter on surface (20-30% coverage)
-        if world_y == SURFACE_LEVEL {
-            let plant_value = self
-                .plant_noise
-                .get([world_x as f64 * 0.05, world_y as f64 * 0.05]);
+        // Step 2: Calculate terrain height using biome parameters
+        let terrain_height_value = self.terrain_height_noise.get([world_x as f64, 0.0]);
+        // Apply biome-specific height variance and offset
+        let height_variation = (terrain_height_value * 100.0 * biome.height_variance as f64) as i32;
+        let terrain_y = SURFACE_Y + biome.height_offset + height_variation;
 
-            // Threshold 0.5 = ~25% coverage (medium density)
-            if plant_value > 0.5 {
-                return MaterialId::PLANT_MATTER;
+        // Step 3: Handle ocean biome specially
+        if biome_type == BiomeType::Ocean {
+            // Ocean surface is water
+            if world_y > terrain_y && world_y <= SURFACE_Y - 20 {
+                return MaterialId::WATER;
+            }
+            // Above water is air
+            if world_y > SURFACE_Y - 20 {
+                return MaterialId::AIR;
+            }
+            // Ocean floor is sand
+            if world_y > terrain_y - 10 && world_y <= terrain_y {
+                return MaterialId::SAND;
+            }
+        } else {
+            // Non-ocean biomes: Air above terrain
+            if world_y > terrain_y {
+                return MaterialId::AIR;
             }
         }
 
-        // Underground: Use cave noise to carve out caves
-        let cave_value = self.cave_noise.get([world_x as f64, world_y as f64]);
+        // Step 4: Surface vegetation
+        let depth = terrain_y - world_y;
+        if depth == 0 || depth == 1 {
+            // Plant placement
+            let plant_value = self.plant_noise.get([world_x as f64 * 0.05, 0.0]);
+            if plant_value > (1.0 - biome.plant_density as f64) {
+                return MaterialId::PLANT_MATTER;
+            }
 
-        // Cave carving: threshold determines cave density
-        // Higher threshold = more caves
-        const CAVE_THRESHOLD: f64 = 0.2;
-        if cave_value > CAVE_THRESHOLD {
-            return MaterialId::AIR;
+            // Tree placement (will be expanded in Phase 2.5)
+            let tree_value = self.tree_noise.get([world_x as f64 * 0.03, 0.0]);
+            if tree_value > (1.0 - biome.tree_density as f64) {
+                // Simple tree: just wood for now
+                if depth == 0 && world_y < SKY_HEIGHT {
+                    return MaterialId::WOOD;
+                }
+            }
         }
 
-        // Solid terrain: depth-based material selection
-        let depth = SURFACE_LEVEL - world_y;
+        // Step 5: Underground caves (apply biome cave density multiplier)
+        if world_y < terrain_y - 10 {
+            let cave_large = self.cave_noise_large.get([world_x as f64, world_y as f64]);
+            let cave_small = self.cave_noise_small.get([world_x as f64, world_y as f64]);
 
-        // Top layer: dirt and sand (shallow)
-        if depth < 4 {
-            return MaterialId::DIRT;
-        } else if depth < 8 {
-            return MaterialId::SAND;
+            // Apply biome cave density
+            let cave_threshold_large = 0.3 / biome.cave_density_multiplier as f64;
+            let cave_threshold_small = 0.4 / biome.cave_density_multiplier as f64;
+
+            if cave_large > cave_threshold_large || cave_small > cave_threshold_small {
+                return MaterialId::AIR;
+            }
         }
 
-        // Ore generation with depth stratification
-        // Noise scale: 0.1 = ~10 pixel wavelength for vein patterns
+        // Step 6: Material layers based on depth and biome
+        if depth < 1 {
+            // Surface material (grass, sand, stone, etc.)
+            return biome.surface_material;
+        } else if depth < biome.stone_depth {
+            // Subsurface material (dirt, sandstone, etc.)
+            return biome.subsurface_material;
+        }
+
+        // Step 7: Ore generation with biome multipliers
         const NOISE_SCALE: f64 = 0.08;
 
-        // Coal: shallow (depth 8-40, roughly y=24 to y=-8)
-        if (8..=40).contains(&depth) {
+        // Coal: shallow underground (y=-50 to y=-500)
+        if world_y > SHALLOW_UNDERGROUND && world_y < SURFACE_Y - 50 {
             let coal_value = self
                 .coal_noise
                 .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
-            // Threshold 0.75 = ~3% density
-            if coal_value > 0.75 {
+            let threshold = 0.75 / biome.get_ore_multiplier(MaterialId::COAL_ORE) as f64;
+            if coal_value > threshold {
                 return MaterialId::COAL_ORE;
             }
         }
 
-        // Copper: medium depth (depth 20-60, roughly y=12 to y=-28)
-        if (20..=60).contains(&depth) {
+        // Copper: medium depth (y=-200 to y=-1000)
+        if world_y > -1000 && world_y < -200 {
             let copper_value = self
                 .copper_noise
                 .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
-            // Threshold 0.77 = ~2.5% density
-            if copper_value > 0.77 {
+            let threshold = 0.77 / biome.get_ore_multiplier(MaterialId::COPPER_ORE) as f64;
+            if copper_value > threshold {
                 return MaterialId::COPPER_ORE;
             }
         }
 
-        // Iron: medium-deep (depth 30-80, roughly y=2 to y=-48)
-        if (30..=80).contains(&depth) {
+        // Iron: deep (y=-500 to y=-2000)
+        if world_y > -2000 && world_y < -500 {
             let iron_value = self
                 .iron_noise
                 .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
-            // Threshold 0.76 = ~2.8% density
-            if iron_value > 0.76 {
+            let threshold = 0.76 / biome.get_ore_multiplier(MaterialId::IRON_ORE) as f64;
+            if iron_value > threshold {
                 return MaterialId::IRON_ORE;
             }
         }
 
-        // Gold: deep (depth 60-120, roughly y=-28 to y=-88)
-        if (60..=120).contains(&depth) {
+        // Gold: very deep (y=-1500 to y=-3000)
+        if world_y > -3000 && world_y < -1500 {
             let gold_value = self
                 .gold_noise
                 .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
-            // Threshold 0.80 = ~2% density (rarest)
-            if gold_value > 0.80 {
+            let threshold = 0.80 / biome.get_ore_multiplier(MaterialId::GOLD_ORE) as f64;
+            if gold_value > threshold {
                 return MaterialId::GOLD_ORE;
+            }
+        }
+
+        // Step 8: Lava layer at extreme depths (y < -2500)
+        if world_y < CAVERN_LAYER {
+            let lava_value = self
+                .cave_noise_large
+                .get([world_x as f64 * 0.05, world_y as f64 * 0.05]);
+            if lava_value > 0.6 {
+                return MaterialId::LAVA;
             }
         }
 
@@ -191,17 +299,20 @@ mod tests {
     fn test_bedrock_layer() {
         let gen = WorldGenerator::new(42);
 
-        // Chunk at y=-96 should be all bedrock
-        let chunk = gen.generate_chunk(0, -2); // chunk y=-2 * 64 = y=-128 to y=-65
+        // Chunk well below BEDROCK_Y should be all bedrock
+        // chunk y=-60 * 64 = y=-3840 to y=-3777 (all below BEDROCK_Y = -3500)
+        let chunk = gen.generate_chunk(0, -60);
 
-        // Bottom rows should be bedrock
-        for x in 0..CHUNK_SIZE {
-            let material = chunk.get_material(x, 0);
-            assert_eq!(
-                material,
-                MaterialId::BEDROCK,
-                "Expected bedrock at bottom of chunk"
-            );
+        // All pixels should be bedrock (well below BEDROCK_Y = -3500)
+        for y in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
+                let material = chunk.get_material(x, y);
+                assert_eq!(
+                    material,
+                    MaterialId::BEDROCK,
+                    "Expected bedrock well below BEDROCK_Y"
+                );
+            }
         }
     }
 
@@ -209,8 +320,8 @@ mod tests {
     fn test_surface_layer() {
         let gen = WorldGenerator::new(42);
 
-        // Chunk above surface should be mostly air
-        let chunk = gen.generate_chunk(0, 1); // chunk y=1 * 64 = y=64 to y=127
+        // Chunk well above surface should be mostly air
+        let chunk = gen.generate_chunk(0, 5); // chunk y=5 * 64 = y=320 to y=383
 
         let mut air_count = 0;
         for y in 0..CHUNK_SIZE {
@@ -221,7 +332,7 @@ mod tests {
             }
         }
 
-        // Most pixels should be air above surface
+        // Most pixels should be air well above surface (y=0)
         assert!(
             air_count > CHUNK_SIZE * CHUNK_SIZE / 2,
             "Expected mostly air above surface, got {} air pixels",

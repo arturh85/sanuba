@@ -9,6 +9,10 @@ struct CameraUniform {
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
+// Texture origin for dynamic camera-centered rendering
+@group(1) @binding(1)
+var<uniform> texture_origin: vec2<f32>;
+
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) tex_coords: vec2<f32>,
@@ -127,14 +131,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         (ndc_flipped.y / camera.zoom) + camera.position.y
     );
 
-    // Transform world to texture space (512x512, centered at origin)
-    let texture_size = 512.0;
-    let tex_coords = vec2<f32>(
-        (world_pos.x + texture_size * 0.5) / texture_size,
-        (world_pos.y + texture_size * 0.5) / texture_size  // No flip - renderer writes Y-up
-    );
+    // Transform world to texture space using dynamic texture origin
+    let texture_size = 2048.0;
+    let relative_pos = world_pos - texture_origin;
+    let tex_coords = relative_pos / texture_size;
 
-    // Bounds check
+    // Bounds check - clamp to valid texture coordinates
     if tex_coords.x < 0.0 || tex_coords.x > 1.0 ||
        tex_coords.y < 0.0 || tex_coords.y > 1.0 {
         return vec4<f32>(0.1, 0.1, 0.15, 1.0); // Background color

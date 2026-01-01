@@ -22,7 +22,3 @@ echo "Generating JS bindings..."
 wasm-bindgen --out-dir web/pkg --no-typescript --target web target/wasm32-unknown-unknown/release/sunaba.wasm
 
 echo "✅ Build complete! Output in web/pkg/"
-echo ""
-echo "To test locally, run:"
-echo "  cd web && python3 -m http.server 8080"
-echo "Then open http://localhost:8080 in your browser"

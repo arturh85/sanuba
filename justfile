@@ -8,7 +8,7 @@ test:
     cargo fmt --all
     cargo fmt --all -- --check
     cargo clippy --fix --lib -p sunaba --tests --allow-dirty
-    cargo test
+    cargo test --quiet
     cargo build --release
     ./build-web.sh
 

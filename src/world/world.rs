@@ -108,8 +108,8 @@ impl World {
             loaded_chunk_limit: 3000,           // ~19MB max memory
         };
 
-        // Initialize with some test chunks
-        world.generate_test_world();
+        // Don't pre-generate - let chunks generate on-demand as player explores
+        // (Demo levels still call generate_test_world() explicitly)
 
         // Initialize light levels before first CA update
         world.initialize_light();
@@ -141,6 +141,8 @@ impl World {
     }
 
     /// Generate a simple test world for development
+    /// Kept for testing and debugging purposes
+    #[allow(dead_code)]
     fn generate_test_world(&mut self) {
         let mut total_pixels = 0;
 
@@ -1569,8 +1571,8 @@ impl World {
         let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
         let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
 
-        // Load chunks within 8-chunk radius (same as initial load)
-        const LOAD_RADIUS: i32 = 8;
+        // Load chunks within 20-chunk radius (ensures chunks loaded beyond texture edge)
+        const LOAD_RADIUS: i32 = 20;
 
         for cy in (player_chunk_y - LOAD_RADIUS)..=(player_chunk_y + LOAD_RADIUS) {
             for cx in (player_chunk_x - LOAD_RADIUS)..=(player_chunk_x + LOAD_RADIUS) {

@@ -24,7 +24,3 @@ if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
 
 echo.
 echo ✅ Build complete! Output in web\pkg\
-echo.
-echo To test locally, run:
-echo   cd web ^&^& python -m http.server 8080
-echo Then open http://localhost:8080 in your browser

@@ -108,10 +108,20 @@ pub struct Renderer {
     overlay_uniform_buffer: wgpu::Buffer,
     overlay_bind_group: wgpu::BindGroup,
     overlay_type: u32, // 0=none, 1=temperature, 2=light
+
+    // Texture origin tracking for dynamic camera-centered rendering
+    /// World coordinate at texture pixel [0, 0]
+    texture_origin: glam::Vec2,
+    /// GPU buffer for texture_origin uniform (passed to shader via camera bind group)
+    texture_origin_buffer: wgpu::Buffer,
+    /// Track which chunks are currently rendered in the texture
+    rendered_chunks: std::collections::HashSet<glam::IVec2>,
+    /// Flag indicating texture needs full rebuffer
+    needs_full_rebuffer: bool,
 }
 
 impl Renderer {
-    const WORLD_TEXTURE_SIZE: u32 = 512; // 8x8 chunks visible
+    const WORLD_TEXTURE_SIZE: u32 = 2048; // 32x32 chunks visible (~16 MB texture)
 
     pub async fn new(window: &Window) -> Result<Self> {
         let size = window.inner_size();
@@ -259,28 +269,61 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // Texture origin tracking for dynamic camera-centered rendering
+        // Start with texture centered on world origin
+        let texture_origin = glam::Vec2::new(
+            -(Self::WORLD_TEXTURE_SIZE as f32 / 2.0),
+            -(Self::WORLD_TEXTURE_SIZE as f32 / 2.0),
+        );
+
+        let texture_origin_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("texture_origin_buffer"),
+            contents: bytemuck::cast_slice(&[texture_origin.x, texture_origin.y]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
         let camera_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("camera_bind_group_layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                entries: &[
+                    // Camera uniform (binding 0)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    // Texture origin uniform (binding 1)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
             });
 
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("camera_bind_group"),
             layout: &camera_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: texture_origin_buffer.as_entire_binding(),
+                },
+            ],
         });
 
         // Temperature overlay texture (40x40 for 5x5 chunks × 8x8 cells)
@@ -547,6 +590,10 @@ impl Renderer {
             overlay_uniform_buffer,
             overlay_bind_group,
             overlay_type: 0, // 0 = no overlay
+            texture_origin,
+            texture_origin_buffer,
+            rendered_chunks: std::collections::HashSet::new(),
+            needs_full_rebuffer: true, // Start with full rebuffer
         })
     }
 
@@ -577,6 +624,10 @@ impl Renderer {
             self.camera.position[1],
             self.camera.zoom
         );
+
+        // Update texture origin to follow camera (for infinite world rendering)
+        let camera_pos = glam::Vec2::new(self.camera.position[0], self.camera.position[1]);
+        self.update_texture_origin(camera_pos);
 
         // Update pixel buffer from world chunks
         self.update_pixel_buffer(world);
@@ -707,17 +758,58 @@ impl Renderer {
     }
 
     fn update_pixel_buffer(&mut self, world: &World) {
-        // Clear buffer with background color
-        for pixel in self.pixel_buffer.chunks_mut(4) {
-            pixel[0] = 40; // R
-            pixel[1] = 44; // G
-            pixel[2] = 52; // B
-            pixel[3] = 255; // A
-        }
+        // If texture origin changed, need to fully rebuffer
+        if self.needs_full_rebuffer {
+            // Clear entire buffer to background
+            for pixel in self.pixel_buffer.chunks_mut(4) {
+                pixel[0] = 40; // R
+                pixel[1] = 44; // G
+                pixel[2] = 52; // B
+                pixel[3] = 255; // A
+            }
 
-        // Render each chunk
-        for chunk in world.active_chunks() {
-            self.render_chunk_to_buffer(chunk, world);
+            // Get visible chunk range for new texture origin
+            let (min_chunk, max_chunk) = self.get_visible_chunk_range();
+
+            log::debug!(
+                "Full rebuffer: rendering chunks from {:?} to {:?}",
+                min_chunk,
+                max_chunk
+            );
+
+            // Render all visible chunks
+            for cy in min_chunk.y..=max_chunk.y {
+                for cx in min_chunk.x..=max_chunk.x {
+                    let chunk_pos = glam::IVec2::new(cx, cy);
+                    if let Some(chunk) = world.chunks.get(&chunk_pos) {
+                        self.render_chunk_to_buffer(chunk, world);
+                    }
+                }
+            }
+
+            self.needs_full_rebuffer = false;
+            self.rendered_chunks.clear();
+
+            // Track newly rendered chunks
+            for cy in min_chunk.y..=max_chunk.y {
+                for cx in min_chunk.x..=max_chunk.x {
+                    self.rendered_chunks.insert(glam::IVec2::new(cx, cy));
+                }
+            }
+        } else {
+            // Normal update: only update active/dirty chunks
+            // Clear buffer with background color
+            for pixel in self.pixel_buffer.chunks_mut(4) {
+                pixel[0] = 40; // R
+                pixel[1] = 44; // G
+                pixel[2] = 52; // B
+                pixel[3] = 255; // A
+            }
+
+            // Render each chunk
+            for chunk in world.active_chunks() {
+                self.render_chunk_to_buffer(chunk, world);
+            }
         }
 
         // Render active debris on top of chunks
@@ -733,12 +825,12 @@ impl Renderer {
         // Draw player as cyan 8×16 rectangle
         use crate::entity::player::Player;
 
-        // Convert world coordinates to texture coordinates
-        let tex_origin_x = (Self::WORLD_TEXTURE_SIZE / 2) as i32;
-        let tex_origin_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32;
+        // Convert world coordinates to texture coordinates using dynamic texture origin
+        let player_world_x = world.player.position.x as i32;
+        let player_world_y = world.player.position.y as i32;
 
-        let player_x = tex_origin_x + world.player.position.x as i32;
-        let player_y = tex_origin_y + world.player.position.y as i32;
+        let player_x = player_world_x - self.texture_origin.x as i32;
+        let player_y = player_world_y - self.texture_origin.y as i32;
 
         let half_width = (Player::WIDTH / 2.0) as i32;
         let half_height = (Player::HEIGHT / 2.0) as i32;
@@ -766,11 +858,77 @@ impl Renderer {
         }
     }
 
+    /// Calculate which chunks should be visible in current texture window
+    fn get_visible_chunk_range(&self) -> (glam::IVec2, glam::IVec2) {
+        let min_chunk_x = (self.texture_origin.x / CHUNK_SIZE as f32).floor() as i32;
+        let min_chunk_y = (self.texture_origin.y / CHUNK_SIZE as f32).floor() as i32;
+
+        let chunks_wide = (Self::WORLD_TEXTURE_SIZE / CHUNK_SIZE as u32) as i32;
+        let chunks_tall = (Self::WORLD_TEXTURE_SIZE / CHUNK_SIZE as u32) as i32;
+
+        let max_chunk_x = min_chunk_x + chunks_wide;
+        let max_chunk_y = min_chunk_y + chunks_tall;
+
+        (
+            glam::IVec2::new(min_chunk_x, min_chunk_y),
+            glam::IVec2::new(max_chunk_x, max_chunk_y),
+        )
+    }
+
+    /// Update texture origin to follow camera position
+    /// This moves the texture window to keep the camera centered
+    pub fn update_texture_origin(&mut self, camera_pos: glam::Vec2) {
+        // Calculate desired texture origin to keep camera centered
+        let desired_origin = glam::Vec2::new(
+            camera_pos.x - (Self::WORLD_TEXTURE_SIZE as f32 / 2.0),
+            camera_pos.y - (Self::WORLD_TEXTURE_SIZE as f32 / 2.0),
+        );
+
+        // Only update if moved significantly (one chunk = 64 pixels)
+        const UPDATE_THRESHOLD: f32 = CHUNK_SIZE as f32;
+        let delta = (desired_origin - self.texture_origin).length();
+
+        if delta > UPDATE_THRESHOLD {
+            // Texture origin changed - need to rebuffer
+            let old_origin = self.texture_origin;
+            self.texture_origin = desired_origin;
+
+            // Update GPU buffer with new origin
+            self.queue.write_buffer(
+                &self.texture_origin_buffer,
+                0,
+                bytemuck::cast_slice(&[desired_origin.x, desired_origin.y]),
+            );
+
+            // Mark texture as needing full rebuffer
+            self.needs_full_rebuffer = true;
+
+            log::debug!(
+                "Texture origin updated: {:?} -> {:?} (delta: {:.1})",
+                old_origin,
+                desired_origin,
+                delta
+            );
+        }
+    }
+
     fn render_chunk_to_buffer(&mut self, chunk: &Chunk, world: &World) {
-        // Calculate chunk position in texture
-        // Center of texture is world origin
-        let tex_origin_x = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + chunk.x * CHUNK_SIZE as i32;
-        let tex_origin_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + chunk.y * CHUNK_SIZE as i32;
+        // Calculate chunk position in texture using dynamic texture origin
+        let world_x = chunk.x * CHUNK_SIZE as i32;
+        let world_y = chunk.y * CHUNK_SIZE as i32;
+
+        // Use dynamic texture origin
+        let tex_origin_x = world_x - self.texture_origin.x as i32;
+        let tex_origin_y = world_y - self.texture_origin.y as i32;
+
+        // Skip chunk if completely outside texture bounds (early return optimization)
+        if tex_origin_x + (CHUNK_SIZE as i32) < 0
+            || tex_origin_y + (CHUNK_SIZE as i32) < 0
+            || tex_origin_x >= (Self::WORLD_TEXTURE_SIZE as i32)
+            || tex_origin_y >= (Self::WORLD_TEXTURE_SIZE as i32)
+        {
+            return; // Chunk not visible in current texture window
+        }
 
         let mut pixels_written = 0;
 
@@ -848,9 +1006,9 @@ impl Renderer {
             let world_x = (debris.position.x + rotated.x as f32).round() as i32;
             let world_y = (debris.position.y + rotated.y as f32).round() as i32;
 
-            // Convert world coordinates to texture coordinates
-            let tex_x = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + world_x;
-            let tex_y = (Self::WORLD_TEXTURE_SIZE / 2) as i32 + world_y;
+            // Convert world coordinates to texture coordinates using dynamic texture origin
+            let tex_x = world_x - self.texture_origin.x as i32;
+            let tex_y = world_y - self.texture_origin.y as i32;
 
             // Bounds check
             if tex_x >= 0
