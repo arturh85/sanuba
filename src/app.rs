@@ -243,6 +243,48 @@ impl App {
         }
     }
 
+    /// Select a hotbar slot and equip/unequip tools
+    fn select_hotbar_slot(&mut self, slot: usize) {
+        // Select the inventory slot
+        self.world.player.select_slot(slot);
+
+        // Check what's in the selected slot (extract value to avoid borrow issues)
+        let slot_tool_id = self
+            .world
+            .player
+            .inventory
+            .get_slot(slot)
+            .and_then(|s| s.as_ref())
+            .and_then(|stack| stack.tool_id());
+
+        let has_material = self
+            .world
+            .player
+            .inventory
+            .get_slot(slot)
+            .and_then(|s| s.as_ref())
+            .and_then(|stack| stack.material_id())
+            .is_some();
+
+        if let Some(tool_id) = slot_tool_id {
+            // Equip the tool
+            self.world.player.equip_tool(tool_id);
+            log::debug!("Equipped tool {} from slot {}", tool_id, slot);
+        } else if has_material {
+            // Unequip any equipped tool (switching to material placement)
+            if self.world.player.equipped_tool.is_some() {
+                self.world.player.unequip_tool();
+                log::debug!("Unequipped tool, slot {} has material", slot);
+            }
+        } else {
+            // Empty slot - unequip any equipped tool
+            if self.world.player.equipped_tool.is_some() {
+                self.world.player.unequip_tool();
+                log::debug!("Unequipped tool, slot {} is empty", slot);
+            }
+        }
+    }
+
     pub fn run(event_loop: EventLoop<()>, mut app: Self) -> Result<()> {
         event_loop.run_app(&mut app)?;
         Ok(())
@@ -284,12 +326,24 @@ impl App {
             );
         }
 
-        // Mining with right mouse button
+        // Mining with right mouse button (hold-to-mine)
         if self.input_state.right_mouse_pressed {
             if let Some((wx, wy)) = self.input_state.mouse_world_pos {
-                self.world.mine_pixel(wx, wy);
+                // Start mining if not already mining this pixel
+                let current_target = self.world.player.mining_progress.target_pixel;
+                if current_target != Some((wx, wy)) {
+                    self.world.start_mining(wx, wy);
+                }
+            }
+        } else {
+            // Cancel mining when mouse released
+            if self.world.player.mining_progress.is_mining() {
+                self.world.player.mining_progress.reset();
             }
         }
+
+        // Update mining progress each frame
+        self.world.update_mining(1.0 / 60.0);
 
         // Placing material from inventory with left mouse button
         if self.input_state.left_mouse_pressed {
@@ -344,7 +398,47 @@ impl App {
                 in_persistent_world,
                 &self.level_manager,
                 &self.world.player,
+                self.world.tool_registry(),
             );
+
+            // Render crafting UI and handle crafting output
+            if let Some(output) = self.ui_state.crafting_ui.render(
+                ctx,
+                &mut self.world.player.inventory,
+                &self.world.recipe_registry,
+                &self.world.materials,
+            ) {
+                // Handle crafted output
+                use crate::entity::crafting::RecipeOutput;
+                match output {
+                    RecipeOutput::Material { id, count } => {
+                        let added = self.world.player.inventory.add_item(id, count);
+                        if added == count {
+                            log::info!(
+                                "[CRAFTING] Added {} x{} to inventory",
+                                self.world.materials.get(id).name,
+                                count
+                            );
+                        } else {
+                            log::warn!(
+                                "[CRAFTING] Inventory full, only added {} of {} items",
+                                added,
+                                count
+                            );
+                        }
+                    }
+                    RecipeOutput::Tool {
+                        tool_id,
+                        durability,
+                    } => {
+                        if self.world.player.inventory.add_tool(tool_id, durability) {
+                            log::info!("[CRAFTING] Added tool {} to inventory", tool_id);
+                        } else {
+                            log::warn!("[CRAFTING] Inventory full, could not add crafted tool");
+                        }
+                    }
+                }
+            }
         });
 
         // Handle level selector actions
@@ -433,55 +527,55 @@ impl ApplicationHandler for App {
                         KeyCode::KeyS => self.input_state.s_pressed = pressed,
                         KeyCode::KeyD => self.input_state.d_pressed = pressed,
 
-                        // Material selection (0-9)
+                        // Hotbar selection (0-9) - select inventory slot and equip/unequip tools
                         KeyCode::Digit0 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::AIR;
+                                self.select_hotbar_slot(9); // 0 key = slot 9
                             }
                         }
                         KeyCode::Digit1 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::STONE;
+                                self.select_hotbar_slot(0);
                             }
                         }
                         KeyCode::Digit2 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::SAND;
+                                self.select_hotbar_slot(1);
                             }
                         }
                         KeyCode::Digit3 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::WATER;
+                                self.select_hotbar_slot(2);
                             }
                         }
                         KeyCode::Digit4 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::WOOD;
+                                self.select_hotbar_slot(3);
                             }
                         }
                         KeyCode::Digit5 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::FIRE;
+                                self.select_hotbar_slot(4);
                             }
                         }
                         KeyCode::Digit6 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::SMOKE;
+                                self.select_hotbar_slot(5);
                             }
                         }
                         KeyCode::Digit7 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::STEAM;
+                                self.select_hotbar_slot(6);
                             }
                         }
                         KeyCode::Digit8 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::LAVA;
+                                self.select_hotbar_slot(7);
                             }
                         }
                         KeyCode::Digit9 => {
                             if pressed {
-                                self.input_state.selected_material = MaterialId::OIL;
+                                self.select_hotbar_slot(8);
                             }
                         }
 
@@ -514,6 +608,11 @@ impl ApplicationHandler for App {
                         KeyCode::KeyI => {
                             if pressed {
                                 self.ui_state.toggle_inventory();
+                            }
+                        }
+                        KeyCode::KeyC => {
+                            if pressed {
+                                self.ui_state.toggle_crafting();
                             }
                         }
 

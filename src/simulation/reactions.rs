@@ -520,12 +520,21 @@ impl ReactionRegistry {
     ///
     /// Returns the first matching reaction, or None if no reaction possible
     /// O(1) HashMap lookup + O(k) where k = reactions for this material pair (typically 1-3)
+    ///
+    /// # Parameters
+    /// - `mat_a`, `mat_b`: Materials in contact
+    /// - `temp`: Temperature at the reaction site
+    /// - `light_level`: Light level (0-15)
+    /// - `pressure`: Gas pressure at the site
+    /// - `neighbor_materials`: Materials in 8-connected neighborhood (for catalyst check)
     pub fn find_reaction(
         &self,
         mat_a: u16,
         mat_b: u16,
         temp: f32,
         light_level: u8,
+        pressure: f32,
+        neighbor_materials: &[u16],
     ) -> Option<&Reaction> {
         // Normalize material order for HashMap key
         let key = if mat_a <= mat_b {
@@ -551,16 +560,28 @@ impl ReactionRegistry {
                 }
             }
 
-            // Check light condition (Phase 5)
+            // Check light condition
             if let Some(min_light) = reaction.requires_light {
                 if light_level < min_light {
                     continue; // Insufficient light
                 }
             }
 
-            // TODO: Check pressure and catalyst conditions when available
+            // Check pressure condition
+            if let Some(min_p) = reaction.min_pressure {
+                if pressure < min_p {
+                    continue; // Insufficient pressure
+                }
+            }
 
-            // Reaction found!
+            // Check catalyst condition
+            if let Some(catalyst_mat) = reaction.catalyst {
+                if !neighbor_materials.contains(&catalyst_mat) {
+                    continue; // Required catalyst not present
+                }
+            }
+
+            // All conditions met!
             return Some(reaction);
         }
 
@@ -596,7 +617,8 @@ mod tests {
         let registry = ReactionRegistry::new();
 
         // Water + Lava should find reaction
-        let reaction = registry.find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0, 0);
+        let reaction =
+            registry.find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0, 0, 1.0, &[]);
         assert!(reaction.is_some());
         assert_eq!(reaction.unwrap().name, "water_lava_steam");
     }
@@ -606,7 +628,8 @@ mod tests {
         let registry = ReactionRegistry::new();
 
         // Lava + Water should also find reaction (order doesn't matter)
-        let reaction = registry.find_reaction(MaterialId::LAVA, MaterialId::WATER, 20.0, 0);
+        let reaction =
+            registry.find_reaction(MaterialId::LAVA, MaterialId::WATER, 20.0, 0, 1.0, &[]);
         assert!(reaction.is_some());
         assert_eq!(reaction.unwrap().name, "water_lava_steam");
     }
@@ -616,7 +639,8 @@ mod tests {
         let registry = ReactionRegistry::new();
 
         // Sand + Water has no reaction
-        let reaction = registry.find_reaction(MaterialId::SAND, MaterialId::WATER, 20.0, 0);
+        let reaction =
+            registry.find_reaction(MaterialId::SAND, MaterialId::WATER, 20.0, 0, 1.0, &[]);
         assert!(reaction.is_none());
     }
 
@@ -625,7 +649,7 @@ mod tests {
         let registry = ReactionRegistry::new();
 
         let reaction = registry
-            .find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0, 0)
+            .find_reaction(MaterialId::WATER, MaterialId::LAVA, 20.0, 0, 1.0, &[])
             .unwrap();
 
         // Water + Lava
@@ -637,5 +661,99 @@ mod tests {
         let (out_a, out_b) = registry.get_outputs(reaction, MaterialId::LAVA, MaterialId::WATER);
         assert_eq!(out_a, MaterialId::STONE); // Lava → Stone
         assert_eq!(out_b, MaterialId::STEAM); // Water → Steam
+    }
+
+    #[test]
+    fn test_catalyst_required() {
+        let mut registry = ReactionRegistry {
+            reactions: std::collections::HashMap::new(),
+        };
+
+        // Create a test reaction that requires a catalyst
+        registry.register(Reaction {
+            name: "test_catalyst".to_string(),
+            input_a: MaterialId::STONE,
+            input_b: MaterialId::WATER,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: Some(MaterialId::FIRE), // Requires fire as catalyst
+            output_a: MaterialId::STEAM,
+            output_b: MaterialId::AIR,
+            probability: 1.0,
+            energy_released: 0.0,
+        });
+
+        // Without catalyst - no reaction
+        let reaction = registry.find_reaction(
+            MaterialId::STONE,
+            MaterialId::WATER,
+            20.0,
+            0,
+            1.0,
+            &[MaterialId::AIR, MaterialId::SAND], // No fire
+        );
+        assert!(reaction.is_none());
+
+        // With catalyst - reaction occurs
+        let reaction = registry.find_reaction(
+            MaterialId::STONE,
+            MaterialId::WATER,
+            20.0,
+            0,
+            1.0,
+            &[MaterialId::AIR, MaterialId::FIRE, MaterialId::SAND], // Fire present
+        );
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "test_catalyst");
+    }
+
+    #[test]
+    fn test_pressure_required() {
+        let mut registry = ReactionRegistry {
+            reactions: std::collections::HashMap::new(),
+        };
+
+        // Create a test reaction that requires minimum pressure
+        registry.register(Reaction {
+            name: "test_pressure".to_string(),
+            input_a: MaterialId::STEAM,
+            input_b: MaterialId::WATER,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: Some(5.0), // Requires pressure >= 5.0
+            catalyst: None,
+            output_a: MaterialId::AIR,
+            output_b: MaterialId::AIR,
+            probability: 1.0,
+            energy_released: 0.0,
+        });
+
+        // Low pressure - no reaction
+        let reaction = registry.find_reaction(
+            MaterialId::STEAM,
+            MaterialId::WATER,
+            20.0,
+            0,
+            2.0, // Below threshold
+            &[],
+        );
+        assert!(reaction.is_none());
+
+        // High pressure - reaction occurs
+        let reaction = registry.find_reaction(
+            MaterialId::STEAM,
+            MaterialId::WATER,
+            20.0,
+            0,
+            10.0, // Above threshold
+            &[],
+        );
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "test_pressure");
     }
 }

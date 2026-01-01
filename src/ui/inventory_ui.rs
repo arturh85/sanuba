@@ -115,44 +115,89 @@ impl InventoryPanel {
 
         // If slot has items, render them
         if let Some(Some(stack)) = slot_data {
-            // Material color indicator (top bar)
-            let material_color = self.get_material_color(stack.material_id);
-            let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
-            painter.rect_filled(color_bar, CornerRadius::same(2), material_color);
+            use crate::entity::inventory::ItemStack;
 
-            // Material name (truncated)
-            let name = if (stack.material_id as usize) < material_names.len() {
-                material_names[stack.material_id as usize]
-            } else {
-                "Unknown"
-            };
+            match stack {
+                ItemStack::Material { material_id, count } => {
+                    // Material color indicator (top bar)
+                    let material_color = self.get_material_color(*material_id);
+                    let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
+                    painter.rect_filled(color_bar, CornerRadius::same(2), material_color);
 
-            let text_pos = Pos2::new(rect.center().x, rect.min.y + 18.0);
+                    // Material name (truncated)
+                    let name = if (*material_id as usize) < material_names.len() {
+                        material_names[*material_id as usize]
+                    } else {
+                        "Unknown"
+                    };
 
-            painter.text(
-                text_pos,
-                egui::Align2::CENTER_CENTER,
-                name,
-                egui::FontId::proportional(10.0),
-                Color32::WHITE,
-            );
+                    let text_pos = Pos2::new(rect.center().x, rect.min.y + 18.0);
 
-            // Count
-            let count_text = if stack.count >= 1000 {
-                format!("{}k", stack.count / 1000)
-            } else {
-                stack.count.to_string()
-            };
+                    painter.text(
+                        text_pos,
+                        egui::Align2::CENTER_CENTER,
+                        name,
+                        egui::FontId::proportional(10.0),
+                        Color32::WHITE,
+                    );
 
-            let count_pos = Pos2::new(rect.center().x, rect.max.y - 10.0);
+                    // Count
+                    let count_text = if *count >= 1000 {
+                        format!("{}k", count / 1000)
+                    } else {
+                        count.to_string()
+                    };
 
-            painter.text(
-                count_pos,
-                egui::Align2::CENTER_CENTER,
-                &count_text,
-                egui::FontId::proportional(12.0),
-                Color32::from_rgb(200, 200, 200),
-            );
+                    let count_pos = Pos2::new(rect.center().x, rect.max.y - 10.0);
+
+                    painter.text(
+                        count_pos,
+                        egui::Align2::CENTER_CENTER,
+                        &count_text,
+                        egui::FontId::proportional(12.0),
+                        Color32::from_rgb(200, 200, 200),
+                    );
+                }
+                ItemStack::Tool {
+                    tool_id,
+                    durability,
+                } => {
+                    // Tool indicator color (golden for tools)
+                    let tool_color = Color32::from_rgb(255, 215, 0); // Gold color
+                    let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
+                    painter.rect_filled(color_bar, CornerRadius::same(2), tool_color);
+
+                    // Tool name (TODO: load from tool registry)
+                    let name = match *tool_id {
+                        1000 => "Wood Pick",
+                        1001 => "Stone Pick",
+                        1002 => "Iron Pick",
+                        _ => "Tool",
+                    };
+
+                    let text_pos = Pos2::new(rect.center().x, rect.min.y + 18.0);
+
+                    painter.text(
+                        text_pos,
+                        egui::Align2::CENTER_CENTER,
+                        name,
+                        egui::FontId::proportional(10.0),
+                        Color32::WHITE,
+                    );
+
+                    // Durability bar
+                    let durability_text = format!("{}", durability);
+                    let durability_pos = Pos2::new(rect.center().x, rect.max.y - 10.0);
+
+                    painter.text(
+                        durability_pos,
+                        egui::Align2::CENTER_CENTER,
+                        &durability_text,
+                        egui::FontId::proportional(12.0),
+                        Color32::from_rgb(150, 255, 150), // Light green
+                    );
+                }
+            }
         } else {
             // Empty slot - show slot number for hotbar
             if slot_index < 10 {
@@ -186,16 +231,38 @@ impl InventoryPanel {
         // Tooltip on hover
         if response.hovered() {
             if let Some(Some(stack)) = slot_data {
-                let name = if (stack.material_id as usize) < material_names.len() {
-                    material_names[stack.material_id as usize]
-                } else {
-                    "Unknown"
-                };
+                use crate::entity::inventory::ItemStack;
 
-                response.on_hover_text(format!(
-                    "{}\nCount: {}\nID: {}",
-                    name, stack.count, stack.material_id
-                ));
+                match stack {
+                    ItemStack::Material { material_id, count } => {
+                        let name = if (*material_id as usize) < material_names.len() {
+                            material_names[*material_id as usize]
+                        } else {
+                            "Unknown"
+                        };
+
+                        response.on_hover_text(format!(
+                            "{}\nCount: {}\nID: {}",
+                            name, count, material_id
+                        ));
+                    }
+                    ItemStack::Tool {
+                        tool_id,
+                        durability,
+                    } => {
+                        let name = match *tool_id {
+                            1000 => "Wood Pickaxe",
+                            1001 => "Stone Pickaxe",
+                            1002 => "Iron Pickaxe",
+                            _ => "Unknown Tool",
+                        };
+
+                        response.on_hover_text(format!(
+                            "{}\nDurability: {}\nTool ID: {}",
+                            name, durability, tool_id
+                        ));
+                    }
+                }
             } else if slot_index < 10 {
                 response.on_hover_text(format!("Hotbar slot {} (empty)", (slot_index + 1) % 10));
             }

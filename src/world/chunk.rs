@@ -214,9 +214,15 @@ impl Chunk {
         self.temperature[cy * 8 + cx]
     }
 
-    /// Set temperature at coarse grid position  
+    /// Set temperature at coarse grid position
     pub fn set_temperature(&mut self, cx: usize, cy: usize, temp: f32) {
         self.temperature[cy * 8 + cx] = temp;
+    }
+
+    /// Get pressure at pixel position (using coarse 8x8 grid)
+    pub fn get_pressure_at(&self, x: usize, y: usize) -> f32 {
+        let (cx, cy) = (x / 8, y / 8); // Convert pixel to coarse grid coords
+        self.pressure[cy * 8 + cx]
     }
 }
 

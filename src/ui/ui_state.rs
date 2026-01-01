@@ -1,6 +1,7 @@
 //! Central UI state management
 
 use super::controls_help::ControlsHelpState;
+use super::crafting_ui::CraftingUI;
 use super::hud::Hud;
 use super::inventory_ui::InventoryPanel;
 use super::level_selector::LevelSelectorState;
@@ -31,6 +32,9 @@ pub struct UiState {
     /// Inventory panel
     pub inventory: InventoryPanel,
 
+    /// Crafting UI panel
+    pub crafting_ui: CraftingUI,
+
     /// Toast notification (message, shown_at)
     pub toast_message: Option<(String, Instant)>,
 }
@@ -45,6 +49,7 @@ impl UiState {
             level_selector: LevelSelectorState::new(),
             hud: Hud::new(),
             inventory: InventoryPanel::new(),
+            crafting_ui: CraftingUI::new(),
             toast_message: None,
         }
     }
@@ -67,6 +72,11 @@ impl UiState {
     /// Toggle inventory visibility
     pub fn toggle_inventory(&mut self) {
         self.inventory.toggle();
+    }
+
+    /// Toggle crafting UI visibility
+    pub fn toggle_crafting(&mut self) {
+        self.crafting_ui.toggle();
     }
 
     /// Show a toast notification
@@ -98,13 +108,19 @@ impl UiState {
         in_persistent_world: bool,
         level_manager: &crate::levels::LevelManager,
         player: &crate::entity::player::Player,
+        tool_registry: &crate::entity::tools::ToolRegistry,
     ) {
         // Collect material names for UI display
         let material_names: Vec<&str> = (0..15).map(|id| materials.get(id).name.as_str()).collect();
 
         // Render HUD (always visible)
-        self.hud
-            .render(ctx, player, selected_material, &material_names);
+        self.hud.render(
+            ctx,
+            player,
+            selected_material,
+            &material_names,
+            tool_registry,
+        );
 
         // Render inventory panel (if open)
         self.inventory.render(ctx, player, &material_names);

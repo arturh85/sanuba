@@ -6,6 +6,7 @@ use super::{
     inventory::Inventory,
     EntityId,
 };
+use crate::simulation::mining::MiningProgress;
 
 /// The player entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +18,8 @@ pub struct Player {
     pub health: Health,
     pub hunger: Hunger,
     pub selected_slot: usize, // Currently selected inventory slot (for hotbar)
+    pub equipped_tool: Option<u16>, // Currently equipped tool ID (1000+)
+    pub mining_progress: MiningProgress, // Mining progress tracker
 }
 
 impl Player {
@@ -30,6 +33,8 @@ impl Player {
             health: Health::new(100.0),
             hunger: Hunger::new(100.0, 0.1, 1.0), // Drain 0.1/sec, 1.0 dmg/sec when starving
             selected_slot: 0,
+            equipped_tool: None,
+            mining_progress: MiningProgress::new(),
         };
 
         // Give player some starting materials for testing
@@ -43,6 +48,7 @@ impl Player {
     }
 
     /// Create a player from existing data (for deserialization)
+    #[allow(clippy::too_many_arguments)]
     pub fn from_data(
         id: EntityId,
         position: Vec2,
@@ -51,6 +57,8 @@ impl Player {
         health: Health,
         hunger: Hunger,
         selected_slot: usize,
+        equipped_tool: Option<u16>,
+        mining_progress: MiningProgress,
     ) -> Self {
         Player {
             id,
@@ -60,6 +68,8 @@ impl Player {
             health,
             hunger,
             selected_slot,
+            equipped_tool,
+            mining_progress,
         }
     }
 
@@ -78,6 +88,12 @@ impl Player {
         }
 
         false
+    }
+
+    /// Update mining progress
+    /// Returns true if mining completed this frame
+    pub fn update_mining(&mut self, delta_time: f32) -> bool {
+        self.mining_progress.update(delta_time)
     }
 
     /// Move the player by the specified velocity
@@ -105,12 +121,12 @@ impl Player {
     }
 
     /// Get the currently selected material from inventory hotbar
-    /// Returns None if slot is empty
+    /// Returns None if slot is empty or slot contains a tool
     pub fn get_selected_material(&self) -> Option<u16> {
         self.inventory
             .get_slot(self.selected_slot)
             .and_then(|slot| slot.as_ref())
-            .map(|stack| stack.material_id)
+            .and_then(|stack| stack.material_id())
     }
 
     /// Select the next inventory slot (cycles through 0-9 for hotbar)
@@ -130,6 +146,29 @@ impl Player {
     /// Select a specific inventory slot
     pub fn select_slot(&mut self, slot: usize) {
         self.selected_slot = slot.min(49); // Clamp to max slots
+    }
+
+    /// Equip a tool by ID
+    pub fn equip_tool(&mut self, tool_id: u16) {
+        self.equipped_tool = Some(tool_id);
+    }
+
+    /// Unequip the currently equipped tool
+    pub fn unequip_tool(&mut self) {
+        self.equipped_tool = None;
+    }
+
+    /// Get the currently equipped tool ID
+    pub fn get_equipped_tool_id(&self) -> Option<u16> {
+        self.equipped_tool
+    }
+
+    /// Get the currently equipped tool from the registry
+    pub fn get_equipped_tool<'a>(
+        &self,
+        tool_registry: &'a crate::entity::tools::ToolRegistry,
+    ) -> Option<&'a crate::entity::tools::ToolDef> {
+        self.equipped_tool.and_then(|id| tool_registry.get(id))
     }
 
     /// Eat food from inventory

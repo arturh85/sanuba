@@ -1,4 +1,5 @@
 use crate::entity::player::Player;
+use crate::entity::tools::ToolRegistry;
 use egui::{Color32, Context, CornerRadius, Rect, Stroke, StrokeKind, Vec2};
 
 /// Heads-up display showing player health, hunger, and hotbar
@@ -23,6 +24,7 @@ impl Hud {
         player: &Player,
         selected_material: u16,
         material_names: &[&str],
+        tool_registry: &ToolRegistry,
     ) {
         if !self.show {
             return;
@@ -81,10 +83,40 @@ impl Hud {
 
                 ui.add_space(5.0);
 
+                // Equipped tool display
+                if let Some(tool_id) = player.equipped_tool {
+                    if let Some(tool) = tool_registry.get(tool_id) {
+                        let durability = player.inventory.get_tool_durability(tool_id).unwrap_or(0);
+                        ui.label(format!(
+                            "Equipped: {} ({}/{}⚒)",
+                            tool.name,
+                            durability,
+                            tool.max_durability()
+                        ));
+                    }
+                } else {
+                    ui.label("Equipped: Hands (slow)");
+                }
+
+                // Mining progress bar
+                if player.mining_progress.is_mining() {
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.label("Mining...");
+
+                    let progress = player.mining_progress.progress;
+                    let bar = egui::ProgressBar::new(progress)
+                        .fill(Color32::from_rgb(100, 200, 255))
+                        .animate(true);
+                    ui.add(bar);
+                }
+
+                ui.add_space(5.0);
+
                 // Controls hint
                 ui.separator();
-                ui.label("Left-click: Place | Right-click: Mine");
-                ui.label("I: Inventory | H: Help | T: Temperature");
+                ui.label("Left-click: Place | Hold Right-click: Mine");
+                ui.label("I: Inventory | C: Crafting | H: Help");
             });
     }
 

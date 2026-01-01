@@ -15,6 +15,9 @@ pub struct TooltipState {
     growth_status: String, // Single simplified message
     // Light overlay state
     light_overlay_active: bool, // Show light level guide when true
+    // Mining time estimate
+    mining_time: Option<f32>, // None if can't mine, Some(time) otherwise
+    mining_tool: String,      // Tool name being used
 }
 
 impl TooltipState {
@@ -28,6 +31,8 @@ impl TooltipState {
             has_nearby_water: false,
             growth_status: String::new(),
             light_overlay_active: false,
+            mining_time: None,
+            mining_tool: String::new(),
         }
     }
 
@@ -55,6 +60,8 @@ impl TooltipState {
                     self.light_level = 0;
                     self.has_nearby_water = false;
                     self.growth_status = String::new();
+                    self.mining_time = None;
+                    self.mining_tool = String::new();
                 } else {
                     self.visible = true;
                     let material = materials.get(pixel.material_id);
@@ -65,6 +72,21 @@ impl TooltipState {
 
                     // Get light level
                     self.light_level = world.get_light_at(wx, wy).unwrap_or(0);
+
+                    // Calculate mining time
+                    use crate::simulation::mining::calculate_mining_time;
+                    if material.hardness.is_some() {
+                        let tool = world.player.get_equipped_tool(world.tool_registry());
+                        self.mining_time = Some(calculate_mining_time(1.0, material, tool));
+                        self.mining_tool = if let Some(t) = tool {
+                            t.name.clone()
+                        } else {
+                            "Hands".to_string()
+                        };
+                    } else {
+                        self.mining_time = None;
+                        self.mining_tool = String::new();
+                    }
 
                     // Check for plant matter - compute simplified growth status
                     if pixel.material_id == MaterialId::PLANT_MATTER {
@@ -152,6 +174,15 @@ impl TooltipState {
                     .color(egui::Color32::DARK_GRAY)
                     .size(11.0),
                 );
+
+                // Show mining time estimate
+                if let Some(time) = self.mining_time {
+                    ui.label(
+                        egui::RichText::new(format!("Mine: {:.1}s ({})", time, self.mining_tool))
+                            .color(egui::Color32::from_rgb(150, 200, 255))
+                            .size(12.0),
+                    );
+                }
 
                 // Show light level guide when overlay is active
                 if self.light_overlay_active {

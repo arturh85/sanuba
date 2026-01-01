@@ -6,12 +6,14 @@ use std::collections::HashMap;
 use super::generation::WorldGenerator;
 use super::persistence::{ChunkPersistence, WorldMetadata};
 use super::{pixel_flags, Chunk, Pixel, CHUNK_SIZE};
+use crate::entity::crafting::RecipeRegistry;
 use crate::entity::player::Player;
+use crate::entity::tools::ToolRegistry;
 use crate::physics::PhysicsWorld;
 use crate::simulation::{
-    add_heat_at_pixel, get_temperature_at_pixel, LightPropagation, MaterialId, MaterialType,
-    Materials, ReactionRegistry, StateChangeSystem, StructuralIntegritySystem,
-    TemperatureSimulator,
+    add_heat_at_pixel, get_temperature_at_pixel, mining::calculate_mining_time, LightPropagation,
+    MaterialId, MaterialType, Materials, ReactionRegistry, RegenerationSystem, StateChangeSystem,
+    StructuralIntegritySystem, TemperatureSimulator,
 };
 
 /// The game world, composed of chunks
@@ -28,11 +30,20 @@ pub struct World {
     /// Chemical reaction registry
     reactions: ReactionRegistry,
 
+    /// Tool registry
+    tool_registry: ToolRegistry,
+
+    /// Recipe registry
+    pub recipe_registry: RecipeRegistry,
+
     /// Structural integrity checker
     structural_system: StructuralIntegritySystem,
 
     /// Light propagation system
     light_propagation: LightPropagation,
+
+    /// Resource regeneration system
+    regeneration_system: RegenerationSystem,
 
     /// Physics world for rigid bodies
     physics_world: PhysicsWorld,
@@ -72,8 +83,11 @@ impl World {
             materials: Materials::new(),
             temperature_sim: TemperatureSimulator::new(),
             reactions: ReactionRegistry::new(),
+            tool_registry: ToolRegistry::new(),
+            recipe_registry: RecipeRegistry::new(),
             structural_system: StructuralIntegritySystem::new(),
             light_propagation: LightPropagation::new(),
+            regeneration_system: RegenerationSystem::new(),
             physics_world: PhysicsWorld::new(),
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             active_chunks: Vec::new(),
@@ -217,6 +231,11 @@ impl World {
         } else {
             self.player.set_velocity(glam::Vec2::ZERO);
         }
+    }
+
+    /// Get the tool registry
+    pub fn tool_registry(&self) -> &ToolRegistry {
+        &self.tool_registry
     }
 
     /// Brush radius for material spawning (1 = 3x3, 2 = 5x5)
@@ -384,6 +403,106 @@ impl World {
         placed
     }
 
+    /// Start mining a pixel (calculates required time based on material hardness and tool)
+    pub fn start_mining(&mut self, world_x: i32, world_y: i32) {
+        // Get the pixel
+        let pixel = match self.get_pixel(world_x, world_y) {
+            Some(p) => p,
+            None => return, // Out of bounds
+        };
+
+        let material = self.materials.get(pixel.material_id);
+
+        // Can't mine air or materials without hardness (bedrock)
+        if material.hardness.is_none() {
+            return;
+        }
+
+        // Get equipped tool
+        let tool = self.player.get_equipped_tool(&self.tool_registry);
+
+        // Calculate mining time
+        let required_time = calculate_mining_time(1.0, material, tool);
+
+        // Start mining
+        self.player
+            .mining_progress
+            .start((world_x, world_y), required_time);
+
+        log::debug!(
+            "[MINING] Started mining {} at ({}, {}) - required time: {:.2}s (tool: {:?})",
+            material.name,
+            world_x,
+            world_y,
+            required_time,
+            tool.map(|t| t.name.as_str())
+        );
+    }
+
+    /// Update mining progress (called each frame)
+    /// Returns true if mining completed this frame
+    pub fn update_mining(&mut self, delta_time: f32) -> bool {
+        if self.player.update_mining(delta_time) {
+            // Mining completed
+            if let Some((x, y)) = self.player.mining_progress.target_pixel {
+                self.complete_mining(x, y);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Complete mining at the specified position
+    fn complete_mining(&mut self, world_x: i32, world_y: i32) {
+        // Get the pixel
+        let pixel = match self.get_pixel(world_x, world_y) {
+            Some(p) => p,
+            None => {
+                log::warn!(
+                    "[MINING] Complete mining failed: pixel at ({}, {}) not found",
+                    world_x,
+                    world_y
+                );
+                return;
+            }
+        };
+
+        let material_id = pixel.material_id;
+        let material_name = self.materials.get(material_id).name.clone();
+
+        // Add to inventory
+        if self.player.mine_material(material_id) {
+            // Remove pixel
+            self.set_pixel(world_x, world_y, MaterialId::AIR);
+
+            // Damage tool durability
+            if let Some(tool_id) = self.player.equipped_tool {
+                let broke = self.player.inventory.damage_tool(tool_id, 1);
+                if broke {
+                    let tool_name = self
+                        .tool_registry
+                        .get(tool_id)
+                        .map(|t| t.name.as_str())
+                        .unwrap_or("Unknown");
+                    log::info!("[MINING] {} broke!", tool_name);
+                    self.player.unequip_tool();
+                }
+            }
+
+            log::debug!(
+                "[MINING] Completed mining {} at ({}, {})",
+                material_name,
+                world_x,
+                world_y
+            );
+        } else {
+            log::warn!(
+                "[MINING] Failed to add {} to inventory (full?)",
+                material_name
+            );
+        }
+    }
+
     /// Update simulation
     pub fn update(&mut self, dt: f32, stats: &mut crate::ui::StatsCollector) {
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
@@ -459,6 +578,10 @@ impl World {
         for handle in settled {
             self.reconstruct_debris(handle);
         }
+
+        // 9. Resource regeneration (fruit spawning)
+        self.regeneration_system
+            .update(&mut self.chunks, &self.active_chunks, 1.0 / 60.0);
     }
 
     /// Calculate sky light level based on day/night cycle (0-15)
@@ -1444,6 +1567,26 @@ impl World {
             }
         }
 
+        // Get pressure at this pixel
+        let pressure = chunk.get_pressure_at(x, y);
+
+        // Collect all 8 neighbor materials for catalyst checking
+        let mut neighbor_materials = Vec::with_capacity(8);
+        for (dx, dy) in [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ] {
+            if let Some(p) = self.get_pixel(world_x + dx, world_y + dy) {
+                neighbor_materials.push(p.material_id);
+            }
+        }
+
         // Check 4 neighbors for reactions
         for (dx, dy) in [(0, 1), (1, 0), (0, -1), (-1, 0)] {
             let neighbor = match self.get_pixel(world_x + dx, world_y + dy) {
@@ -1461,6 +1604,8 @@ impl World {
                 neighbor.material_id,
                 temp,
                 light_level,
+                pressure,
+                &neighbor_materials,
             ) {
                 // Probability check
                 if rand::random::<f32>() < reaction.probability {

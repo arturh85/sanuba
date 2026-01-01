@@ -1,6 +1,8 @@
+pub mod crafting;
 pub mod health;
 pub mod inventory;
 pub mod player;
+pub mod tools;
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
