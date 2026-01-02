@@ -20,10 +20,38 @@ just load    # Run release (load existing world)
 just web     # Build and serve web version at localhost:8080
 
 # Individual commands (prefer just test)
-cargo run --release
-cargo test
-cargo clippy
-cargo fmt
+cargo run -p sunaba --release
+cargo test --workspace
+cargo clippy --workspace
+cargo fmt --all
+```
+
+## Workspace Structure
+
+sunaba is organized as a Cargo workspace with 2 crates:
+
+| Crate | Purpose | Key Dependencies |
+|-------|---------|------------------|
+| `sunaba-core` | Game logic: world, simulation, entity, physics, levels, creature | rapier2d, petgraph, noise |
+| `sunaba` | Main binary, rendering, UI, headless training | wgpu, egui, winit, sunaba-core |
+
+### Crate Dependency Graph
+```
+sunaba (main binary + cdylib for WASM)
+  └── sunaba-core (all game logic)
+```
+
+### Developing Individual Crates
+```bash
+# Test individual crates
+cargo test -p sunaba-core
+cargo test -p sunaba
+
+# Check workspace
+cargo check --workspace
+
+# Build only the game binary
+cargo build --release -p sunaba
 ```
 
 ## Rust Coding Guidelines
@@ -115,55 +143,67 @@ World
 ## Project Structure
 
 ```
-src/
-├── main.rs                 # Entry point, CLI
-├── lib.rs                  # Library root, WASM entry
-├── app.rs                  # Application state, game loop
-├── world/
-│   ├── chunk.rs            # Chunk data structure (64x64)
-│   ├── world.rs            # World manager, chunk loading
-│   ├── generation.rs       # Procedural terrain (Perlin noise)
-│   ├── persistence.rs      # Save/load (bincode + lz4)
-│   └── biome.rs            # Biome definitions
-├── simulation/
-│   ├── materials.rs        # Material registry (15+ materials)
-│   ├── reactions.rs        # Chemistry system (20+ reactions)
-│   ├── temperature.rs      # Heat diffusion
-│   ├── state_changes.rs    # Melt, freeze, boil
-│   ├── structural.rs       # Structural integrity
-│   ├── mining.rs           # Mining mechanics
-│   ├── regeneration.rs     # Resource regeneration
-│   └── light.rs            # Light propagation
-├── physics/
-│   └── rigid_body.rs       # rapier2d integration, debris
-├── render/
-│   └── renderer.rs         # wgpu pipeline, camera
-├── entity/
-│   ├── player.rs           # Player controller
-│   ├── inventory.rs        # Inventory system
-│   ├── crafting.rs         # Crafting recipes
-│   ├── tools.rs            # Tool definitions
-│   └── health.rs           # Health/hunger system
-├── creature/               # ML creatures (Phase 6+)
-│   ├── genome.rs           # CPPN-NEAT genome
-│   ├── morphology.rs       # Body generation
-│   ├── neural.rs           # Brain (GNN/Transformer)
-│   ├── behavior.rs         # GOAP planner
-│   ├── sensors.rs          # Raycasts, material detection
-│   ├── spawning.rs         # Creature manager
-│   └── world_interaction.rs
-├── ui/
-│   ├── ui_state.rs         # Central UI state
-│   ├── hud.rs              # Heads-up display
-│   ├── stats.rs            # Debug stats (F1)
-│   ├── tooltip.rs          # Mouse hover info
-│   ├── inventory_ui.rs     # Inventory panel
-│   ├── crafting_ui.rs      # Crafting interface
-│   ├── level_selector.rs   # Level dropdown (L)
-│   └── controls_help.rs    # Help overlay (H)
-└── levels/
-    ├── level_def.rs        # Level definition
-    └── demo_levels.rs      # 16 demo scenarios
+crates/
+├── sunaba-core/            # Game logic crate (no GUI deps)
+│   └── src/
+│       ├── lib.rs
+│       ├── world/
+│       │   ├── chunk.rs            # Chunk data structure (64x64)
+│       │   ├── world.rs            # World manager, chunk loading
+│       │   ├── generation.rs       # Procedural terrain (Perlin noise)
+│       │   ├── persistence.rs      # Save/load (bincode + lz4)
+│       │   ├── stats.rs            # SimStats trait
+│       │   └── biome.rs            # Biome definitions
+│       ├── simulation/
+│       │   ├── materials.rs        # Material registry (15+ materials)
+│       │   ├── reactions.rs        # Chemistry system (20+ reactions)
+│       │   ├── temperature.rs      # Heat diffusion
+│       │   ├── state_changes.rs    # Melt, freeze, boil
+│       │   ├── structural.rs       # Structural integrity
+│       │   ├── mining.rs           # Mining mechanics
+│       │   ├── regeneration.rs     # Resource regeneration
+│       │   └── light.rs            # Light propagation
+│       ├── physics/
+│       │   └── rigid_body.rs       # rapier2d integration, debris
+│       ├── entity/
+│       │   ├── player.rs           # Player controller
+│       │   ├── input.rs            # InputState
+│       │   ├── inventory.rs        # Inventory system
+│       │   ├── crafting.rs         # Crafting recipes
+│       │   ├── tools.rs            # Tool definitions
+│       │   └── health.rs           # Health/hunger system
+│       ├── creature/               # ML creatures (Phase 6+)
+│       │   ├── genome.rs           # CPPN-NEAT genome
+│       │   ├── morphology.rs       # Body generation
+│       │   ├── neural.rs           # Brain (GNN/Transformer)
+│       │   ├── behavior.rs         # GOAP planner
+│       │   ├── sensors.rs          # Raycasts, material detection
+│       │   ├── spawning.rs         # Creature manager
+│       │   └── world_interaction.rs
+│       └── levels/
+│           ├── level_def.rs        # Level definition
+│           └── demo_levels.rs      # 16 demo scenarios
+│
+└── sunaba/                 # Main binary + rendering crate
+    └── src/
+        ├── main.rs                 # Entry point, CLI
+        ├── lib.rs                  # Library root, WASM entry
+        ├── app.rs                  # Application state, game loop
+        ├── render/
+        │   └── renderer.rs         # wgpu pipeline, camera
+        ├── ui/
+        │   ├── ui_state.rs         # Central UI state
+        │   ├── hud.rs              # Heads-up display
+        │   ├── stats.rs            # Debug stats (F1)
+        │   ├── tooltip.rs          # Mouse hover info
+        │   ├── inventory_ui.rs     # Inventory panel
+        │   ├── crafting_ui.rs      # Crafting interface
+        │   ├── level_selector.rs   # Level dropdown (L)
+        │   └── controls_help.rs    # Help overlay (H)
+        └── headless/               # Offline training (native only)
+            ├── training_env.rs
+            ├── scenario.rs
+            └── map_elites.rs
 ```
 
 ## Development Phases

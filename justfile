@@ -5,14 +5,14 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 export RUST_LOG := "info"
 
 start:
-    cargo run --release -- --regenerate
+    cargo run -p sunaba --release -- --regenerate
 
 load:
-    cargo run --release
+    cargo run -p sunaba --release
 
 test: fmt clippy
-    cargo test --quiet
-    cargo build --release
+    cargo test --workspace --quiet
+    cargo build --workspace --release
     just build-web
 
 fmt:
@@ -20,14 +20,14 @@ fmt:
     cargo fmt --all -- --check
 
 clippy:
-    cargo clippy --fix --lib -p sunaba --tests --allow-dirty
+    cargo clippy --fix --workspace --tests --allow-dirty
 
 [unix]
 build-web:
     @echo "Building Sunaba for Web (WASM)..."
     @command -v wasm-bindgen >/dev/null 2>&1 || cargo install wasm-bindgen-cli --version 0.2.106
     @mkdir -p web/pkg
-    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --lib --release --target wasm32-unknown-unknown
+    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --lib --release --target wasm32-unknown-unknown -p sunaba
     wasm-bindgen --out-dir web/pkg --no-typescript --target web target/wasm32-unknown-unknown/release/sunaba.wasm
     @echo "Build complete! Output in web/pkg/"
 
@@ -36,7 +36,7 @@ build-web:
     @echo "Building Sunaba for Web (WASM)..."
     @if (-not (Get-Command wasm-bindgen -ErrorAction SilentlyContinue)) { cargo install wasm-bindgen-cli --version 0.2.106 }
     @if (-not (Test-Path web\pkg)) { New-Item -ItemType Directory -Path web\pkg | Out-Null }
-    $env:RUSTFLAGS='--cfg getrandom_backend="wasm_js"'; cargo build --lib --release --target wasm32-unknown-unknown
+    $env:RUSTFLAGS='--cfg getrandom_backend="wasm_js"'; cargo build --lib --release --target wasm32-unknown-unknown -p sunaba
     wasm-bindgen --out-dir web/pkg --no-typescript --target web target/wasm32-unknown-unknown/release/sunaba.wasm
     @echo "Build complete! Output in web/pkg/"
 
@@ -51,12 +51,12 @@ web: build-web
 # Evolution training commands (RUST_LOG=warn for clean progress bar output)
 train scenario="locomotion" generations="100" population="50":
     rm -rf training_output
-    RUST_LOG=warn cargo run --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
+    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
 
 train-quick:
     rm -rf training_output
-    RUST_LOG=warn cargo run --features headless --release -- --train --generations 10 --population 20
+    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --generations 10 --population 20
 
 train-full:
     rm -rf training_output
-    RUST_LOG=warn cargo run --features headless --release -- --train --generations 500 --population 100
+    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --generations 500 --population 100
