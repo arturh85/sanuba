@@ -19,7 +19,11 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 ## Downloads
 
 - **Native Builds**: Download from [GitHub Releases](https://github.com/arturh85/sunaba/releases/)
-- **Web Version**: Play at [https://arturh85.github.io/sunaba](https://arturh85.github.io/sunaba/)
+- **Web Version**: Play at [https://arturh85.github.io/sunaba/game/](https://arturh85.github.io/sunaba/game/)
+
+## Documentation
+
+- **Technical Documentation**: [https://arturh85.github.io/sunaba/](https://arturh85.github.io/sunaba/) — Scientific explanations of CPPN-NEAT, MAP-Elites, cellular automata, and system architecture
 
 ## Building
 
