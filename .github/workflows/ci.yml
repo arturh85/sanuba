@@ -89,3 +89,37 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    # Skip on push to main - pages workflow handles WASM build
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-wasm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build WASM
+        run: ./build-web.sh
