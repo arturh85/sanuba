@@ -255,7 +255,7 @@ impl ControllerGenome {
     /// Create random controller genome
     pub fn random(hidden_dim: usize, message_passing_steps: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // For a simple feedforward network:
         // message_weights: input_dim -> hidden_dim
@@ -271,15 +271,15 @@ impl ControllerGenome {
         let output_weight_count = hidden_dim * output_dim_estimate;
 
         let message_weights: Vec<f32> = (0..message_weight_count)
-            .map(|_| rng.gen_range(-0.5..0.5))
+            .map(|_| rng.random_range(-0.5..0.5))
             .collect();
 
         let update_weights: Vec<f32> = (0..update_weight_count)
-            .map(|_| rng.gen_range(-0.5..0.5))
+            .map(|_| rng.random_range(-0.5..0.5))
             .collect();
 
         let output_weights: Vec<f32> = (0..output_weight_count)
-            .map(|_| rng.gen_range(-0.5..0.5))
+            .map(|_| rng.random_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -520,11 +520,13 @@ mod tests {
         let genome = CreatureGenome::test_biped();
 
         // Serialize
-        let serialized = bincode::serialize(&genome).expect("Failed to serialize genome");
+        let serialized = bincode::serde::encode_to_vec(&genome, bincode::config::standard())
+            .expect("Failed to serialize genome");
 
         // Deserialize
-        let mut deserialized: CreatureGenome =
-            bincode::deserialize(&serialized).expect("Failed to deserialize genome");
+        let (mut deserialized, _): (CreatureGenome, _) =
+            bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
+                .expect("Failed to deserialize genome");
 
         // Graph needs to be rebuilt after deserialization
         deserialized.cppn.rebuild_graph();
