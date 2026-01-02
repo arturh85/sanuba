@@ -9,10 +9,13 @@ use rayon::prelude::*;
 use crate::creature::genome::{crossover_genome, CreatureGenome, MutationConfig};
 use crate::creature::spawning::CreatureManager;
 use crate::physics::PhysicsWorld;
+use crate::simulation::Materials;
 
 use super::fitness::BehaviorDescriptor;
+use super::gif_capture::GifCapture;
 use super::map_elites::MapElitesGrid;
-use super::report::ReportGenerator;
+use super::pixel_renderer::PixelRenderer;
+use super::report::{CapturedGif, ReportGenerator};
 use super::scenario::Scenario;
 
 /// Configuration for the training run
@@ -172,9 +175,12 @@ impl TrainingEnv {
             }
         }
 
-        // Final report
+        // Capture GIFs of evolved creatures
+        let gifs = self.capture_all_gifs(&pb);
+
+        // Final report with GIFs
         self.report_gen
-            .generate_final_report(&self.grid, &self.stats_history)?;
+            .generate_final_report(&self.grid, &self.stats_history, &gifs)?;
 
         pb.finish_with_message("Training complete!");
         Ok(())
@@ -384,6 +390,98 @@ impl TrainingEnv {
             self.generation
         ));
         Ok(())
+    }
+
+    /// Capture a GIF of a creature running in the scenario
+    fn capture_elite_gif(
+        &self,
+        genome: &CreatureGenome,
+        label: &str,
+        fitness: f32,
+        behavior: &[f32],
+    ) -> Result<CapturedGif> {
+        let size = self.config.gif_size as usize;
+        let mut gif = GifCapture::new(self.config.gif_size, self.config.gif_size, self.config.gif_fps);
+        let mut renderer = PixelRenderer::new(size, size);
+        let materials = Materials::new();
+
+        // Set up world and spawn creature
+        let world = self.scenario.setup_world();
+        let mut physics_world = PhysicsWorld::new();
+        let mut creature_manager = CreatureManager::new(1);
+        let spawn_pos = self.scenario.config.spawn_position;
+        let creature_id = creature_manager.spawn_creature(genome.clone(), spawn_pos, &mut physics_world);
+
+        // Simulation with frame capture
+        let dt = 1.0 / 60.0;
+        let fps = self.config.gif_fps as usize;
+        let capture_interval = if fps > 0 { 60 / fps } else { 6 }; // frames between captures
+
+        // Capture for a shorter duration for GIFs (max 5 seconds)
+        let gif_duration = self.config.eval_duration.min(5.0);
+        let total_steps = (gif_duration / dt) as usize;
+
+        for step in 0..total_steps {
+            creature_manager.update(dt, &world, &mut physics_world);
+            physics_world.step();
+
+            // Capture frame at intervals
+            if step % capture_interval == 0 {
+                if let Some(creature) = creature_manager.get(creature_id) {
+                    let render_data = creature.get_render_data(&physics_world);
+                    let creatures: Vec<_> = render_data.into_iter().collect();
+
+                    // Center camera on creature
+                    let center = creature.position;
+                    renderer.render(&world, &materials, center, &creatures);
+                    gif.capture_frame(&renderer);
+                }
+            }
+        }
+
+        // Encode GIF to bytes
+        let data = gif.to_bytes().context("Failed to encode GIF")?;
+
+        Ok(CapturedGif {
+            label: label.to_string(),
+            fitness,
+            behavior: behavior.to_vec(),
+            data,
+        })
+    }
+
+    /// Capture GIFs for the best and diverse elites
+    fn capture_all_gifs(&self, pb: &ProgressBar) -> Vec<CapturedGif> {
+        let mut gifs = Vec::new();
+
+        pb.println("Capturing GIFs of evolved creatures...");
+
+        // Capture best elite
+        if let Some(best) = self.grid.best_elite() {
+            pb.println("  Capturing: Champion (best fitness)");
+            match self.capture_elite_gif(&best.genome, "Champion", best.fitness, &best.behavior) {
+                Ok(gif) => gifs.push(gif),
+                Err(e) => log::warn!("Failed to capture champion GIF: {}", e),
+            }
+        }
+
+        // Capture diverse elites
+        let diverse = self.grid.sample_diverse_elites();
+        for diverse_elite in diverse {
+            pb.println(format!("  Capturing: {}", diverse_elite.label));
+            match self.capture_elite_gif(
+                &diverse_elite.elite.genome,
+                &diverse_elite.label,
+                diverse_elite.elite.fitness,
+                &diverse_elite.elite.behavior,
+            ) {
+                Ok(gif) => gifs.push(gif),
+                Err(e) => log::warn!("Failed to capture {} GIF: {}", diverse_elite.label, e),
+            }
+        }
+
+        pb.println(format!("Captured {} GIFs", gifs.len()));
+        gifs
     }
 }
 

@@ -19,7 +19,7 @@ pub use fitness::{
     CompositeFitness, DistanceFitness, FitnessFunction, ForagingFitness, SurvivalFitness,
 };
 pub use gif_capture::GifCapture;
-pub use map_elites::{Elite, MapElitesGrid};
+pub use map_elites::{DiverseElite, Elite, MapElitesGrid};
 pub use pixel_renderer::PixelRenderer;
 pub use report::ReportGenerator;
 pub use scenario::{Scenario, ScenarioConfig};

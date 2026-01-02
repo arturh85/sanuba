@@ -10,6 +10,19 @@ use super::map_elites::MapElitesGrid;
 use super::scenario::ScenarioConfig;
 use super::training_env::TrainingStats;
 
+/// A captured GIF with metadata for the report
+#[derive(Debug, Clone)]
+pub struct CapturedGif {
+    /// Label for this GIF (e.g., "Champion", "High Locomotion")
+    pub label: String,
+    /// Fitness score of the creature
+    pub fitness: f32,
+    /// Behavior descriptor values
+    pub behavior: Vec<f32>,
+    /// GIF data as bytes
+    pub data: Vec<u8>,
+}
+
 /// Generates HTML reports for training runs
 pub struct ReportGenerator {
     /// Output directory
@@ -32,12 +45,13 @@ impl ReportGenerator {
         &self,
         grid: &MapElitesGrid,
         stats_history: &[TrainingStats],
+        gifs: &[CapturedGif],
     ) -> Result<()> {
         // Create output directory
         fs::create_dir_all(&self.output_dir).context("Failed to create output directory")?;
 
         // Generate index.html
-        let html = self.generate_html(grid, stats_history);
+        let html = self.generate_html(grid, stats_history, gifs);
         let path = format!("{}/index.html", self.output_dir);
         fs::write(&path, html).context("Failed to write report HTML")?;
 
@@ -51,10 +65,11 @@ impl ReportGenerator {
     }
 
     /// Generate the main HTML content
-    fn generate_html(&self, grid: &MapElitesGrid, stats_history: &[TrainingStats]) -> String {
+    fn generate_html(&self, grid: &MapElitesGrid, stats_history: &[TrainingStats], gifs: &[CapturedGif]) -> String {
         let stats = grid.stats();
         let fitness_chart = self.generate_fitness_svg(stats_history);
         let grid_svg = self.generate_grid_svg(grid);
+        let gif_section = self.generate_gif_section(gifs);
 
         format!(
             r#"<!DOCTYPE html>
@@ -125,6 +140,48 @@ impl ReportGenerator {
             color: #aaa;
             line-height: 1.6;
         }}
+        .gif-section {{
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }}
+        .gif-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .gif-card {{
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }}
+        .gif-card img {{
+            width: 128px;
+            height: 128px;
+            border-radius: 5px;
+            image-rendering: pixelated;
+            background: #000;
+        }}
+        .gif-label {{
+            font-weight: bold;
+            color: #4ecdc4;
+            margin-top: 10px;
+            font-size: 1.1em;
+        }}
+        .gif-stats {{
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }}
+        .champion-card {{
+            border: 2px solid #ffd700;
+        }}
+        .champion-card .gif-label {{
+            color: #ffd700;
+        }}
     </style>
 </head>
 <body>
@@ -159,6 +216,8 @@ impl ReportGenerator {
         </div>
     </div>
 
+    {gif_section}
+
     <div class="chart-container">
         <h3>Fitness Over Generations</h3>
         {fitness_chart}
@@ -183,11 +242,61 @@ impl ReportGenerator {
             best_fitness = stats.best_fitness,
             coverage = stats.coverage * 100.0,
             cell_count = stats.cell_count,
+            gif_section = gif_section,
             fitness_chart = fitness_chart,
             grid_svg = grid_svg,
             dim0 = grid.dim0_name,
             dim1 = grid.dim1_name,
         )
+    }
+
+    /// Generate HTML section for creature GIFs
+    fn generate_gif_section(&self, gifs: &[CapturedGif]) -> String {
+        if gifs.is_empty() {
+            return String::new();
+        }
+
+        use std::fmt::Write;
+
+        let mut html = String::new();
+        html.push_str(r#"<div class="gif-section">"#);
+        html.push_str("<h3>Evolved Behaviors</h3>");
+        html.push_str(r#"<p class="description">Animated visualizations of the best evolved creatures. Each GIF shows a creature performing its evolved behavior.</p>"#);
+        html.push_str(r#"<div class="gif-grid">"#);
+
+        for gif in gifs {
+            // Encode GIF as base64
+            let base64_data = base64_encode(&gif.data);
+
+            // Determine if this is the champion (first GIF)
+            let card_class = if gif.label == "Champion" {
+                "gif-card champion-card"
+            } else {
+                "gif-card"
+            };
+
+            let _ = write!(
+                html,
+                r#"<div class="{}">
+                    <img src="data:image/gif;base64,{}" alt="{}">
+                    <div class="gif-label">{}</div>
+                    <div class="gif-stats">
+                        Fitness: {:.1}<br>
+                        Locomotion: {:.2} | Foraging: {:.2}
+                    </div>
+                </div>"#,
+                card_class,
+                base64_data,
+                gif.label,
+                gif.label,
+                gif.fitness,
+                gif.behavior.first().unwrap_or(&0.0),
+                gif.behavior.get(1).unwrap_or(&0.0),
+            );
+        }
+
+        html.push_str("</div></div>");
+        html
     }
 
     /// Generate SVG chart for fitness over time
@@ -368,6 +477,38 @@ impl ReportGenerator {
     }
 }
 
+/// Simple base64 encoding for embedding binary data in HTML
+fn base64_encode(data: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+
+        result.push(ALPHABET[(triple >> 18) & 0x3F] as char);
+        result.push(ALPHABET[(triple >> 12) & 0x3F] as char);
+
+        if chunk.len() > 1 {
+            result.push(ALPHABET[(triple >> 6) & 0x3F] as char);
+        } else {
+            result.push('=');
+        }
+
+        if chunk.len() > 2 {
+            result.push(ALPHABET[triple & 0x3F] as char);
+        } else {
+            result.push('=');
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,5 +518,12 @@ mod tests {
         let config = ScenarioConfig::default();
         let gen = ReportGenerator::new("test_output", &config);
         assert_eq!(gen.output_dir, "test_output");
+    }
+
+    #[test]
+    fn test_base64_encode() {
+        assert_eq!(base64_encode(b"Hello"), "SGVsbG8=");
+        assert_eq!(base64_encode(b"Hi"), "SGk=");
+        assert_eq!(base64_encode(b"A"), "QQ==");
     }
 }

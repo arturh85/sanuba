@@ -246,6 +246,104 @@ impl MapElitesGrid {
 
         grid
     }
+
+    /// Sample diverse elites from different regions of the grid
+    ///
+    /// Returns up to 4 elites representing different behavioral strategies:
+    /// 1. High dim0 (e.g., high locomotion)
+    /// 2. High dim1 (e.g., high foraging)
+    /// 3. Balanced (center region)
+    /// 4. Random alternative
+    pub fn sample_diverse_elites(&self) -> Vec<DiverseElite> {
+        let mut results = Vec::new();
+        let mid = self.resolution / 2;
+        let high = self.resolution - 1;
+
+        // Strategy 1: High dim0 (top-right quadrant for dim0)
+        if let Some(elite) = self.find_elite_in_region(mid..=high, 0..=high) {
+            results.push(DiverseElite {
+                elite: elite.clone(),
+                label: format!("High {}", self.dim0_name),
+            });
+        }
+
+        // Strategy 2: High dim1 (top region for dim1)
+        if let Some(elite) = self.find_elite_in_region(0..=high, mid..=high) {
+            // Avoid duplicates
+            if !results.iter().any(|r| {
+                (r.elite.behavior[0] - elite.behavior[0]).abs() < 0.01
+                    && (r.elite.behavior[1] - elite.behavior[1]).abs() < 0.01
+            }) {
+                results.push(DiverseElite {
+                    elite: elite.clone(),
+                    label: format!("High {}", self.dim1_name),
+                });
+            }
+        }
+
+        // Strategy 3: Balanced (center region)
+        let center_start = mid.saturating_sub(1);
+        let center_end = (mid + 1).min(high);
+        if let Some(elite) = self.find_elite_in_region(center_start..=center_end, center_start..=center_end) {
+            if !results.iter().any(|r| {
+                (r.elite.behavior[0] - elite.behavior[0]).abs() < 0.01
+                    && (r.elite.behavior[1] - elite.behavior[1]).abs() < 0.01
+            }) {
+                results.push(DiverseElite {
+                    elite: elite.clone(),
+                    label: "Balanced".to_string(),
+                });
+            }
+        }
+
+        // Strategy 4: Random alternative (any cell not already picked)
+        let stats = self.stats();
+        let existing_behaviors: Vec<_> = results.iter().map(|r| &r.elite.behavior).collect();
+
+        for elite in self.cells.values() {
+            if elite.fitness > stats.avg_fitness {
+                let dominated = existing_behaviors.iter().any(|b| {
+                    (b[0] - elite.behavior[0]).abs() < 1.0
+                        && (b[1] - elite.behavior[1]).abs() < 1.0
+                });
+                if !dominated {
+                    results.push(DiverseElite {
+                        elite: elite.clone(),
+                        label: "Alternative".to_string(),
+                    });
+                    break;
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Find the best elite in a specific region of the grid
+    fn find_elite_in_region(
+        &self,
+        x_range: std::ops::RangeInclusive<usize>,
+        y_range: std::ops::RangeInclusive<usize>,
+    ) -> Option<&Elite> {
+        self.cells
+            .iter()
+            .filter(|((x, y), _)| x_range.contains(x) && y_range.contains(y))
+            .map(|(_, elite)| elite)
+            .max_by(|a, b| {
+                a.fitness
+                    .partial_cmp(&b.fitness)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    }
+}
+
+/// A diverse elite with a descriptive label
+#[derive(Debug, Clone)]
+pub struct DiverseElite {
+    /// The elite creature
+    pub elite: Elite,
+    /// Label describing this elite's strategy
+    pub label: String,
 }
 
 /// Statistics about the MAP-Elites grid

@@ -50,10 +50,13 @@ web: build-web
 
 # Evolution training commands (RUST_LOG=warn for clean progress bar output)
 train scenario="locomotion" generations="100" population="50":
+    rm -rf training_output
     RUST_LOG=warn cargo run --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
 
 train-quick:
+    rm -rf training_output
     RUST_LOG=warn cargo run --features headless --release -- --train --generations 10 --population 20
 
 train-full:
+    rm -rf training_output
     RUST_LOG=warn cargo run --features headless --release -- --train --generations 500 --population 100

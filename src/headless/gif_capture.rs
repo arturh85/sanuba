@@ -3,6 +3,7 @@
 //! Captures simulation frames and encodes them as animated GIFs.
 
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -93,6 +94,38 @@ impl GifCapture {
         // For simplicity, use standard save
         // A more sophisticated implementation could use color quantization
         self.save(path)
+    }
+
+    /// Save captured frames to a writer (for in-memory encoding)
+    pub fn save_to_writer<W: Write>(&self, writer: W) -> Result<()> {
+        if self.frames.is_empty() {
+            anyhow::bail!("No frames to save");
+        }
+
+        let mut encoder = Encoder::new(writer, self.width, self.height, &[])
+            .context("Failed to create GIF encoder")?;
+
+        encoder
+            .set_repeat(Repeat::Infinite)
+            .context("Failed to set GIF repeat")?;
+
+        for frame_data in &self.frames {
+            let mut frame = Frame::from_rgb(self.width, self.height, frame_data);
+            frame.delay = self.frame_delay;
+
+            encoder
+                .write_frame(&frame)
+                .context("Failed to write GIF frame")?;
+        }
+
+        Ok(())
+    }
+
+    /// Save to a Vec<u8> buffer and return it
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut buffer = Vec::new();
+        self.save_to_writer(&mut buffer)?;
+        Ok(buffer)
     }
 }
 
