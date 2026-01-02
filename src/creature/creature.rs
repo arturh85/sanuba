@@ -52,6 +52,8 @@ pub struct Creature {
     pub facing_direction: f32, // -1.0 = left, 1.0 = right
     #[serde(skip)]
     pub grounded: bool,
+    #[serde(skip)]
+    pub pending_motor_commands: Option<Vec<f32>>,
 }
 
 impl Creature {
@@ -95,12 +97,19 @@ impl Creature {
             wander_timer: 0.0,
             facing_direction: 1.0,
             grounded: false,
+            pending_motor_commands: None,
         }
     }
 
     /// Update creature state
     /// Returns true if the creature died
-    pub fn update(&mut self, delta_time: f32, sensory_input: &SensoryInput) -> bool {
+    pub fn update(
+        &mut self,
+        delta_time: f32,
+        sensory_input: &SensoryInput,
+        physics_world: &crate::physics::PhysicsWorld,
+        world: &crate::world::World,
+    ) -> bool {
         // 1. Update hunger (depletes over time)
         self.hunger.update(delta_time);
 
@@ -135,14 +144,67 @@ impl Creature {
             self.action_timer -= delta_time;
         }
 
-        // 4. Neural control (placeholder for Phase 6 - motors not yet applied)
-        if let Some(ref _brain) = self.brain {
-            // TODO: Extract features, run forward pass, apply motor commands to physics
-            // This will be fully implemented when we integrate with physics
-        }
+        // 4. Neural control - run brain and get motor commands
+        self.run_neural_control(delta_time, sensory_input, physics_world, world);
 
         // 5. Check if dead
         self.health.is_dead()
+    }
+
+    /// Run neural controller and return motor commands
+    fn run_neural_control(
+        &mut self,
+        _delta_time: f32,
+        sensory_input: &SensoryInput,
+        physics_world: &crate::physics::PhysicsWorld,
+        world: &crate::world::World,
+    ) {
+        // Get physics handles for feature extraction
+        let physics_handles: Option<&[rapier2d::prelude::RigidBodyHandle]> =
+            self.physics.as_ref().map(|p| p.link_handles.as_slice());
+
+        // Extract features from physics state
+        let features = super::neural::extract_body_part_features(
+            &self.morphology,
+            physics_world,
+            sensory_input,
+            physics_handles,
+            world,
+        );
+
+        // Flatten features into input vector for neural network
+        let mut input_vec = Vec::new();
+        for feature in &features {
+            input_vec.extend(feature.to_vec());
+        }
+
+        // Run neural network forward pass
+        if let Some(ref brain) = self.brain {
+            // Ensure input dimensions match
+            if input_vec.len() == brain.input_dim() {
+                let motor_commands = brain.forward(&input_vec);
+
+                // Store motor commands to be applied during apply_movement
+                self.pending_motor_commands = Some(motor_commands);
+            }
+        }
+    }
+
+    /// Apply pending motor commands to physics
+    fn apply_motor_commands_to_physics(
+        &mut self,
+        delta_time: f32,
+        physics_world: &mut crate::physics::PhysicsWorld,
+    ) {
+        if let (Some(ref mut physics), Some(motor_commands)) =
+            (&mut self.physics, self.pending_motor_commands.take())
+        {
+            // Apply motor commands to update target angles
+            physics.apply_all_motor_commands(&motor_commands, &self.morphology, delta_time);
+
+            // Apply motor rotations to physics bodies
+            physics.apply_motor_rotations(&self.morphology, self.position, physics_world);
+        }
     }
 
     /// Rebuild physics body (after loading from save)
@@ -365,7 +427,10 @@ impl Creature {
             self.velocity.y = 0.0;
         }
 
-        // Update physics body positions
+        // Apply motor commands from neural network (rotates body parts)
+        self.apply_motor_commands_to_physics(delta_time, physics_world);
+
+        // Update physics body positions (for non-motorized parts)
         self.sync_physics_positions(physics_world);
     }
 
@@ -451,8 +516,13 @@ mod tests {
 
     #[test]
     fn test_creature_update_hunger() {
+        use crate::physics::PhysicsWorld;
+        use crate::world::World;
+
         let genome = CreatureGenome::test_biped();
         let mut creature = Creature::from_genome(genome, Vec2::ZERO);
+        let physics_world = PhysicsWorld::new();
+        let world = World::new();
 
         let initial_hunger = creature.hunger.percentage();
 
@@ -470,7 +540,7 @@ mod tests {
         };
 
         // Update for 1 second
-        let died = creature.update(1.0, &sensory);
+        let died = creature.update(1.0, &sensory, &physics_world, &world);
 
         // Should not have died yet
         assert!(!died);
@@ -481,8 +551,13 @@ mod tests {
 
     #[test]
     fn test_creature_starvation_damage() {
+        use crate::physics::PhysicsWorld;
+        use crate::world::World;
+
         let genome = CreatureGenome::test_biped();
         let mut creature = Creature::from_genome(genome, Vec2::ZERO);
+        let physics_world = PhysicsWorld::new();
+        let world = World::new();
 
         // Set hunger to starving (0.0 = completely empty)
         creature.hunger.set(0.0);
@@ -502,7 +577,7 @@ mod tests {
         };
 
         // Update for 1 second while starving
-        creature.update(1.0, &sensory);
+        creature.update(1.0, &sensory, &physics_world, &world);
 
         // Health should have decreased
         assert!(creature.health.current < initial_health);
@@ -510,8 +585,13 @@ mod tests {
 
     #[test]
     fn test_creature_action_planning() {
+        use crate::physics::PhysicsWorld;
+        use crate::world::World;
+
         let genome = CreatureGenome::test_biped();
         let mut creature = Creature::from_genome(genome, Vec2::ZERO);
+        let physics_world = PhysicsWorld::new();
+        let world = World::new();
 
         let sensory = SensoryInput {
             raycasts: vec![],
@@ -526,7 +606,7 @@ mod tests {
         };
 
         // Update to trigger planning
-        creature.update(0.1, &sensory);
+        creature.update(0.1, &sensory, &physics_world, &world);
 
         // Should have some action planned
         assert!(creature.current_action.is_some());

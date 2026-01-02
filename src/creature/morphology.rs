@@ -349,7 +349,12 @@ impl Default for MorphologyConfig {
 pub struct MorphologyPhysics {
     pub multibody_handle: MultibodyJointHandle,
     pub link_handles: Vec<RigidBodyHandle>,
+    /// Indices of body parts that have motorized joints (revolute joints only)
     pub motor_link_indices: Vec<usize>,
+    /// Current target angles for each motor joint (matches motor_link_indices order)
+    pub motor_target_angles: Vec<f32>,
+    /// Current angular velocities for motor interpolation
+    pub motor_angular_velocities: Vec<f32>,
 }
 
 impl MorphologyPhysics {
@@ -390,6 +395,20 @@ impl MorphologyPhysics {
             physics_world.add_collider_with_parent(collider, body_handle);
         }
 
+        // Find motorized joints (revolute joints) and track their child body part indices
+        let mut motor_link_indices = Vec::new();
+        for joint in &morphology.joints {
+            if let JointType::Revolute { .. } = joint.joint_type {
+                // The child body part of a revolute joint can be motorized
+                motor_link_indices.push(joint.child_index);
+            }
+        }
+
+        // Initialize target angles and velocities for motors
+        let num_motors = motor_link_indices.len();
+        let motor_target_angles = vec![0.0; num_motors];
+        let motor_angular_velocities = vec![0.0; num_motors];
+
         // For Phase 6, we'll use a placeholder multibody handle
         // In a future phase, we can create actual multibody joints
         let multibody_handle = MultibodyJointHandle::from_raw_parts(0, 0);
@@ -397,7 +416,9 @@ impl MorphologyPhysics {
         Self {
             multibody_handle,
             link_handles,
-            motor_link_indices: Vec::new(), // Motors will be added later
+            motor_link_indices,
+            motor_target_angles,
+            motor_angular_velocities,
         }
     }
 
@@ -421,14 +442,139 @@ impl MorphologyPhysics {
     }
 
     /// Apply motor command to joint
-    /// For Phase 6, this is a placeholder - motor control will be added later
+    /// target is the target angular velocity in radians per second [-1, 1] normalized
+    /// Returns the actual angular velocity applied
     pub fn apply_motor_command(
-        &self,
-        _link_index: usize,
-        _target: f32,
-        _physics_world: &mut crate::physics::PhysicsWorld,
+        &mut self,
+        motor_index: usize,
+        target: f32,
+        morphology: &CreatureMorphology,
+        delta_time: f32,
+    ) -> f32 {
+        if motor_index >= self.motor_link_indices.len() {
+            return 0.0;
+        }
+
+        // Get the joint constraints for this motor
+        let link_idx = self.motor_link_indices[motor_index];
+
+        // Find the joint that controls this body part
+        let joint = morphology.joints.iter().find(|j| j.child_index == link_idx);
+
+        let (min_angle, max_angle) = match joint {
+            Some(BodyJoint {
+                joint_type:
+                    JointType::Revolute {
+                        min_angle,
+                        max_angle,
+                    },
+                ..
+            }) => (*min_angle, *max_angle),
+            _ => (-std::f32::consts::PI / 4.0, std::f32::consts::PI / 4.0),
+        };
+
+        // Motor speed constant (radians per second at max command)
+        const MAX_ANGULAR_VELOCITY: f32 = 3.0;
+
+        // Calculate target angular velocity from normalized command [-1, 1]
+        let target_angular_vel = target.clamp(-1.0, 1.0) * MAX_ANGULAR_VELOCITY;
+
+        // Store angular velocity for this motor
+        if motor_index < self.motor_angular_velocities.len() {
+            self.motor_angular_velocities[motor_index] = target_angular_vel;
+        }
+
+        // Update target angle based on angular velocity
+        if motor_index < self.motor_target_angles.len() {
+            let current_target = self.motor_target_angles[motor_index];
+            let new_target = current_target + target_angular_vel * delta_time;
+            // Clamp to joint limits
+            self.motor_target_angles[motor_index] = new_target.clamp(min_angle, max_angle);
+        }
+
+        target_angular_vel
+    }
+
+    /// Apply all motor commands from neural network output
+    /// motor_commands should be a slice of values in [-1, 1], one per motor
+    pub fn apply_all_motor_commands(
+        &mut self,
+        motor_commands: &[f32],
+        morphology: &CreatureMorphology,
+        delta_time: f32,
     ) {
-        // Motor commands will be implemented when we add proper joint motors
+        let num_motors = self.motor_link_indices.len().min(motor_commands.len());
+        for (i, &command) in motor_commands.iter().enumerate().take(num_motors) {
+            self.apply_motor_command(i, command, morphology, delta_time);
+        }
+    }
+
+    /// Apply motor target angles to physics bodies
+    /// This rotates child body parts around their parent joint pivot
+    pub fn apply_motor_rotations(
+        &self,
+        morphology: &CreatureMorphology,
+        root_position: Vec2,
+        physics_world: &mut crate::physics::PhysicsWorld,
+    ) {
+        use rapier2d::prelude::*;
+
+        // Start with root position and work outward
+        // For each motorized joint, rotate the child body part around the parent
+
+        for (motor_idx, &link_idx) in self.motor_link_indices.iter().enumerate() {
+            // Find the joint for this link
+            let joint = morphology.joints.iter().find(|j| j.child_index == link_idx);
+
+            if let Some(joint) = joint {
+                let target_angle = self
+                    .motor_target_angles
+                    .get(motor_idx)
+                    .copied()
+                    .unwrap_or(0.0);
+
+                // Get parent body position
+                let parent_handle = self.link_handles.get(joint.parent_index);
+                let child_handle = self.link_handles.get(link_idx);
+
+                if let (Some(&parent_handle), Some(&child_handle)) = (parent_handle, child_handle) {
+                    // Get parent position
+                    let parent_pos = physics_world
+                        .rigid_body_set()
+                        .get(parent_handle)
+                        .map(|rb| {
+                            let t = rb.translation();
+                            Vec2::new(t.x, t.y)
+                        })
+                        .unwrap_or(root_position);
+
+                    // Get child's local offset from parent
+                    let parent_part = &morphology.body_parts[joint.parent_index];
+                    let child_part = &morphology.body_parts[link_idx];
+                    let local_offset = child_part.local_position - parent_part.local_position;
+
+                    // Rotate the local offset by the target angle
+                    let rotated_offset = Vec2::new(
+                        local_offset.x * target_angle.cos() - local_offset.y * target_angle.sin(),
+                        local_offset.x * target_angle.sin() + local_offset.y * target_angle.cos(),
+                    );
+
+                    // New child position
+                    let new_child_pos = parent_pos + rotated_offset;
+
+                    // Update child body position and rotation
+                    if let Some(rb) = physics_world.rigid_body_set_mut().get_mut(child_handle) {
+                        rb.set_translation(vector![new_child_pos.x, new_child_pos.y], true);
+                        rb.set_rotation(Rotation::new(target_angle), true);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get number of motors (for neural network output sizing)
+    pub fn num_motors(&self) -> usize {
+        self.motor_link_indices.len()
     }
 }
 

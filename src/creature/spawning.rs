@@ -104,8 +104,8 @@ impl CreatureManager {
             let sensory_input =
                 SensoryInput::gather(world, creature.position, &creature.sensor_config);
 
-            // Update creature state (hunger, needs, planning)
-            let died = creature.update(delta_time, &sensory_input);
+            // Update creature state (hunger, needs, planning, neural control)
+            let died = creature.update(delta_time, &sensory_input, physics_world, world);
 
             if died {
                 dead_creatures.push(id);

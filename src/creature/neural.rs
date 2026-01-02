@@ -126,6 +126,16 @@ impl SimpleNeuralController {
         }
     }
 
+    /// Get input dimension
+    pub fn input_dim(&self) -> usize {
+        self.input_dim
+    }
+
+    /// Get output dimension
+    pub fn output_dim(&self) -> usize {
+        self.output_dim
+    }
+
     /// Forward pass: features -> motor commands
     /// Simple 2-layer network: input -> hidden (tanh) -> output (tanh)
     pub fn forward(&self, input: &[f32]) -> Vec<f32> {
@@ -165,39 +175,161 @@ impl SimpleNeuralController {
 }
 
 /// Extract features from physics state
-/// Simplified for Phase 6 - returns placeholder features
+/// Extracts actual physics data from rapier2d bodies for neural control
 pub fn extract_body_part_features(
     morphology: &CreatureMorphology,
-    _physics_world: &crate::physics::PhysicsWorld,
+    physics_world: &crate::physics::PhysicsWorld,
     sensory_input: &super::sensors::SensoryInput,
+    physics_handles: Option<&[rapier2d::prelude::RigidBodyHandle]>,
+    world: &crate::world::World,
 ) -> Vec<BodyPartFeatures> {
     let num_parts = morphology.body_parts.len();
     let mut features = Vec::with_capacity(num_parts);
 
-    // For Phase 6: Create placeholder features for each body part
-    // Later this will extract real physics data (joint angles, velocities, etc.)
-    for _i in 0..num_parts {
+    // Get body part positions and orientations from physics
+    let body_data: Vec<(Vec2, f32, Vec2)> = if let Some(handles) = physics_handles {
+        handles
+            .iter()
+            .filter_map(|&handle| {
+                physics_world.rigid_body_set().get(handle).map(|rb| {
+                    let pos = rb.translation();
+                    let rotation = rb.rotation().angle();
+                    let linvel = rb.linvel();
+                    (
+                        Vec2::new(pos.x, pos.y),
+                        rotation,
+                        Vec2::new(linvel.x, linvel.y),
+                    )
+                })
+            })
+            .collect()
+    } else {
+        // No physics handles - return placeholder data
+        morphology
+            .body_parts
+            .iter()
+            .map(|part| (part.local_position, 0.0, Vec2::ZERO))
+            .collect()
+    };
+
+    // Get root orientation for relative calculations
+    let _root_pos = body_data.first().map(|(p, _, _)| *p).unwrap_or(Vec2::ZERO);
+    let root_orientation = body_data.first().map(|(_, r, _)| *r).unwrap_or(0.0);
+
+    // Build joint angle map (parent_index -> child angles relative to parent)
+    let mut joint_angles: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+    let mut prev_angles: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+
+    for joint in &morphology.joints {
+        if let (Some((_, parent_rot, _)), Some((_, child_rot, _))) = (
+            body_data.get(joint.parent_index),
+            body_data.get(joint.child_index),
+        ) {
+            // Joint angle is the relative rotation between parent and child
+            let angle = child_rot - parent_rot;
+            // Normalize to [-PI, PI]
+            let normalized = (angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                - std::f32::consts::PI;
+            joint_angles.insert(joint.child_index, normalized);
+        }
+    }
+
+    for (i, _part) in morphology.body_parts.iter().enumerate() {
+        // Get this body part's data
+        let (position, orientation, velocity) =
+            body_data
+                .get(i)
+                .copied()
+                .unwrap_or((Vec2::ZERO, 0.0, Vec2::ZERO));
+
+        // Joint angle (relative to parent, or 0 if root)
+        let joint_angle = joint_angles.get(&i).copied().unwrap_or(0.0);
+
+        // Joint angular velocity (approximate from angle change)
+        // For now, use 0 since we need previous frame data
+        // This will be improved when we track previous angles
+        let joint_angular_velocity = prev_angles
+            .get(&i)
+            .map(|prev| (joint_angle - prev) * 60.0) // Assuming 60fps
+            .unwrap_or(0.0);
+        prev_angles.insert(i, joint_angle);
+
+        // Ground contact: raycast downward from body part
+        let ground_contact = check_ground_contact(world, position, &morphology.body_parts[i]);
+
+        // Raycast distances from sensory input
         let raycast_distances: Vec<f32> = sensory_input
             .raycasts
             .iter()
             .map(|hit| hit.distance)
             .collect();
 
-        // Simplified contact materials (just count unique materials)
-        let contact_materials = vec![0.0; 5]; // Placeholder for top 5 material types
+        // Contact materials (one-hot encoding of nearby materials)
+        let contact_materials = encode_contact_materials(&sensory_input.contact_materials);
+
+        // Normalize orientation relative to root
+        let relative_orientation = orientation - root_orientation;
 
         features.push(BodyPartFeatures {
-            joint_angle: 0.0,            // TODO: Extract from physics
-            joint_angular_velocity: 0.0, // TODO: Extract from physics
-            orientation: 0.0,            // TODO: Extract from physics
-            velocity: Vec2::ZERO,        // TODO: Extract from physics
-            ground_contact: 0.0,         // TODO: Raycast downward
+            joint_angle,
+            joint_angular_velocity,
+            orientation: relative_orientation,
+            velocity,
+            ground_contact,
             raycast_distances,
             contact_materials,
         });
     }
 
     features
+}
+
+/// Check if body part is in contact with ground
+fn check_ground_contact(
+    world: &crate::world::World,
+    position: Vec2,
+    body_part: &super::morphology::BodyPart,
+) -> f32 {
+    // Raycast downward from bottom of body part
+    let check_pos = position - Vec2::new(0.0, body_part.radius + 1.0);
+    let (px, py) = (check_pos.x as i32, check_pos.y as i32);
+
+    // Check a few pixels below the body part
+    for dy in 0..3 {
+        let pixel = world.get_pixel(px, py - dy);
+        if let Some(p) = pixel {
+            if p.material_id != 0 {
+                // Not air
+                // Return 1.0 if touching, fade based on distance
+                return 1.0 - (dy as f32 * 0.3);
+            }
+        }
+    }
+
+    0.0 // Not grounded
+}
+
+/// Encode contact materials as one-hot vector
+fn encode_contact_materials(contact_materials: &[u16]) -> Vec<f32> {
+    // Create 5-element vector for most common material types
+    // 0=solid, 1=liquid, 2=powder, 3=gas, 4=other
+    let mut encoded = vec![0.0; 5];
+
+    for &material_id in contact_materials {
+        // Map material to category based on material_id ranges
+        // This is a simplified encoding - could be improved with actual material properties
+        let category = match material_id {
+            0 => continue,                    // Air - skip
+            1 | 12 | 13 | 14 | 19 => 0,       // Stone, glass, metal, bedrock, bone = solid
+            3 | 8 | 10 => 1,                  // Water, lava, acid = liquid
+            2 | 5 | 6 | 7 | 9 | 11 | 17 => 2, // Sand, fire, smoke, steam, oil, ice, fruit = powder
+            16 | 18 => 3,                     // Plant matter, flesh = organic
+            _ => 4,                           // Other
+        };
+        encoded[category] = (encoded[category] + 0.2_f32).min(1.0);
+    }
+
+    encoded
 }
 
 #[cfg(test)]
@@ -299,7 +431,9 @@ mod tests {
 
         let sensory_input = SensoryInput::gather(&world, Vec2::new(100.0, 100.0), &config);
 
-        let features = extract_body_part_features(&morphology, &physics_world, &sensory_input);
+        // Test without physics handles (uses placeholder data)
+        let features =
+            extract_body_part_features(&morphology, &physics_world, &sensory_input, None, &world);
 
         // Should have features for each body part
         assert_eq!(features.len(), morphology.body_parts.len());
@@ -307,6 +441,8 @@ mod tests {
         // Each feature should have raycast data
         for feature in &features {
             assert_eq!(feature.raycast_distances.len(), config.num_raycasts);
+            // Contact materials should be encoded as 5-element vector
+            assert_eq!(feature.contact_materials.len(), 5);
         }
     }
 
