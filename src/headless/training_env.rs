@@ -10,7 +10,6 @@ use rayon::prelude::*;
 use crate::creature::genome::{crossover_genome, CreatureGenome, MutationConfig};
 use crate::creature::spawning::CreatureManager;
 use crate::physics::PhysicsWorld;
-use crate::ui::StatsCollector;
 
 use super::fitness::BehaviorDescriptor;
 use super::map_elites::MapElitesGrid;
@@ -127,6 +126,8 @@ impl TrainingEnv {
         for gen in 0..self.config.generations {
             self.generation = gen;
 
+            log::info!("=== Generation {}/{} ===", gen + 1, self.config.generations);
+
             // Generate offspring population
             let offspring = self.generate_offspring();
 
@@ -240,6 +241,7 @@ impl TrainingEnv {
     fn evaluate_population(&self, genomes: &[CreatureGenome]) -> Result<Vec<EvalResult>> {
         let counter = AtomicUsize::new(0);
         let total = genomes.len();
+        let start_time = std::time::Instant::now();
 
         let results: Vec<EvalResult> = genomes
             .par_iter()
@@ -247,13 +249,23 @@ impl TrainingEnv {
                 let result = self.evaluate_single(genome.clone());
 
                 let done = counter.fetch_add(1, Ordering::Relaxed) + 1;
-                if done % 10 == 0 {
-                    log::debug!("Evaluated {}/{} creatures", done, total);
-                }
+                let elapsed = start_time.elapsed().as_secs_f32();
+                let per_creature = elapsed / done as f32;
+                let remaining = (total - done) as f32 * per_creature;
+                log::info!(
+                    "  Creature {}/{} ({:.2}s ea, ~{:.0}s remaining)",
+                    done,
+                    total,
+                    per_creature,
+                    remaining
+                );
 
                 result
             })
             .collect();
+
+        let total_time = start_time.elapsed().as_secs_f32();
+        log::info!("  Population evaluated in {:.1}s", total_time);
 
         Ok(results)
     }
@@ -261,23 +273,21 @@ impl TrainingEnv {
     /// Evaluate a single creature
     fn evaluate_single(&self, genome: CreatureGenome) -> EvalResult {
         // Set up world
-        let mut world = self.scenario.setup_world();
+        let world = self.scenario.setup_world();
         let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
-        let mut stats_collector = StatsCollector::new();
 
         // Spawn creature
         let spawn_pos = self.scenario.config.spawn_position;
         let creature_id =
             creature_manager.spawn_creature(genome.clone(), spawn_pos, &mut physics_world);
 
-        // Run simulation
+        // Run simulation (physics only - skip world.update() for speed)
         let dt = 1.0 / 60.0;
         let steps = (self.config.eval_duration / dt) as usize;
 
         for _step in 0..steps {
-            // Update simulation
-            world.update(dt, &mut stats_collector);
+            // Skip world.update() - terrain is static, only need creature physics
             creature_manager.update(dt, &world, &mut physics_world);
             physics_world.step();
         }
