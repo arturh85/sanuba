@@ -1420,6 +1420,11 @@ impl World {
         self.physics_world.get_debris_render_data()
     }
 
+    /// Get creature render data for rendering
+    pub fn get_creature_render_data(&self) -> Vec<crate::creature::CreatureRenderData> {
+        self.creature_manager.get_render_data(&self.physics_world)
+    }
+
     /// Add bedrock collider for a chunk (called when chunk is loaded)
     pub fn add_bedrock_collider(&mut self, chunk_x: i32, chunk_y: i32) {
         self.physics_world.add_bedrock_collider(chunk_x, chunk_y);

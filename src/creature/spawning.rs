@@ -149,6 +149,14 @@ impl CreatureManager {
         self.creatures.values().map(|c| c.position).collect()
     }
 
+    /// Get render data for all creatures (for rendering)
+    pub fn get_render_data(&self, physics_world: &PhysicsWorld) -> Vec<super::CreatureRenderData> {
+        self.creatures
+            .values()
+            .filter_map(|creature| creature.get_render_data(physics_world))
+            .collect()
+    }
+
     /// Get creature by ID
     pub fn get(&self, id: EntityId) -> Option<&Creature> {
         self.creatures.get(&id)

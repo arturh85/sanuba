@@ -151,6 +151,41 @@ impl Creature {
         self.planner = Some(GoalPlanner::new());
     }
 
+    /// Get render data for this creature (body part positions and radii)
+    pub fn get_render_data(
+        &self,
+        physics_world: &crate::physics::PhysicsWorld,
+    ) -> Option<super::CreatureRenderData> {
+        let physics = self.physics.as_ref()?;
+
+        let mut body_parts = Vec::new();
+
+        // Iterate through body parts and their physics handles
+        for (i, body_part) in self.morphology.body_parts.iter().enumerate() {
+            if let Some(&handle) = physics.link_handles.get(i) {
+                if let Some(rigid_body) = physics_world.rigid_body_set().get(handle) {
+                    let translation = rigid_body.translation();
+                    let position = Vec2::new(translation.x, translation.y);
+
+                    // Magenta color to stand out from environment
+                    let color = [200, 50, 200, 255];
+
+                    body_parts.push(super::BodyPartRenderData {
+                        position,
+                        radius: body_part.radius,
+                        color,
+                    });
+                }
+            }
+        }
+
+        if body_parts.is_empty() {
+            return None;
+        }
+
+        Some(super::CreatureRenderData { body_parts })
+    }
+
     /// Execute current action (called by CreatureManager)
     pub fn execute_action(&mut self, world: &mut crate::world::World, _delta_time: f32) -> bool {
         if let Some(ref action) = self.current_action {

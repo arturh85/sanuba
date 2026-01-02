@@ -899,6 +899,12 @@ impl Renderer {
             self.render_debris_to_buffer(debris_data, world.materials());
         }
 
+        // Render creatures on top of debris
+        let creature_data = world.get_creature_render_data();
+        for creature in &creature_data {
+            self.render_creature_to_buffer(creature);
+        }
+
         // Draw player sprite
         // Convert world coordinates to texture coordinates using dynamic texture origin
         let player_world_x = world.player.position.x as i32;
@@ -1302,6 +1308,51 @@ impl Renderer {
         let x = point.x as f32 * cos - point.y as f32 * sin;
         let y = point.x as f32 * sin + point.y as f32 * cos;
         glam::IVec2::new(x.round() as i32, y.round() as i32)
+    }
+
+    /// Render a single creature to the pixel buffer
+    fn render_creature_to_buffer(&mut self, creature: &crate::creature::CreatureRenderData) {
+        for body_part in &creature.body_parts {
+            self.render_filled_circle(body_part.position, body_part.radius, body_part.color);
+        }
+    }
+
+    /// Render a filled circle at world position
+    fn render_filled_circle(&mut self, center: glam::Vec2, radius: f32, color: [u8; 4]) {
+        let radius_i = radius.ceil() as i32;
+        let radius_sq = radius * radius;
+
+        // Convert center to texture coordinates
+        let center_tex_x = center.x as i32 - self.texture_origin.x as i32;
+        let center_tex_y = center.y as i32 - self.texture_origin.y as i32;
+
+        // Iterate over bounding box of circle
+        for dy in -radius_i..=radius_i {
+            for dx in -radius_i..=radius_i {
+                // Check if pixel is within circle
+                let dist_sq = (dx * dx + dy * dy) as f32;
+                if dist_sq <= radius_sq {
+                    let tex_x = center_tex_x + dx;
+                    let tex_y = center_tex_y + dy;
+
+                    // Bounds check
+                    if tex_x >= 0
+                        && tex_x < Self::WORLD_TEXTURE_SIZE as i32
+                        && tex_y >= 0
+                        && tex_y < Self::WORLD_TEXTURE_SIZE as i32
+                    {
+                        let idx =
+                            ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
+                        if idx + 3 < self.pixel_buffer.len() {
+                            self.pixel_buffer[idx] = color[0];
+                            self.pixel_buffer[idx + 1] = color[1];
+                            self.pixel_buffer[idx + 2] = color[2];
+                            self.pixel_buffer[idx + 3] = color[3];
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Update temperature overlay texture with data from world
