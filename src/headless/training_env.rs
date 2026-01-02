@@ -2,9 +2,8 @@
 //!
 //! Main training loop with parallel evaluation and checkpointing.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use anyhow::{Context, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::creature::genome::{crossover_genome, CreatureGenome, MutationConfig};
@@ -111,46 +110,65 @@ impl TrainingEnv {
         }
     }
 
+    /// Create a progress bar style
+    fn progress_style() -> ProgressStyle {
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("█▓░")
+    }
+
     /// Run the full training loop
     pub fn run(&mut self) -> Result<()> {
-        log::info!(
+        // Calculate total evaluations: init population + generations * population
+        let total_evals = (self.config.generations as u64 + 1) * self.config.population_size as u64;
+
+        // Create main progress bar for entire training
+        let pb = ProgressBar::new(total_evals);
+        pb.set_style(Self::progress_style());
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+
+        pb.println(format!(
             "Starting training: {} generations, {} population",
-            self.config.generations,
-            self.config.population_size
-        );
+            self.config.generations, self.config.population_size
+        ));
 
         // Initialize with random population
-        self.initialize_population()?;
+        self.initialize_population_with_progress(&pb)?;
 
         // Main training loop
         for gen in 0..self.config.generations {
             self.generation = gen;
 
-            log::info!("=== Generation {}/{} ===", gen + 1, self.config.generations);
+            pb.println(format!(
+                "=== Generation {}/{} ===",
+                gen + 1,
+                self.config.generations
+            ));
 
             // Generate offspring population
             let offspring = self.generate_offspring();
 
             // Evaluate offspring in parallel
-            let results = self.evaluate_population(&offspring)?;
+            let results = self.evaluate_population_with_progress(&offspring, &pb)?;
 
             // Update grid and collect stats
             let stats = self.update_grid(results);
             self.stats_history.push(stats.clone());
 
             // Log progress
-            log::info!(
+            pb.println(format!(
                 "Gen {}: best={:.2}, avg={:.2}, coverage={:.1}%, new={}",
                 gen,
                 stats.best_fitness,
                 stats.avg_fitness,
                 stats.grid_coverage * 100.0,
                 stats.new_elites
-            );
+            ));
 
             // Checkpoint
             if self.config.checkpoint_interval > 0 && gen % self.config.checkpoint_interval == 0 {
-                self.save_checkpoint()?;
+                self.save_checkpoint(&pb)?;
             }
         }
 
@@ -158,16 +176,16 @@ impl TrainingEnv {
         self.report_gen
             .generate_final_report(&self.grid, &self.stats_history)?;
 
-        log::info!("Training complete!");
+        pb.finish_with_message("Training complete!");
         Ok(())
     }
 
     /// Initialize with random population
-    fn initialize_population(&mut self) -> Result<()> {
-        log::info!(
+    fn initialize_population_with_progress(&mut self, pb: &ProgressBar) -> Result<()> {
+        pb.println(format!(
             "Initializing population with {} creatures",
             self.config.population_size
-        );
+        ));
 
         // Use test_biped as a starting point and mutate for variety
         let genomes: Vec<CreatureGenome> = (0..self.config.population_size)
@@ -181,17 +199,17 @@ impl TrainingEnv {
             })
             .collect();
 
-        let results = self.evaluate_population(&genomes)?;
+        let results = self.evaluate_population_with_progress(&genomes, pb)?;
 
         for result in results {
             self.grid
                 .try_insert(result.genome, result.fitness, &result.behavior, 0);
         }
 
-        log::info!(
+        pb.println(format!(
             "Initial grid coverage: {:.1}%",
             self.grid.coverage() * 100.0
-        );
+        ));
         Ok(())
     }
 
@@ -238,34 +256,19 @@ impl TrainingEnv {
     }
 
     /// Evaluate a population of genomes in parallel
-    fn evaluate_population(&self, genomes: &[CreatureGenome]) -> Result<Vec<EvalResult>> {
-        let counter = AtomicUsize::new(0);
-        let total = genomes.len();
-        let start_time = std::time::Instant::now();
-
+    fn evaluate_population_with_progress(
+        &self,
+        genomes: &[CreatureGenome],
+        pb: &ProgressBar,
+    ) -> Result<Vec<EvalResult>> {
         let results: Vec<EvalResult> = genomes
             .par_iter()
             .map(|genome| {
                 let result = self.evaluate_single(genome.clone());
-
-                let done = counter.fetch_add(1, Ordering::Relaxed) + 1;
-                let elapsed = start_time.elapsed().as_secs_f32();
-                let per_creature = elapsed / done as f32;
-                let remaining = (total - done) as f32 * per_creature;
-                log::info!(
-                    "  Creature {}/{} ({:.2}s ea, ~{:.0}s remaining)",
-                    done,
-                    total,
-                    per_creature,
-                    remaining
-                );
-
+                pb.inc(1);
                 result
             })
             .collect();
-
-        let total_time = start_time.elapsed().as_secs_f32();
-        log::info!("  Population evaluated in {:.1}s", total_time);
 
         Ok(results)
     }
@@ -362,7 +365,7 @@ impl TrainingEnv {
     }
 
     /// Save a checkpoint
-    fn save_checkpoint(&self) -> Result<()> {
+    fn save_checkpoint(&self, pb: &ProgressBar) -> Result<()> {
         let checkpoint_dir = format!("{}/checkpoints", self.config.output_dir);
         std::fs::create_dir_all(&checkpoint_dir)
             .context("Failed to create checkpoint directory")?;
@@ -376,7 +379,10 @@ impl TrainingEnv {
             std::fs::write(&path, data).context("Failed to write genome file")?;
         }
 
-        log::info!("Saved checkpoint at generation {}", self.generation);
+        pb.println(format!(
+            "Saved checkpoint at generation {}",
+            self.generation
+        ));
         Ok(())
     }
 }
