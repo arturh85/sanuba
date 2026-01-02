@@ -80,6 +80,9 @@ pub struct World {
 
     /// Maximum number of chunks to keep loaded in memory
     loaded_chunk_limit: usize,
+
+    /// Demo mode flag - prevents dynamic chunk loading
+    demo_mode: bool,
 }
 
 impl World {
@@ -106,6 +109,7 @@ impl World {
             persistence: None,
             generator: WorldGenerator::new(42), // Default seed
             loaded_chunk_limit: 3000,           // ~19MB max memory
+            demo_mode: false,
         };
 
         // Don't pre-generate - let chunks generate on-demand as player explores
@@ -1573,6 +1577,9 @@ impl World {
 
     /// Initialize persistent world (load or generate)
     pub fn load_persistent_world(&mut self) {
+        // Reset demo mode when returning to persistent world
+        self.demo_mode = false;
+
         // Clear any existing chunks (from test world generation)
         self.clear_all_chunks();
 
@@ -1610,6 +1617,14 @@ impl World {
         log::info!("Loaded persistent world (seed: {})", metadata.seed);
     }
 
+    /// Disable persistence for demo levels
+    /// This prevents dynamic chunk loading from overwriting demo level chunks
+    pub fn disable_persistence(&mut self) {
+        self.persistence = None;
+        self.demo_mode = true;
+        log::info!("Persistence disabled for demo mode");
+    }
+
     /// Load chunks within active radius of player (17x17 = 289 chunks)
     fn load_chunks_around_player(&mut self) {
         let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
@@ -1624,6 +1639,11 @@ impl World {
 
     /// Load nearby chunks dynamically as player moves (called when entering new chunk)
     fn load_nearby_chunks(&mut self) {
+        // Don't auto-load chunks in demo mode - use only chunks the demo level created
+        if self.demo_mode {
+            return;
+        }
+
         let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
         let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
 

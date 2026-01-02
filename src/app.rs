@@ -451,6 +451,9 @@ impl App {
                 self.world.save_all_dirty_chunks();
             }
 
+            // Disable persistence to prevent dynamic chunk loading from overwriting demo level
+            self.world.disable_persistence();
+
             self.game_mode = GameMode::DemoLevel(level_id);
             self.level_manager.load_level(level_id, &mut self.world);
             self.ui_state.level_selector.reset_flags(); // Reset flag after processing
