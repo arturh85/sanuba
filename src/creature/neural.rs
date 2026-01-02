@@ -106,7 +106,7 @@ impl SimpleNeuralController {
     /// Create random controller for testing
     pub fn random(input_dim: usize, hidden_dim: usize, output_dim: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Calculate weight count: input->hidden + hidden->output
         let input_to_hidden = input_dim * hidden_dim;
@@ -115,7 +115,7 @@ impl SimpleNeuralController {
 
         // Initialize with Xavier/Glorot uniform distribution
         let weights: Vec<f32> = (0..total_weights)
-            .map(|_| rng.gen_range(-0.5..0.5))
+            .map(|_| rng.random_range(-0.5..0.5))
             .collect();
 
         Self {

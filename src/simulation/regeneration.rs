@@ -46,7 +46,7 @@ impl RegenerationSystem {
     /// Spawn fruit below plant matter pixels
     fn spawn_fruit_in_chunk(&self, chunk: &mut Chunk) {
         const FRUIT_SPAWN_CHANCE: f32 = 0.05; // 5% chance per plant pixel per check
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Scan all pixels in chunk
         for y in 0..CHUNK_SIZE {
@@ -59,7 +59,7 @@ impl RegenerationSystem {
                 }
 
                 // Roll for fruit spawning
-                if rng.gen::<f32>() > FRUIT_SPAWN_CHANCE {
+                if rng.random::<f32>() > FRUIT_SPAWN_CHANCE {
                     continue;
                 }
 
