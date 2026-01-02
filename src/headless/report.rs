@@ -65,7 +65,12 @@ impl ReportGenerator {
     }
 
     /// Generate the main HTML content
-    fn generate_html(&self, grid: &MapElitesGrid, stats_history: &[TrainingStats], gifs: &[CapturedGif]) -> String {
+    fn generate_html(
+        &self,
+        grid: &MapElitesGrid,
+        stats_history: &[TrainingStats],
+        gifs: &[CapturedGif],
+    ) -> String {
         let stats = grid.stats();
         let fitness_chart = self.generate_fitness_svg(stats_history);
         let grid_svg = self.generate_grid_svg(grid);

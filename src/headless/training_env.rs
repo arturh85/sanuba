@@ -401,7 +401,11 @@ impl TrainingEnv {
         behavior: &[f32],
     ) -> Result<CapturedGif> {
         let size = self.config.gif_size as usize;
-        let mut gif = GifCapture::new(self.config.gif_size, self.config.gif_size, self.config.gif_fps);
+        let mut gif = GifCapture::new(
+            self.config.gif_size,
+            self.config.gif_size,
+            self.config.gif_fps,
+        );
         let mut renderer = PixelRenderer::new(size, size);
         let materials = Materials::new();
 
@@ -410,7 +414,8 @@ impl TrainingEnv {
         let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
         let spawn_pos = self.scenario.config.spawn_position;
-        let creature_id = creature_manager.spawn_creature(genome.clone(), spawn_pos, &mut physics_world);
+        let creature_id =
+            creature_manager.spawn_creature(genome.clone(), spawn_pos, &mut physics_world);
 
         // Simulation with frame capture
         let dt = 1.0 / 60.0;
@@ -434,6 +439,61 @@ impl TrainingEnv {
                     // Center camera on creature
                     let center = creature.position;
                     renderer.render(&world, &materials, center, &creatures);
+
+                    // Draw debug overlays
+                    let half = (size / 2) as i32;
+
+                    // Draw vertical reference lines every 50 pixels for motion visibility
+                    let gray = [100, 100, 100, 200];
+                    for world_x in (-500i32..500).step_by(50) {
+                        let screen_x = half + world_x - center.x as i32;
+                        if screen_x >= 0 && screen_x < size as i32 {
+                            renderer.draw_dashed_vline(screen_x, 3, 5, gray);
+                        }
+                    }
+
+                    // Draw ground level indicator (y=20 is ground in locomotion scenario)
+                    let ground_y = 20.0;
+                    let ground_screen_y = half - (ground_y - center.y) as i32;
+                    if ground_screen_y >= 0 && ground_screen_y < size as i32 {
+                        renderer.draw_dashed_hline(ground_screen_y, 5, 3, [139, 69, 19, 200]);
+                        // Brown
+                    }
+
+                    // Spawn position marker (red dot showing where creature started)
+                    let spawn_screen_x = half + (spawn_pos.x - center.x) as i32;
+                    let spawn_screen_y = half - (spawn_pos.y - center.y) as i32;
+                    if spawn_screen_x >= -10
+                        && spawn_screen_x < size as i32 + 10
+                        && spawn_screen_y >= -10
+                        && spawn_screen_y < size as i32 + 10
+                    {
+                        renderer.draw_filled_circle(
+                            spawn_screen_x,
+                            spawn_screen_y,
+                            4,
+                            [255, 0, 0, 255],
+                        );
+                    }
+
+                    // Velocity arrow (green) from creature center
+                    let vel = creature.velocity;
+                    renderer.draw_arrow(half, half, vel.x, vel.y, 3.0, [0, 255, 0, 255]);
+
+                    // Speed text (white on dark background area - top left)
+                    let speed = vel.length();
+                    let speed_text = format!("SPD:{:.0}", speed);
+                    renderer.draw_text(4, 4, &speed_text, [255, 255, 255, 255]);
+
+                    // Distance from spawn (displacement)
+                    let dist = (creature.position - spawn_pos).length();
+                    let dist_text = format!("DST:{:.0}", dist);
+                    renderer.draw_text(4, 12, &dist_text, [255, 255, 255, 255]);
+
+                    // Current position
+                    let pos_text = format!("X:{:.0}", creature.position.x);
+                    renderer.draw_text(4, 20, &pos_text, [255, 255, 255, 255]);
+
                     gif.capture_frame(&renderer);
                 }
             }

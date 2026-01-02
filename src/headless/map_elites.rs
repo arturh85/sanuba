@@ -284,7 +284,9 @@ impl MapElitesGrid {
         // Strategy 3: Balanced (center region)
         let center_start = mid.saturating_sub(1);
         let center_end = (mid + 1).min(high);
-        if let Some(elite) = self.find_elite_in_region(center_start..=center_end, center_start..=center_end) {
+        if let Some(elite) =
+            self.find_elite_in_region(center_start..=center_end, center_start..=center_end)
+        {
             if !results.iter().any(|r| {
                 (r.elite.behavior[0] - elite.behavior[0]).abs() < 0.01
                     && (r.elite.behavior[1] - elite.behavior[1]).abs() < 0.01
@@ -303,8 +305,7 @@ impl MapElitesGrid {
         for elite in self.cells.values() {
             if elite.fitness > stats.avg_fitness {
                 let dominated = existing_behaviors.iter().any(|b| {
-                    (b[0] - elite.behavior[0]).abs() < 1.0
-                        && (b[1] - elite.behavior[1]).abs() < 1.0
+                    (b[0] - elite.behavior[0]).abs() < 1.0 && (b[1] - elite.behavior[1]).abs() < 1.0
                 });
                 if !dominated {
                     results.push(DiverseElite {
