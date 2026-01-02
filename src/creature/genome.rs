@@ -558,10 +558,10 @@ pub struct MutationConfig {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            weight_mutation_rate: 0.8,
+            weight_mutation_rate: 0.3, // Reduced from 0.8 to preserve good solutions
             weight_mutation_power: 0.5,
-            add_connection_rate: 0.05,
-            add_node_rate: 0.03,
+            add_connection_rate: 0.15, // Increased from 0.05 for more structural exploration
+            add_node_rate: 0.10,       // Increased from 0.03 for more complexity growth
             toggle_connection_rate: 0.01,
         }
     }
@@ -1415,10 +1415,10 @@ mod tests {
     #[test]
     fn test_mutation_config_defaults() {
         let config = MutationConfig::default();
-        assert_eq!(config.weight_mutation_rate, 0.8);
+        assert_eq!(config.weight_mutation_rate, 0.3); // Reduced from 0.8
         assert_eq!(config.weight_mutation_power, 0.5);
-        assert_eq!(config.add_connection_rate, 0.05);
-        assert_eq!(config.add_node_rate, 0.03);
+        assert_eq!(config.add_connection_rate, 0.15); // Increased from 0.05
+        assert_eq!(config.add_node_rate, 0.10); // Increased from 0.03
         assert_eq!(config.toggle_connection_rate, 0.01);
     }
 

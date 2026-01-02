@@ -181,6 +181,166 @@ impl SimpleNeuralController {
     }
 }
 
+/// Deep neural controller with two hidden layers and optional recurrence
+/// Architecture: input -> hidden1 (tanh) -> hidden2 (tanh) -> output (tanh)
+/// Provides more representational capacity for learning complex gaits
+pub struct DeepNeuralController {
+    weights: Vec<f32>,
+    hidden1_dim: usize, // First hidden layer (larger)
+    hidden2_dim: usize, // Second hidden layer (smaller)
+    input_dim: usize,
+    output_dim: usize,
+    /// Previous hidden state for simple recurrence
+    prev_hidden: Option<Vec<f32>>,
+    /// Recurrence blend factor (0.0 = no recurrence, 1.0 = full recurrence)
+    recurrence_factor: f32,
+}
+
+impl DeepNeuralController {
+    /// Create from genome weights with two hidden layers
+    /// Scales architecture based on genome's hidden_dim:
+    /// - hidden_dim=16 (biped) -> 48, 24
+    /// - hidden_dim=24 (quadruped) -> 72, 36
+    pub fn from_genome(genome: &ControllerGenome, input_dim: usize, output_dim: usize) -> Self {
+        // Scale hidden layer sizes from genome's hidden_dim
+        let scale = genome.hidden_dim as f32 / 16.0;
+        let hidden1_dim = (48.0 * scale).round() as usize;
+        let hidden2_dim = (24.0 * scale).round() as usize;
+
+        // Flatten all genome weights
+        let mut weights = Vec::new();
+        weights.extend(&genome.message_weights);
+        weights.extend(&genome.update_weights);
+        weights.extend(&genome.output_weights);
+
+        // Expected weight count for 2-layer network:
+        // input->hidden1 + hidden1->hidden2 + hidden2->output
+        let expected_size =
+            input_dim * hidden1_dim + hidden1_dim * hidden2_dim + hidden2_dim * output_dim;
+
+        weights.resize(expected_size, 0.0);
+
+        Self {
+            weights,
+            hidden1_dim,
+            hidden2_dim,
+            input_dim,
+            output_dim,
+            prev_hidden: None,
+            recurrence_factor: 0.3, // Blend 30% of previous hidden state
+        }
+    }
+
+    /// Create random controller for testing
+    pub fn random(
+        input_dim: usize,
+        hidden1_dim: usize,
+        hidden2_dim: usize,
+        output_dim: usize,
+    ) -> Self {
+        use rand::Rng;
+        let mut rng = rand::rng();
+
+        let total_weights =
+            input_dim * hidden1_dim + hidden1_dim * hidden2_dim + hidden2_dim * output_dim;
+
+        // Xavier/Glorot initialization
+        let weights: Vec<f32> = (0..total_weights)
+            .map(|_| rng.random_range(-0.5..0.5))
+            .collect();
+
+        Self {
+            weights,
+            hidden1_dim,
+            hidden2_dim,
+            input_dim,
+            output_dim,
+            prev_hidden: None,
+            recurrence_factor: 0.3,
+        }
+    }
+
+    /// Get input dimension
+    pub fn input_dim(&self) -> usize {
+        self.input_dim
+    }
+
+    /// Get output dimension
+    pub fn output_dim(&self) -> usize {
+        self.output_dim
+    }
+
+    /// Reset hidden state (call between episodes/evaluations)
+    pub fn reset_hidden(&mut self) {
+        self.prev_hidden = None;
+    }
+
+    /// Forward pass with two hidden layers and optional recurrence
+    /// input -> hidden1 (tanh) -> hidden2 (tanh) -> output (tanh)
+    pub fn forward(&mut self, input: &[f32]) -> Vec<f32> {
+        assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
+
+        let mut offset = 0;
+
+        // Layer 1: input -> hidden1
+        let w1_end = self.input_dim * self.hidden1_dim;
+        let w1 = &self.weights[offset..w1_end];
+        offset = w1_end;
+
+        let mut hidden1 = vec![0.0; self.hidden1_dim];
+        #[allow(clippy::needless_range_loop)]
+        for h in 0..self.hidden1_dim {
+            let mut sum = 0.0;
+            for i in 0..self.input_dim {
+                sum += input[i] * w1[h * self.input_dim + i];
+            }
+            hidden1[h] = sum.tanh();
+        }
+
+        // Layer 2: hidden1 -> hidden2
+        let w2_end = offset + self.hidden1_dim * self.hidden2_dim;
+        let w2 = &self.weights[offset..w2_end];
+        offset = w2_end;
+
+        let mut hidden2 = vec![0.0; self.hidden2_dim];
+        #[allow(clippy::needless_range_loop)]
+        for h in 0..self.hidden2_dim {
+            let mut sum = 0.0;
+            for i in 0..self.hidden1_dim {
+                sum += hidden1[i] * w2[h * self.hidden1_dim + i];
+            }
+            hidden2[h] = sum.tanh();
+        }
+
+        // Simple recurrence: blend with previous hidden state
+        if let Some(ref prev) = self.prev_hidden {
+            let blend = self.recurrence_factor;
+            for h in 0..self.hidden2_dim.min(prev.len()) {
+                hidden2[h] = (1.0 - blend) * hidden2[h] + blend * prev[h];
+            }
+        }
+        self.prev_hidden = Some(hidden2.clone());
+
+        // Layer 3: hidden2 -> output
+        let w3 = &self.weights[offset..];
+        let mut output = vec![0.0; self.output_dim];
+
+        #[allow(clippy::needless_range_loop)]
+        for o in 0..self.output_dim {
+            let mut sum = 0.0;
+            for h in 0..self.hidden2_dim {
+                let idx = o * self.hidden2_dim + h;
+                if idx < w3.len() {
+                    sum += hidden2[h] * w3[idx];
+                }
+            }
+            output[o] = sum.tanh();
+        }
+
+        output
+    }
+}
+
 /// Extract features from physics state
 /// Extracts actual physics data from rapier2d bodies for neural control
 pub fn extract_body_part_features(

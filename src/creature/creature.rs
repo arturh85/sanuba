@@ -10,7 +10,7 @@ use crate::entity::{health::Health, health::Hunger, EntityId};
 use super::behavior::{CreatureAction, CreatureNeeds, GoalPlanner};
 use super::genome::CreatureGenome;
 use super::morphology::{CreatureMorphology, MorphologyPhysics};
-use super::neural::SimpleNeuralController;
+use super::neural::DeepNeuralController;
 use super::sensors::{SensorConfig, SensoryInput};
 
 /// Main creature entity
@@ -31,7 +31,7 @@ pub struct Creature {
     pub planner: Option<GoalPlanner>,
 
     #[serde(skip)] // Rebuilt from genome on load
-    pub brain: Option<SimpleNeuralController>,
+    pub brain: Option<DeepNeuralController>,
 
     pub current_action: Option<CreatureAction>,
     pub action_timer: f32,
@@ -75,7 +75,7 @@ impl Creature {
             * super::neural::BodyPartFeatures::feature_dim(num_raycasts, num_materials);
         let output_dim = morphology.joints.len(); // One motor command per joint
 
-        let brain = SimpleNeuralController::from_genome(&genome.controller, input_dim, output_dim);
+        let brain = DeepNeuralController::from_genome(&genome.controller, input_dim, output_dim);
 
         // Create planner
         let planner = GoalPlanner::new();
@@ -183,7 +183,7 @@ impl Creature {
         }
 
         // Run neural network forward pass
-        if let Some(ref brain) = self.brain {
+        if let Some(ref mut brain) = self.brain {
             // Ensure input dimensions match
             if input_vec.len() == brain.input_dim() {
                 let motor_commands = brain.forward(&input_vec);
@@ -228,7 +228,7 @@ impl Creature {
         let output_dim = self.morphology.joints.len();
 
         let brain =
-            SimpleNeuralController::from_genome(&self.genome.controller, input_dim, output_dim);
+            DeepNeuralController::from_genome(&self.genome.controller, input_dim, output_dim);
 
         self.brain = Some(brain);
         self.planner = Some(GoalPlanner::new());

@@ -12,6 +12,16 @@ use crate::creature::genome::CreatureGenome;
 
 use super::fitness::BehaviorDescriptor;
 
+/// Selection method for parent sampling
+#[derive(Debug, Clone, Copy, Default)]
+pub enum SelectionMethod {
+    /// Uniform random selection (original behavior)
+    Uniform,
+    /// Tournament selection - pick best from k random candidates
+    #[default]
+    Tournament,
+}
+
 /// An elite individual in the MAP-Elites grid
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Elite {
@@ -44,6 +54,10 @@ pub struct MapElitesGrid {
     dim0_range: (f32, f32),
     /// Min/max range for dimension 1
     dim1_range: (f32, f32),
+    /// Selection method for parent sampling
+    selection_method: SelectionMethod,
+    /// Tournament size (how many candidates to compare)
+    tournament_size: usize,
 }
 
 impl MapElitesGrid {
@@ -75,7 +89,19 @@ impl MapElitesGrid {
             dim1_idx,
             dim0_range,
             dim1_range,
+            selection_method: SelectionMethod::Tournament,
+            tournament_size: 3, // Default tournament size
         }
+    }
+
+    /// Set the selection method
+    pub fn set_selection_method(&mut self, method: SelectionMethod) {
+        self.selection_method = method;
+    }
+
+    /// Set the tournament size (only affects Tournament selection)
+    pub fn set_tournament_size(&mut self, size: usize) {
+        self.tournament_size = size.max(2); // Minimum of 2
     }
 
     /// Create default grid using locomotion and foraging efficiency
@@ -178,37 +204,87 @@ impl MapElitesGrid {
         self.cells.values()
     }
 
-    /// Sample a random elite for reproduction
+    /// Sample an elite for reproduction using configured selection method
     pub fn sample_elite(&self) -> Option<&Elite> {
         if self.cells.is_empty() {
             return None;
         }
 
+        match self.selection_method {
+            SelectionMethod::Uniform => self.sample_uniform(),
+            SelectionMethod::Tournament => self.sample_tournament(),
+        }
+    }
+
+    /// Uniform random selection (original behavior)
+    fn sample_uniform(&self) -> Option<&Elite> {
         let mut rng = rand::rng();
         let keys: Vec<_> = self.cells.keys().collect();
         let idx = rng.random_range(0..keys.len());
         self.cells.get(keys[idx])
     }
 
-    /// Sample two different elites for crossover
+    /// Tournament selection - pick best from k random candidates
+    /// This creates selection pressure toward higher fitness elites
+    fn sample_tournament(&self) -> Option<&Elite> {
+        let mut rng = rand::rng();
+        let keys: Vec<_> = self.cells.keys().collect();
+
+        let mut best: Option<&Elite> = None;
+        let mut best_fitness = f32::NEG_INFINITY;
+
+        // Sample tournament_size random candidates
+        let actual_size = self.tournament_size.min(keys.len());
+        for _ in 0..actual_size {
+            let idx = rng.random_range(0..keys.len());
+            if let Some(elite) = self.cells.get(keys[idx]) {
+                if elite.fitness > best_fitness {
+                    best_fitness = elite.fitness;
+                    best = Some(elite);
+                }
+            }
+        }
+
+        best
+    }
+
+    /// Sample two different elites for crossover using configured selection method
     pub fn sample_parents(&self) -> Option<(&Elite, &Elite)> {
         if self.cells.len() < 2 {
             return None;
         }
 
-        let mut rng = rand::rng();
-        let keys: Vec<_> = self.cells.keys().collect();
+        // Sample first parent using selection method
+        let parent1 = self.sample_elite()?;
 
-        let idx1 = rng.random_range(0..keys.len());
-        let mut idx2 = rng.random_range(0..keys.len());
-        while idx2 == idx1 {
-            idx2 = rng.random_range(0..keys.len());
+        // Sample second parent, ensuring it's different
+        // Try a few times with selection method, then fallback to random
+        let mut attempts = 0;
+        loop {
+            if let Some(parent2) = self.sample_elite() {
+                if !std::ptr::eq(parent1, parent2) {
+                    return Some((parent1, parent2));
+                }
+            }
+            attempts += 1;
+            if attempts >= 10 {
+                break;
+            }
         }
 
-        Some((
-            self.cells.get(keys[idx1]).unwrap(),
-            self.cells.get(keys[idx2]).unwrap(),
-        ))
+        // Fallback: uniform random different parent
+        let mut rng = rand::rng();
+        let keys: Vec<_> = self.cells.keys().collect();
+        for _ in 0..keys.len() {
+            let idx = rng.random_range(0..keys.len());
+            if let Some(parent2) = self.cells.get(keys[idx]) {
+                if !std::ptr::eq(parent1, parent2) {
+                    return Some((parent1, parent2));
+                }
+            }
+        }
+
+        None
     }
 
     /// Get statistics about the grid
