@@ -103,6 +103,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Install just
+        uses: extractions/setup-just@v2
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -122,4 +125,4 @@ jobs:
           key: ${{ runner.os }}-wasm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build WASM
-        run: ./build-web.sh
+        run: just build-web
