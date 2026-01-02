@@ -465,29 +465,30 @@ impl Creature {
                 for (i, &angular_vel) in physics.motor_angular_velocities.iter().enumerate() {
                     // Get the body part position relative to center
                     if let Some(motor_idx) = physics.motor_link_indices.get(i)
-                        && let Some(part) = self.morphology.body_parts.get(*motor_idx) {
-                            // Body parts on the left (negative x) contribute differently than right
-                            // This creates asymmetric locomotion like legs
-                            let side = if part.local_position.x < 0.0 {
-                                -1.0
-                            } else {
-                                1.0
-                            };
-                            let height_factor = if part.local_position.y < 0.0 {
-                                1.5 // Lower body parts contribute more (like legs)
-                            } else {
-                                0.5 // Upper parts contribute less
-                            };
+                        && let Some(part) = self.morphology.body_parts.get(*motor_idx)
+                    {
+                        // Body parts on the left (negative x) contribute differently than right
+                        // This creates asymmetric locomotion like legs
+                        let side = if part.local_position.x < 0.0 {
+                            -1.0
+                        } else {
+                            1.0
+                        };
+                        let height_factor = if part.local_position.y < 0.0 {
+                            1.5 // Lower body parts contribute more (like legs)
+                        } else {
+                            0.5 // Upper parts contribute less
+                        };
 
-                            // Motor activity creates thrust
-                            // Opposing sides with opposite rotations = forward motion
-                            thrust_x += angular_vel * side * height_factor * 5.0;
+                        // Motor activity creates thrust
+                        // Opposing sides with opposite rotations = forward motion
+                        thrust_x += angular_vel * side * height_factor * 5.0;
 
-                            // Vertical thrust (for jumping attempts)
-                            if self.grounded && angular_vel.abs() > 2.0 {
-                                thrust_y += angular_vel.abs() * height_factor * 0.5;
-                            }
+                        // Vertical thrust (for jumping attempts)
+                        if self.grounded && angular_vel.abs() > 2.0 {
+                            thrust_y += angular_vel.abs() * height_factor * 0.5;
                         }
+                    }
                 }
 
                 // Normalize by motor count for consistent behavior

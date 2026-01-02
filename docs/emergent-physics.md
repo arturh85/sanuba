@@ -39,7 +39,7 @@ timeline
     2008 : Powder Game (Dan-Ball)
     2009 : The Powder Toy
     2019 : Noita
-    2024 : Sunaba
+    2026 : Sunaba
 ```
 
 ### Why Falling Sand Works
