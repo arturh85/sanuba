@@ -240,7 +240,8 @@ crates/
 
 ```
 # Movement
-WASD           : Move player
+A/D            : Move left/right
+W              : Fly/Levitate (Noita-style)
 Space          : Jump
 
 # Camera

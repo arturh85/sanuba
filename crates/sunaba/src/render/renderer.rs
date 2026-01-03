@@ -6,6 +6,7 @@ use std::iter;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
+use crate::render::particles::ParticleSystem;
 use crate::render::sprite::PlayerSprite;
 use crate::world::{CHUNK_SIZE, Chunk, World};
 
@@ -281,9 +282,12 @@ impl Renderer {
         });
 
         // Camera uniform
+        // Zoom adjusted for Noita-like proportions: 640x360 visible area
+        // Formula: visible_height = 2 / zoom, so zoom = 2 / 360 ≈ 0.0055
+        // With 12px player height, player takes ~3.3% of screen (close to Noita's ~4%)
         let camera = CameraUniform {
             position: [0.0, 0.0],
-            zoom: 0.015, // Lower = zoomed out more (world_width = 2 * aspect / zoom)
+            zoom: 0.0055, // Shows ~640x360 pixels (was 0.015 showing ~237x133)
             aspect: size.width as f32 / size.height as f32,
         };
 
@@ -655,6 +659,7 @@ impl Renderer {
     pub fn render(
         &mut self,
         world: &mut World,
+        particles: &ParticleSystem,
         egui_ctx: &egui::Context,
         textures_delta: egui::TexturesDelta,
         shapes: Vec<egui::epaint::ClippedShape>,
@@ -677,7 +682,7 @@ impl Renderer {
 
         // Time: Update pixel buffer from world chunks
         let t0 = Instant::now();
-        self.update_pixel_buffer(world);
+        self.update_pixel_buffer(world, particles);
         timing.pixel_buffer_ms = t0.elapsed().as_secs_f32() * 1000.0;
 
         // Time: Upload to GPU
@@ -823,7 +828,7 @@ impl Renderer {
         Ok(timing)
     }
 
-    fn update_pixel_buffer(&mut self, world: &mut World) {
+    fn update_pixel_buffer(&mut self, world: &mut World, particles: &ParticleSystem) {
         // If texture origin changed, need to fully rebuffer
         if self.needs_full_rebuffer {
             // Clear entire buffer to background
@@ -907,6 +912,46 @@ impl Renderer {
         let creature_data = world.get_creature_render_data();
         for creature in &creature_data {
             self.render_creature_to_buffer(creature);
+        }
+
+        // Render visual particles (flight exhaust, effects, etc.)
+        for particle in particles.iter() {
+            let alpha = particle.alpha();
+            if alpha > 0 {
+                // Convert world coords to texture coords
+                let tex_x = particle.position.x as i32 - self.texture_origin.x as i32;
+                let tex_y = particle.position.y as i32 - self.texture_origin.y as i32;
+
+                // Bounds check
+                if tex_x >= 0
+                    && tex_x < Self::WORLD_TEXTURE_SIZE as i32
+                    && tex_y >= 0
+                    && tex_y < Self::WORLD_TEXTURE_SIZE as i32
+                {
+                    let idx =
+                        ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
+                    if idx + 3 < self.pixel_buffer.len() {
+                        // Simple alpha blend with background
+                        let bg_r = self.pixel_buffer[idx] as u32;
+                        let bg_g = self.pixel_buffer[idx + 1] as u32;
+                        let bg_b = self.pixel_buffer[idx + 2] as u32;
+
+                        let fg_r = particle.color[0] as u32;
+                        let fg_g = particle.color[1] as u32;
+                        let fg_b = particle.color[2] as u32;
+                        let a = alpha as u32;
+
+                        // Alpha blend: result = fg * a + bg * (255 - a)
+                        self.pixel_buffer[idx] =
+                            ((fg_r * a + bg_r * (255 - a)) / 255).min(255) as u8;
+                        self.pixel_buffer[idx + 1] =
+                            ((fg_g * a + bg_g * (255 - a)) / 255).min(255) as u8;
+                        self.pixel_buffer[idx + 2] =
+                            ((fg_b * a + bg_b * (255 - a)) / 255).min(255) as u8;
+                        self.pixel_buffer[idx + 3] = 255;
+                    }
+                }
+            }
         }
 
         // Draw player sprite
@@ -1213,31 +1258,43 @@ impl Renderer {
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
                 let pixel = chunk.get_pixel(x, y);
-                if pixel.material_id == 0 {
-                    continue; // Skip air
-                }
-
-                let color = world.materials.get_color(pixel.material_id);
 
                 let tex_x = tex_origin_x + x as i32;
                 let tex_y = tex_origin_y + y as i32;
 
                 // Bounds check
-                if tex_x >= 0
-                    && tex_x < Self::WORLD_TEXTURE_SIZE as i32
-                    && tex_y >= 0
-                    && tex_y < Self::WORLD_TEXTURE_SIZE as i32
+                if tex_x < 0
+                    || tex_x >= Self::WORLD_TEXTURE_SIZE as i32
+                    || tex_y < 0
+                    || tex_y >= Self::WORLD_TEXTURE_SIZE as i32
                 {
-                    // Don't flip here - shader handles Y-flip
-                    let idx =
-                        ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
-
-                    self.pixel_buffer[idx] = color[0];
-                    self.pixel_buffer[idx + 1] = color[1];
-                    self.pixel_buffer[idx + 2] = color[2];
-                    self.pixel_buffer[idx + 3] = color[3];
-                    pixels_written += 1;
+                    continue;
                 }
+
+                // Don't flip here - shader handles Y-flip
+                let idx = ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
+
+                if pixel.material_id == 0 {
+                    // Foreground is air - check for background layer
+                    let bg_material = chunk.get_background(x, y);
+                    if bg_material != 0 {
+                        // Render background material with darkened color (40% brightness)
+                        let color = world.materials.get_color(bg_material);
+                        self.pixel_buffer[idx] = (color[0] as u32 * 40 / 100) as u8;
+                        self.pixel_buffer[idx + 1] = (color[1] as u32 * 40 / 100) as u8;
+                        self.pixel_buffer[idx + 2] = (color[2] as u32 * 40 / 100) as u8;
+                        self.pixel_buffer[idx + 3] = color[3];
+                        pixels_written += 1;
+                    }
+                    continue;
+                }
+
+                let color = world.materials.get_color(pixel.material_id);
+                self.pixel_buffer[idx] = color[0];
+                self.pixel_buffer[idx + 1] = color[1];
+                self.pixel_buffer[idx + 2] = color[2];
+                self.pixel_buffer[idx + 3] = color[3];
+                pixels_written += 1;
             }
         }
 

@@ -31,7 +31,7 @@ Create new experiments or suggest experiments based on current progress.
 1. Parse the goal (often from PLAN.md or user request)
 2. Determine research area and appropriate template
 3. Generate descriptive experiment name
-4. Create `experiments/YYYY-MM-DD-<name>.md`
+4. Create `experiments/YYYY-MM-DD-<name>.md` (not inside .claude/skills, at the top level!)
 5. Add entry to `experiments/PROGRESS.md`
 
 **What I'll do (suggest mode - no arguments):**

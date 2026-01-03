@@ -1,44 +1,27 @@
-# Experiment Progress Tracker
+# Research Progress
 
-## Active Experiments
+## Experiments
 
-| Date       | Name                    | Status      | Focus                              |
-|------------|-------------------------|-------------|-------------------------------------|
-| 2026-01-03 | Food Collection Research| Proposed    | Get creatures to eat food & mine walls |
+| Date | Experiment | Area | Status | Result |
+|------|------------|------|--------|--------|
+| 2026-01-03 | [Food Collection Research](2026-01-03-food-collection-research.md) | Creature/Neural | In Progress | Investigating food collection behavior |
+| 2026-01-03 | [World Scale Investigation](2026-01-03-world-scale-investigation.md) | World/Rendering | Implemented | 640x360, 12px player, larger caves |
 
-## Completed Experiments
+## Key Discoveries
 
-| Date       | Name                     | Best Fitness | Key Finding                                                         |
-|------------|--------------------------|--------------|---------------------------------------------------------------------|
-| 2026-01-03 | Morphology Investigation | N/A          | Bodies have left-upper bias; old fitness rewards any movement       |
-| 2026-01-03 | Directional Fitness      | 195.5        | **SUCCESS!** Creature now moves RIGHT toward food (was moving left) |
+### 2026-01-03: World Scale (Implemented)
+- **Original:** ~240x135 visible, player 16px = 11.9% of screen height
+- **Noita reference:** 480x270 visible, player ~10-12px = ~4% of screen height
+- **New settings:**
+  - Player height: 16px → 12px
+  - Default zoom: 0.015 → 0.0055 (shows ~640x360 pixels)
+  - Cave noise frequency: halved for larger caverns
+  - Cave thresholds: lowered for more open spaces
+  - **Background layer added** - Shows darkened rock behind caves (40% brightness)
+- **Result:** Player now takes ~3.3% of screen (close to Noita's 4%), caves have visible depth
 
-## Planned Experiments
+## Next Research Priorities
 
-### Phase 7a: Locomotion Research
-- [x] Baseline locomotion training (champion moves 2400px LEFT)
-- [x] Morphology investigation (found left-bias in body generation)
-- [x] **Directional fitness** - reward movement toward food ✓
-- [x] Training run with directional fitness ✓ (moves 196px RIGHT now!)
-- [ ] **Food collection integration** - auto-eating on contact
-- [ ] **GIF visualization upgrade** - 128x128 → 512x512
-- [ ] **Mining behavior** - auto-mine when blocked near food
-- [ ] Angular velocity tuning (1.5, 2.0, 3.0, 5.0, 8.0 rad/s)
-- [ ] Velocity damping tests (0.7, 0.8, 0.9, 0.95)
-
-## Iteration Chains
-
-Track experiment progressions here:
-
-| Chain | Experiments | Current Best |
-|-------|-------------|--------------|
-| -     | -           | -            |
-
-## Suggested Queue
-
-Experiments proposed by `/research suggest`:
-
-| Priority | Name | Rationale | Status |
-|----------|------|-----------|--------|
-| -        | -    | -         | -      |
-
+1. **Mining system changes** - 4x4 mining patches for Terraria feel
+2. **Food collection creature behavior** - Continue neural/behavior research
+3. **Background interactions** - Moss growing from background to foreground

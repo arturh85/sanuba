@@ -27,7 +27,7 @@ pub struct Player {
 
 impl Player {
     pub const WIDTH: f32 = 8.0; // pixels
-    pub const HEIGHT: f32 = 16.0; // pixels
+    pub const HEIGHT: f32 = 12.0; // pixels (reduced from 16 for Noita-like proportions)
 
     // Physics constants
     pub const GRAVITY: f32 = 800.0; // px/s² (downward)
@@ -35,6 +35,7 @@ impl Player {
     pub const MAX_FALL_SPEED: f32 = 500.0; // Terminal velocity
     pub const COYOTE_TIME: f32 = 0.1; // Jump grace period (seconds)
     pub const JUMP_BUFFER: f32 = 0.1; // Jump input buffer (seconds)
+    pub const FLIGHT_THRUST: f32 = 1200.0; // px/s² (upward, Noita-style levitation)
 
     /// Create a new player at the specified position
     pub fn new(position: Vec2) -> Self {

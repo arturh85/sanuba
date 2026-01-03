@@ -5,10 +5,10 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 export RUST_LOG := "info"
 
 start:
-    cargo run -p sunaba --release -- --regenerate
+    cargo run -p sunaba --bin sunaba --release -- --regenerate
 
 load:
-    cargo run -p sunaba --release
+    cargo run -p sunaba --bin sunaba --release
 
 test: fmt clippy
     cargo test --workspace --quiet
@@ -51,14 +51,14 @@ web: build-web
 # Evolution training commands (RUST_LOG=warn for clean progress bar output)
 train scenario="parcour" generations="100" population="50":
     rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
+    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
 
 # Quick training with simple morphology (fewer body parts, viability filter, movement-focused fitness)
 train-quick generations="100":
     rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --scenario simple --simple --generations {{generations}} --population 50
+    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario simple --simple --generations {{generations}} --population 50
 
 # Full training with default complex morphology
 train-full:
     rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --features headless --release -- --train --generations 500 --population 100
+    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --generations 500 --population 100

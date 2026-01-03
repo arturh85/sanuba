@@ -451,7 +451,7 @@ impl World {
         }
         // Note: No friction in air - preserve momentum for better jump control
 
-        // 5. Vertical movement (gravity + jump)
+        // 5. Vertical movement (gravity + jump + flight)
         if self.player.jump_buffer > 0.0 && self.player.coyote_time > 0.0 {
             // Jump!
             self.player.velocity.y = Player::JUMP_VELOCITY;
@@ -459,9 +459,18 @@ impl World {
             self.player.coyote_time = 0.0;
             log::debug!("Player jumped!");
         } else if !self.player.grounded {
+            // Apply flight thrust if W pressed (Noita-style levitation)
+            if input.w_pressed {
+                self.player.velocity.y += Player::FLIGHT_THRUST * dt;
+            }
             // Apply gravity when airborne
             self.player.velocity.y -= Player::GRAVITY * dt;
-            self.player.velocity.y = self.player.velocity.y.max(-Player::MAX_FALL_SPEED);
+            // Clamp to terminal velocity (both up and down)
+            self.player.velocity.y = self
+                .player
+                .velocity
+                .y
+                .clamp(-Player::MAX_FALL_SPEED, Player::MAX_FALL_SPEED);
         } else {
             // Grounded and not jumping - reset vertical velocity
             self.player.velocity.y = 0.0;

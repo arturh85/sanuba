@@ -65,17 +65,19 @@ impl WorldGenerator {
             .set_lacunarity(2.0)
             .set_persistence(0.5);
 
-        // Large cave systems (big caverns)
+        // Large cave systems (big caverns) - reduced frequency for Noita-like scale
+        // Target: 60-80px tall caverns (5-6x player height of 12px)
         let cave_noise_large = Fbm::<Perlin>::new((seed + 3) as u32)
             .set_octaves(3)
-            .set_frequency(0.01) // ~100 pixel wavelength
+            .set_frequency(0.005) // ~200 pixel wavelength (was 0.01)
             .set_lacunarity(2.0)
             .set_persistence(0.5);
 
-        // Small cave tunnels
+        // Small cave tunnels - reduced frequency for wider passages
+        // Target: 36-48px wide tunnels (3-4x player height)
         let cave_noise_small = Fbm::<Perlin>::new((seed + 4) as u32)
             .set_octaves(4)
-            .set_frequency(0.02) // ~50 pixel wavelength
+            .set_frequency(0.008) // ~125 pixel wavelength (was 0.02)
             .set_lacunarity(2.0)
             .set_persistence(0.5);
 
@@ -117,12 +119,51 @@ impl WorldGenerator {
 
                 let material = self.get_material_at(world_x, world_y);
                 chunk.set_material(local_x, local_y, material);
+
+                // Generate background layer - shows rock behind caves
+                let background = self.get_background_at(world_x, world_y, material);
+                chunk.set_background(local_x, local_y, background);
             }
         }
 
         // Fresh chunks start as not dirty
         chunk.dirty = false;
         chunk
+    }
+
+    /// Determine background material at a world coordinate
+    /// Background is decorative (no physics) - shows cave walls behind open spaces
+    fn get_background_at(&self, world_x: i32, world_y: i32, foreground: u16) -> u16 {
+        // Above ground: no background (sky)
+        let terrain_height_value = self.terrain_height_noise.get([world_x as f64, 0.0]);
+        let height_variation = (terrain_height_value * 100.0) as i32;
+        let terrain_y = SURFACE_Y + height_variation;
+
+        if world_y > terrain_y - 5 {
+            return MaterialId::AIR; // No background above/near surface
+        }
+
+        // Underground: if foreground is air (cave), show stone background
+        if foreground == MaterialId::AIR {
+            // Use offset noise to create variation in background
+            let bg_noise = self.cave_noise_large.get([
+                world_x as f64 + 1000.0, // Offset to get different pattern
+                world_y as f64 + 1000.0,
+            ]);
+
+            // Vary the background material for visual interest
+            if bg_noise > 0.3 {
+                return MaterialId::STONE;
+            } else if bg_noise > 0.0 {
+                // Darker stone variant (use dirt as placeholder for now)
+                return MaterialId::DIRT;
+            } else {
+                return MaterialId::STONE;
+            }
+        }
+
+        // Solid foreground: no visible background
+        MaterialId::AIR
     }
 
     /// Determine material at a world coordinate using biome-based generation
@@ -185,13 +226,15 @@ impl WorldGenerator {
         }
 
         // Step 5: Underground caves (apply biome cave density multiplier)
+        // Thresholds lowered to create larger, more open caves like Noita
         if world_y < terrain_y - 10 {
             let cave_large = self.cave_noise_large.get([world_x as f64, world_y as f64]);
             let cave_small = self.cave_noise_small.get([world_x as f64, world_y as f64]);
 
-            // Apply biome cave density
-            let cave_threshold_large = 0.3 / biome.cave_density_multiplier as f64;
-            let cave_threshold_small = 0.4 / biome.cave_density_multiplier as f64;
+            // Apply biome cave density - lower thresholds = more cave space
+            // Original: 0.3/0.4, now 0.15/0.25 for larger openings
+            let cave_threshold_large = 0.15 / biome.cave_density_multiplier as f64;
+            let cave_threshold_small = 0.25 / biome.cave_density_multiplier as f64;
 
             if cave_large > cave_threshold_large || cave_small > cave_threshold_small {
                 return MaterialId::AIR;

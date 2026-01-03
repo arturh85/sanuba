@@ -13,7 +13,7 @@ use winit::{
 
 use crate::entity::InputState;
 use crate::levels::LevelManager;
-use crate::render::Renderer;
+use crate::render::{ParticleSystem, Renderer};
 use crate::ui::UiState;
 use crate::world::World;
 
@@ -24,28 +24,10 @@ pub enum GameMode {
     DemoLevel(usize),
 }
 
-// Zoom constants
+// Zoom constants - adjusted for Noita-like scale
 const ZOOM_SPEED: f32 = 1.1; // Multiplicative zoom factor per keypress
-const MIN_ZOOM: f32 = 0.001; // Max zoom out (see more of the world)
-const MAX_ZOOM: f32 = 0.5; // Max zoom in (closer view)
-
-/// Print controls to console
-fn print_controls() {
-    println!("=== Sunaba Controls ===");
-    println!("Movement: WASD");
-    println!("Jump: Space");
-    println!("Zoom: +/- or Mouse Wheel");
-    println!("Materials: 1-9 (Stone, Sand, Water, Wood, Fire, Smoke, Steam, Lava, Oil)");
-    println!("Spawn: Left Click");
-    println!("Spawn Creature: G");
-    println!("Toggle Temperature Overlay: T");
-    println!("Toggle Stats: F1");
-    println!("Toggle Active Chunks: F2");
-    println!("Toggle Help: H");
-    println!("Level Selector: L");
-    println!("Manual Save: F5");
-    println!("======================");
-}
+const MIN_ZOOM: f32 = 0.002; // Max zoom out (~1000px visible, was 0.001)
+const MAX_ZOOM: f32 = 0.01; // Max zoom in (~40px visible, was 0.5)
 
 /// Convert screen coordinates to world coordinates
 fn screen_to_world(
@@ -115,6 +97,7 @@ pub struct App {
     level_manager: LevelManager,
     game_mode: GameMode,
     last_autosave: Instant,
+    particle_system: ParticleSystem,
 }
 
 impl App {
@@ -178,8 +161,6 @@ impl App {
             None, // max_texture_side
         );
 
-        // Print controls to console
-        print_controls();
         log::info!("Loaded persistent world");
 
         let app = Self {
@@ -193,6 +174,7 @@ impl App {
             level_manager,
             game_mode,
             last_autosave: Instant::now(),
+            particle_system: ParticleSystem::new(),
         };
 
         Ok((app, event_loop))
@@ -300,6 +282,17 @@ impl App {
         // Update player from input
         self.world.update_player(&self.input_state, 1.0 / 60.0);
 
+        // Spawn flight particles when flying (W pressed while airborne)
+        if self.input_state.w_pressed && !self.world.player.grounded {
+            self.particle_system.spawn_flight_burst(
+                self.world.player.position,
+                crate::entity::player::Player::HEIGHT,
+            );
+        }
+
+        // Update visual particles
+        self.particle_system.update(1.0 / 60.0);
+
         // Update camera zoom
         self.renderer
             .update_zoom(self.input_state.zoom_delta, MIN_ZOOM, MAX_ZOOM);
@@ -325,7 +318,7 @@ impl App {
             let player_pos = self.world.player.position;
             let center_x = player_pos.x as i32;
             let center_y = player_pos.y as i32;
-            self.world.debug_mine_circle(center_x, center_y, 13);
+            self.world.debug_mine_circle(center_x, center_y, 16);
         }
 
         // Placing material from inventory with left mouse button
@@ -499,6 +492,7 @@ impl App {
         // Render world + UI
         match self.renderer.render(
             &mut self.world,
+            &self.particle_system,
             &self.egui_ctx,
             full_output.textures_delta,
             full_output.shapes,

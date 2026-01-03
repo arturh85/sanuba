@@ -12,10 +12,15 @@ pub struct Chunk {
     pub x: i32,
     pub y: i32,
 
-    /// Pixel data, row-major order
+    /// Pixel data, row-major order (foreground - simulated)
     /// Index = y * CHUNK_SIZE + x
     #[serde(with = "serde_big_array::BigArray")]
     pixels: [Pixel; CHUNK_AREA],
+
+    /// Background pixel data (decorative, not simulated)
+    /// Shows cave walls behind open spaces, rendered darker
+    #[serde(with = "serde_big_array::BigArray")]
+    background: [u16; CHUNK_AREA],
 
     /// Temperature field (8x8 coarse grid)
     #[serde(with = "serde_big_array::BigArray")]
@@ -80,6 +85,7 @@ impl Chunk {
             x,
             y,
             pixels: [Pixel::AIR; CHUNK_AREA],
+            background: [0; CHUNK_AREA],   // 0 = no background (air)
             temperature: [20.0; 64],       // Room temperature (Celsius)
             pressure: [1.0; 64],           // Atmospheric pressure
             light_levels: [0; CHUNK_AREA], // Start dark, will be calculated
@@ -190,6 +196,25 @@ impl Chunk {
     /// Get raw pixel slice for rendering
     pub fn pixels(&self) -> &[Pixel] {
         &self.pixels
+    }
+
+    /// Get background material at local coordinates
+    #[inline]
+    pub fn get_background(&self, x: usize, y: usize) -> u16 {
+        debug_assert!(x < CHUNK_SIZE && y < CHUNK_SIZE);
+        self.background[y * CHUNK_SIZE + x]
+    }
+
+    /// Set background material at local coordinates
+    #[inline]
+    pub fn set_background(&mut self, x: usize, y: usize, material_id: u16) {
+        debug_assert!(x < CHUNK_SIZE && y < CHUNK_SIZE);
+        self.background[y * CHUNK_SIZE + x] = material_id;
+    }
+
+    /// Get raw background slice for rendering
+    pub fn background(&self) -> &[u16] {
+        &self.background
     }
 
     /// Get temperature at coarse grid position
