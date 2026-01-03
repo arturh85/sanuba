@@ -28,6 +28,9 @@ pub struct GameConfig {
 
     #[serde(default)]
     pub debug: DebugConfig,
+
+    #[serde(default)]
+    pub rendering: RenderingConfig,
 }
 
 /// Camera/zoom settings
@@ -135,6 +138,27 @@ impl Default for DebugConfig {
     }
 }
 
+/// Rendering/post-processing settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenderingConfig {
+    /// Scanline effect intensity (0.0 = off, 0.5 = strong)
+    pub scanline_intensity: f32,
+    /// Vignette darkening intensity (0.0 = off, 0.5 = strong)
+    pub vignette_intensity: f32,
+    /// Bloom/glow intensity (0.0 = off, 1.0 = strong)
+    pub bloom_intensity: f32,
+}
+
+impl Default for RenderingConfig {
+    fn default() -> Self {
+        Self {
+            scanline_intensity: 0.15,
+            vignette_intensity: 0.25,
+            bloom_intensity: 0.3,
+        }
+    }
+}
+
 impl GameConfig {
     /// Load configuration with layered priority:
     /// 1. Compiled defaults (lowest priority)
@@ -158,6 +182,9 @@ impl GameConfig {
             .set_default("ui.show_stats_on_start", false)?
             .set_default("debug.debug_placement", true)?
             .set_default("debug.verbose_logging", false)?
+            .set_default("rendering.scanline_intensity", 0.15)?
+            .set_default("rendering.vignette_intensity", 0.25)?
+            .set_default("rendering.bloom_intensity", 0.3)?
             // Layer 2: Config file (optional, won't error if missing)
             .add_source(
                 File::with_name("config")

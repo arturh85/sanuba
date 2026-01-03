@@ -92,13 +92,19 @@ impl ControlsHelpState {
                 ui.add_space(8.0);
                 ui.heading("UI");
                 ui.label("T - Toggle temperature overlay");
+                ui.label("V - Toggle light overlay");
                 ui.label("F1 - Toggle stats");
                 ui.label("F2 - Toggle active chunks");
+                ui.label("F4 - Toggle parameters (native)");
+                ui.label("F6 - Toggle log (native)");
+                ui.label("F7 - Toggle dock mode");
                 ui.label("H - Toggle this help");
 
                 ui.add_space(8.0);
                 ui.heading("World");
                 ui.label("L - Level selector");
+                ui.label("I - Inventory");
+                ui.label("C - Crafting");
                 ui.label("F5 - Save world");
 
                 ui.add_space(8.0);
@@ -187,13 +193,19 @@ impl ControlsHelpState {
                 ui.add_space(8.0);
                 ui.heading("UI");
                 ui.label("T - Toggle temperature overlay");
+                ui.label("V - Toggle light overlay");
                 ui.label("F1 - Toggle stats");
                 ui.label("F2 - Toggle active chunks");
+                ui.label("F4 - Toggle parameters (native)");
+                ui.label("F6 - Toggle log (native)");
+                ui.label("F7 - Toggle dock mode");
                 ui.label("H - Toggle this help");
 
                 ui.add_space(8.0);
                 ui.heading("World");
                 ui.label("L - Level selector");
+                ui.label("I - Inventory");
+                ui.label("C - Crafting");
                 ui.label("F5 - Save world");
 
                 ui.add_space(8.0);

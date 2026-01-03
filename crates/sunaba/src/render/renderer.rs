@@ -1781,6 +1781,28 @@ impl Renderer {
         self.show_active_chunks
     }
 
+    /// Set post-processing parameters
+    pub fn set_post_process_params(
+        &mut self,
+        scanline_intensity: f32,
+        vignette_intensity: f32,
+        bloom_intensity: f32,
+    ) {
+        self.post_process.scanline_intensity = scanline_intensity;
+        self.post_process.vignette_intensity = vignette_intensity;
+        self.post_process.bloom_intensity = bloom_intensity;
+        // GPU buffer will be updated in the next render frame
+    }
+
+    /// Get current post-processing parameters
+    pub fn get_post_process_params(&self) -> (f32, f32, f32) {
+        (
+            self.post_process.scanline_intensity,
+            self.post_process.vignette_intensity,
+            self.post_process.bloom_intensity,
+        )
+    }
+
     /// Update light overlay texture with data from world
     pub fn update_light_overlay(&mut self, world: &World) {
         const LIGHT_TEXTURE_SIZE: u32 = 40;

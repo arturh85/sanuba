@@ -13,7 +13,7 @@ path = "src/main.rs"
 required-features = ["native"]
 
 [features]
-default = ["native"]
+default = ["native", "profiling"]
 native = []
 headless = []
 profiling = ["puffin", "puffin_egui", "sunaba-core/profiling"]
@@ -29,6 +29,8 @@ bytemuck = { version = "1.14", features = ["derive"] }
 # UI
 egui = "0.33"
 egui-wgpu = "0.33"
+egui_dock = "0.18"
+egui-notify = "0.21"
 
 # Physics (needed for rapier types in app)
 rapier2d = "0.18"
@@ -62,6 +64,7 @@ config = { version = "0.15", default-features = false, features = ["ron"] }
 rayon = "1.8"
 chrono = "0.4"
 egui-winit = { version = "0.33", features = ["clipboard"] }
+egui_logger = "0.9"
 gif = "0.13"
 indicatif = "0.17"
 puffin = { git = "https://github.com/blip-radar/puffin.git", branch = "egui-0.33", optional = true }

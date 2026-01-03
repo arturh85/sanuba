@@ -34,13 +34,13 @@ This migration removes the rapier2d physics engine dependency and adds Spacetime
 
 ### What Changes
 
-| Component | Before | After |
-|-----------|--------|-------|
-| Debris physics | rapier2d rigid bodies | Simple kinematic falling chunks |
-| Creature physics | rapier2d kinematic | Direct position/angle math |
-| Training | Native binary | Native binary (unchanged) |
-| Local play | Native binary | Native binary (unchanged) |
-| Multiplayer | N/A | SpacetimeDB server using shared code |
+| Component        | Before                | After                                |
+|------------------|-----------------------|--------------------------------------|
+| Debris physics   | rapier2d rigid bodies | Simple kinematic falling chunks      |
+| Creature physics | rapier2d kinematic    | Direct position/angle math           |
+| Training         | Native binary         | Native binary (unchanged)            |
+| Local play       | Native binary         | Native binary (unchanged)            |
+| Multiplayer      | N/A                   | SpacetimeDB server using shared code |
 
 ### What Stays the Same
 
@@ -1242,6 +1242,39 @@ just train parcour 10 20
 just spacetime-build
 # - [ ] Compiles to WASM without errors
 ```
+
+---
+
+## Bonus Phase 8: Improve Chunk Simulation coverage / performance by following the noita approach
+
+Make sure we are using the same CA update order as Noita to ensure fair updates across all pixels and chunks, especially when simulating many chunks far from players.
+Use the following update order to ensure all pixels are updated fairly and efficiently:
+
+### CA Update Order (Noita-style)
+```
+For each frame:
+  Checkerboard pattern (4 passes) for parallel chunk updates
+
+Within each chunk (bottom to top):
+  For y from 0 to 63:
+    For x (alternating direction each row):
+      Update pixel based on material type
+      Check reactions with neighbors
+```
+
+Hopefully using this we can simulate more chunks and have creatures living which are not close to a player.
+
+---
+
+## Phase 9: Update Documentation
+
+Update README.md and other docs to reflect the new architecture:
+
+- Update architecture diagrams to show SpacetimeDB server module
+- Document the new simple physics model for creatures
+- Add instructions for setting up and running the SpacetimeDB server
+
+Update CLAUDE.md to guide claude code generation for future features.
 
 ---
 

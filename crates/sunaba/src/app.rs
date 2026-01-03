@@ -207,6 +207,12 @@ impl App {
 
         log::info!("Loaded persistent world");
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let ui_state = UiState::new(&config);
+
+        #[cfg(target_arch = "wasm32")]
+        let ui_state = UiState::default();
+
         let app = Self {
             window,
             renderer,
@@ -214,7 +220,7 @@ impl App {
             input_state: InputState::default(),
             egui_ctx,
             egui_state,
-            ui_state: UiState::new(),
+            ui_state,
             level_manager,
             game_mode,
             last_autosave: Instant::now(),
@@ -357,6 +363,18 @@ impl App {
                 }
             }
             // materials.ron hot reload would go here when implemented
+
+            // Check for params changes (from dock parameters panel) and apply to game systems
+            if self.ui_state.take_params_changed() {
+                // Apply rendering params
+                self.renderer.set_post_process_params(
+                    self.config.rendering.scanline_intensity,
+                    self.config.rendering.vignette_intensity,
+                    self.config.rendering.bloom_intensity,
+                );
+
+                log::debug!("Applied params changes from dock");
+            }
         }
 
         // Periodic auto-save in persistent world mode
@@ -500,6 +518,7 @@ impl App {
             };
             let in_persistent_world = matches!(self.game_mode, GameMode::PersistentWorld);
 
+            #[cfg(not(target_arch = "wasm32"))]
             self.ui_state.render(
                 ctx,
                 cursor_pos,
@@ -510,46 +529,23 @@ impl App {
                 &self.level_manager,
                 &self.world.player,
                 self.world.tool_registry(),
+                &self.world.recipe_registry,
+                &mut self.config,
             );
 
-            // Render crafting UI and handle crafting output
-            if let Some(output) = self.ui_state.crafting_ui.render(
+            #[cfg(target_arch = "wasm32")]
+            self.ui_state.render(
                 ctx,
-                &mut self.world.player.inventory,
+                cursor_pos,
+                self.input_state.selected_material,
+                self.world.materials(),
+                &game_mode_desc,
+                in_persistent_world,
+                &self.level_manager,
+                &self.world.player,
+                self.world.tool_registry(),
                 &self.world.recipe_registry,
-                &self.world.materials,
-            ) {
-                // Handle crafted output
-                use crate::entity::crafting::RecipeOutput;
-                match output {
-                    RecipeOutput::Material { id, count } => {
-                        let added = self.world.player.inventory.add_item(id, count);
-                        if added == count {
-                            log::info!(
-                                "[CRAFTING] Added {} x{} to inventory",
-                                self.world.materials.get(id).name,
-                                count
-                            );
-                        } else {
-                            log::warn!(
-                                "[CRAFTING] Inventory full, only added {} of {} items",
-                                added,
-                                count
-                            );
-                        }
-                    }
-                    RecipeOutput::Tool {
-                        tool_id,
-                        durability,
-                    } => {
-                        if self.world.player.inventory.add_tool(tool_id, durability) {
-                            log::info!("[CRAFTING] Added tool {} to inventory", tool_id);
-                        } else {
-                            log::warn!("[CRAFTING] Inventory full, could not add crafted tool");
-                        }
-                    }
-                }
-            }
+            );
 
             // Draw active chunks overlay if enabled
             if let Some((window_size, camera_pos, camera_zoom, active_chunks)) = &active_chunks_data
@@ -565,30 +561,9 @@ impl App {
         });
         let egui_build_time = egui_build_start.elapsed().as_secs_f32() * 1000.0;
 
-        // Handle level selector actions
-        if self.ui_state.level_selector.return_to_world {
-            self.game_mode = GameMode::PersistentWorld;
-            self.world.load_persistent_world();
-            self.ui_state.level_selector.reset_flags(); // Reset flag after processing
-            log::info!("Returned to persistent world");
-        } else if let Some(level_id) = self.ui_state.level_selector.selected_level {
-            // Save current world if in persistent mode
-            if matches!(self.game_mode, GameMode::PersistentWorld) {
-                self.world.save_all_dirty_chunks();
-            }
-
-            // Disable persistence to prevent dynamic chunk loading from overwriting demo level
-            self.world.disable_persistence();
-
-            self.game_mode = GameMode::DemoLevel(level_id);
-            self.level_manager.load_level(level_id, &mut self.world);
-            self.ui_state.level_selector.reset_flags(); // Reset flag after processing
-            log::info!(
-                "Switched to demo level {}: {}",
-                level_id,
-                self.level_manager.current_level_name()
-            );
-        }
+        // TODO: Level selector actions now handled via dock
+        // The dock's LevelSelector tab currently just displays info
+        // Interactive level switching could be added later via dock callback system
 
         // Handle egui output
         self.egui_state
@@ -904,10 +879,10 @@ impl ApplicationHandler for App {
                             }
                         }
 
-                        // UI toggles
+                        // UI toggles - all panels are now dock tabs
                         KeyCode::F1 => {
                             if pressed {
-                                self.ui_state.toggle_stats();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Stats);
                             }
                         }
                         KeyCode::F2 => {
@@ -915,16 +890,27 @@ impl ApplicationHandler for App {
                                 self.renderer.toggle_active_chunks_overlay();
                             }
                         }
-                        KeyCode::F3 =>
-                        {
-                            #[cfg(feature = "profiling")]
+                        #[cfg(feature = "profiling")]
+                        KeyCode::F3 => {
                             if pressed {
-                                self.ui_state.toggle_puffin();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Profiler);
+                            }
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        KeyCode::F4 => {
+                            if pressed {
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Parameters);
+                            }
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        KeyCode::F6 => {
+                            if pressed {
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Logger);
                             }
                         }
                         KeyCode::KeyH => {
                             if pressed {
-                                self.ui_state.toggle_help();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Controls);
                             }
                         }
                         KeyCode::KeyT => {
@@ -939,17 +925,17 @@ impl ApplicationHandler for App {
                         }
                         KeyCode::KeyL => {
                             if pressed {
-                                self.ui_state.toggle_level_selector();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::LevelSelector);
                             }
                         }
                         KeyCode::KeyI => {
                             if pressed {
-                                self.ui_state.toggle_inventory();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Inventory);
                             }
                         }
                         KeyCode::KeyC => {
                             if pressed {
-                                self.ui_state.toggle_crafting();
+                                self.ui_state.toggle_tab(crate::ui::DockTab::Crafting);
                             }
                         }
                         KeyCode::KeyG => {

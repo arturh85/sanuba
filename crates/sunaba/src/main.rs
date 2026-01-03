@@ -39,7 +39,10 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    // Initialize egui_logger for in-game log viewing (also provides env_logger functionality)
+    egui_logger::builder()
+        .init()
+        .expect("Failed to initialize logger");
 
     // Initialize puffin profiler (native only, when feature enabled)
     #[cfg(feature = "profiling")]

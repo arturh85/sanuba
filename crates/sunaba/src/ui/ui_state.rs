@@ -1,12 +1,12 @@
 //! Central UI state management
 
-use super::controls_help::ControlsHelpState;
-use super::crafting_ui::CraftingUI;
+use super::dock::{DockManager, DockTab};
 use super::hud::Hud;
-use super::inventory_ui::InventoryPanel;
-use super::level_selector::LevelSelectorState;
 use super::stats::{SimulationStats, StatsCollector};
+use super::toasts::ToastManager;
 use super::tooltip::TooltipState;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::config::GameConfig;
 use instant::Instant;
 
 /// Central UI state container
@@ -14,95 +14,88 @@ pub struct UiState {
     /// Stats collector and display
     pub stats: StatsCollector,
 
-    /// Whether stats window is visible
-    pub stats_visible: bool,
-
     /// Cached stats for throttled display (updates 4x/sec)
-    display_stats: SimulationStats,
+    pub display_stats: SimulationStats,
     last_stats_update: Instant,
 
     /// Tooltip for mouseover information
     pub tooltip: TooltipState,
 
-    /// Controls help panel
-    pub controls_help: ControlsHelpState,
-
-    /// Level selector panel
-    pub level_selector: LevelSelectorState,
-
     /// HUD (health, hunger bars)
     pub hud: Hud,
 
-    /// Inventory panel
-    pub inventory: InventoryPanel,
+    /// Toast notification manager
+    pub toasts: ToastManager,
 
-    /// Crafting UI panel
-    pub crafting_ui: CraftingUI,
+    /// Dock manager for dockable panels
+    pub dock: DockManager,
 
-    /// Toast notification (message, shown_at)
-    pub toast_message: Option<(String, Instant)>,
-
-    /// Whether puffin profiler window is visible
-    #[cfg(feature = "profiling")]
-    pub puffin_visible: bool,
+    /// Track if parameters were changed (for propagation to renderer)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub params_changed: bool,
 }
 
 impl UiState {
     /// Stats display update interval (4 updates per second)
     const STATS_UPDATE_INTERVAL_MS: u128 = 250;
 
-    pub fn new() -> Self {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[allow(unused_variables)]
+    pub fn new(config: &GameConfig) -> Self {
         Self {
             stats: StatsCollector::new(),
-            stats_visible: true, // Start with stats visible
             display_stats: SimulationStats::default(),
             last_stats_update: Instant::now(),
             tooltip: TooltipState::new(),
-            controls_help: ControlsHelpState::new(),
-            level_selector: LevelSelectorState::new(),
             hud: Hud::new(),
-            inventory: InventoryPanel::new(),
-            crafting_ui: CraftingUI::new(),
-            toast_message: None,
-            #[cfg(feature = "profiling")]
-            puffin_visible: false,
+            toasts: ToastManager::new(),
+            dock: DockManager::new(),
+            params_changed: false,
         }
     }
 
-    /// Toggle stats visibility
-    pub fn toggle_stats(&mut self) {
-        self.stats_visible = !self.stats_visible;
+    #[cfg(target_arch = "wasm32")]
+    pub fn new() -> Self {
+        Self {
+            stats: StatsCollector::new(),
+            display_stats: SimulationStats::default(),
+            last_stats_update: Instant::now(),
+            tooltip: TooltipState::new(),
+            hud: Hud::new(),
+            toasts: ToastManager::new(),
+            dock: DockManager::new(),
+        }
     }
 
-    /// Toggle controls help visibility
-    pub fn toggle_help(&mut self) {
-        self.controls_help.toggle();
+    /// Toggle a dock tab (H, L, I, C hotkeys)
+    pub fn toggle_tab(&mut self, tab: DockTab) {
+        self.dock.toggle_tab(tab);
     }
 
-    /// Toggle level selector visibility
-    pub fn toggle_level_selector(&mut self) {
-        self.level_selector.toggle();
+    /// Take the params_changed flag (resets it to false)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn take_params_changed(&mut self) -> bool {
+        std::mem::take(&mut self.params_changed)
     }
 
-    /// Toggle inventory visibility
-    pub fn toggle_inventory(&mut self) {
-        self.inventory.toggle();
-    }
-
-    /// Toggle crafting UI visibility
-    pub fn toggle_crafting(&mut self) {
-        self.crafting_ui.toggle();
-    }
-
-    /// Toggle puffin profiler visibility
-    #[cfg(feature = "profiling")]
-    pub fn toggle_puffin(&mut self) {
-        self.puffin_visible = !self.puffin_visible;
-    }
-
-    /// Show a toast notification
+    /// Show a success toast notification
     pub fn show_toast(&mut self, message: &str) {
-        self.toast_message = Some((message.to_string(), Instant::now()));
+        self.toasts.success(message);
+    }
+
+    /// Show an info toast notification
+    pub fn show_toast_info(&mut self, message: &str) {
+        self.toasts.info(message);
+    }
+
+    /// Show a warning toast notification
+    pub fn show_toast_warning(&mut self, message: &str) {
+        self.toasts.warning(message);
+    }
+
+    /// Show an error toast notification
+    pub fn show_toast_error(&mut self, message: &str) {
+        self.toasts.error(message);
     }
 
     /// Update tooltip with world data
@@ -123,6 +116,7 @@ impl UiState {
 
     /// Render all UI elements
     #[allow(clippy::too_many_arguments)]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn render(
         &mut self,
         ctx: &egui::Context,
@@ -134,11 +128,33 @@ impl UiState {
         level_manager: &crate::levels::LevelManager,
         player: &crate::entity::player::Player,
         tool_registry: &crate::entity::tools::ToolRegistry,
+        recipe_registry: &crate::entity::crafting::RecipeRegistry,
+        config: &mut crate::config::GameConfig,
     ) {
-        // Collect material names for UI display
-        let material_names: Vec<&str> = (0..15).map(|id| materials.get(id).name.as_str()).collect();
+        // Update stats display (throttled)
+        if self.last_stats_update.elapsed().as_millis() >= Self::STATS_UPDATE_INTERVAL_MS {
+            self.display_stats = self.stats.stats().clone();
+            self.last_stats_update = Instant::now();
+        }
 
-        // Render HUD (always visible)
+        // Render dock with all panels
+        let dock_ctx = super::dock::DockContext {
+            stats: &self.display_stats,
+            selected_material,
+            materials,
+            game_mode_desc,
+            level_manager,
+            in_persistent_world,
+            player,
+            tool_registry,
+            recipe_registry,
+            params: config,
+            params_changed: &mut self.params_changed,
+        };
+        super::dock::render_dock(ctx, &mut self.dock, dock_ctx);
+
+        // Render overlays (outside dock)
+        let material_names: Vec<&str> = (0..15).map(|id| materials.get(id).name.as_str()).collect();
         self.hud.render(
             ctx,
             player,
@@ -146,107 +162,70 @@ impl UiState {
             &material_names,
             tool_registry,
         );
-
-        // Render inventory panel (if open)
-        self.inventory.render(ctx, player, &material_names);
-
-        if self.stats_visible {
-            self.render_stats(ctx);
-        }
-
-        // Render controls help with game mode description
-        self.controls_help
-            .render_with_level(ctx, selected_material, materials, game_mode_desc);
-
-        // Render level selector
-        self.level_selector
-            .render(ctx, level_manager, game_mode_desc, in_persistent_world);
-
-        // Render toast notifications
-        if let Some((msg, shown_at)) = &self.toast_message {
-            const TOAST_DURATION_SECS: u64 = 3;
-            if shown_at.elapsed().as_secs() < TOAST_DURATION_SECS {
-                egui::Area::new("toast_notification".into())
-                    .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
-                    .show(ctx, |ui| {
-                        ui.label(
-                            egui::RichText::new(msg)
-                                .size(20.0)
-                                .color(egui::Color32::from_rgb(100, 255, 100)),
-                        );
-                    });
-            } else {
-                self.toast_message = None;
-            }
-        }
-
-        // Render creature tooltip (takes priority over material tooltip)
+        self.toasts.render(ctx);
         self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
-
-        // Render material tooltip (only if creature tooltip not visible)
         self.tooltip.render(ctx, cursor_screen_pos);
-
-        // Render puffin profiler window
-        #[cfg(feature = "profiling")]
-        if self.puffin_visible {
-            puffin_egui::profiler_window(ctx);
-        }
     }
 
-    fn render_stats(&mut self, ctx: &egui::Context) {
-        // Throttle stats display updates to 4 times per second
+    /// Render all UI elements (WASM version)
+    #[allow(clippy::too_many_arguments)]
+    #[cfg(target_arch = "wasm32")]
+    pub fn render(
+        &mut self,
+        ctx: &egui::Context,
+        cursor_screen_pos: egui::Pos2,
+        selected_material: u16,
+        materials: &crate::simulation::Materials,
+        game_mode_desc: &str,
+        in_persistent_world: bool,
+        level_manager: &crate::levels::LevelManager,
+        player: &crate::entity::player::Player,
+        tool_registry: &crate::entity::tools::ToolRegistry,
+        recipe_registry: &crate::entity::crafting::RecipeRegistry,
+    ) {
+        // Update stats display (throttled)
         if self.last_stats_update.elapsed().as_millis() >= Self::STATS_UPDATE_INTERVAL_MS {
             self.display_stats = self.stats.stats().clone();
             self.last_stats_update = Instant::now();
         }
 
-        let stats = &self.display_stats;
+        // Render dock with all panels (WASM - no params)
+        let dock_ctx = super::dock::DockContext {
+            stats: &self.display_stats,
+            selected_material,
+            materials,
+            game_mode_desc,
+            level_manager,
+            in_persistent_world,
+            player,
+            tool_registry,
+            recipe_registry,
+        };
+        super::dock::render_dock(ctx, &mut self.dock, dock_ctx);
 
-        egui::Window::new("Debug Stats")
-            .default_pos(egui::pos2(10.0, 10.0))
-            .resizable(false)
-            .collapsible(true)
-            .show(ctx, |ui| {
-                ui.heading("Performance");
-                ui.label(format!("FPS: {:.1}", stats.fps));
-                ui.label(format!("Frame: {:.2}ms", stats.frame_time_ms));
-                ui.label(format!("  Sim: {:.2}ms", stats.sim_time_ms));
-                ui.label(format!("  UI Build: {:.2}ms", stats.egui_build_time_ms));
-                ui.label(format!("  Overlays: {:.2}ms", stats.overlay_time_ms));
-                ui.label(format!("  Pixels: {:.2}ms", stats.pixel_buffer_time_ms));
-                ui.label(format!("  Upload: {:.2}ms", stats.gpu_upload_time_ms));
-                ui.label(format!("  Acquire: {:.2}ms", stats.acquire_time_ms));
-                ui.label(format!("  egui GPU: {:.2}ms", stats.egui_time_ms));
-                ui.label(format!("  Present: {:.2}ms", stats.present_time_ms));
-
-                ui.separator();
-                ui.heading("World");
-                ui.label(format!("Active Chunks: {}", stats.active_chunks));
-                ui.label(format!("Total Chunks: {}", stats.total_chunks));
-                ui.label(format!("Active Pixels: {}", stats.active_pixels));
-
-                ui.separator();
-                ui.heading("Temperature");
-                ui.label(format!(
-                    "Range: {:.0}°C - {:.0}°C",
-                    stats.min_temp, stats.max_temp
-                ));
-                ui.label(format!("Average: {:.1}°C", stats.avg_temp));
-
-                ui.separator();
-                ui.heading("Activity");
-                ui.label(format!("Moved: {} pixels", stats.pixels_moved));
-                ui.label(format!("Reactions: {}", stats.reactions));
-                ui.label(format!("State Changes: {}", stats.state_changes));
-
-                ui.separator();
-                ui.heading("Render");
-                ui.label(format!("Dirty Chunks: {}", stats.render_dirty_chunks));
-                ui.label(format!("Rendered Total: {}", stats.rendered_chunks_total));
-            });
+        // Render overlays (outside dock)
+        let material_names: Vec<&str> = (0..15).map(|id| materials.get(id).name.as_str()).collect();
+        self.hud.render(
+            ctx,
+            player,
+            selected_material,
+            &material_names,
+            tool_registry,
+        );
+        self.toasts.render(ctx);
+        self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
+        self.tooltip.render(ctx, cursor_screen_pos);
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for UiState {
+    fn default() -> Self {
+        Self::new(&GameConfig::default())
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 impl Default for UiState {
     fn default() -> Self {
         Self::new()
