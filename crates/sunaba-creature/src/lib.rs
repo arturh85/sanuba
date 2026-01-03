@@ -28,7 +28,7 @@ pub mod world_interaction;
 pub use creature::Creature;
 pub use critter::{Critter, CritterManager, CritterState};
 pub use genome::CreatureGenome;
-pub use morphology::{CreatureMorphology, MorphologyPhysics};
+pub use morphology::{CreatureArchetype, CreatureMorphology, MorphologyPhysics};
 pub use physics::PhysicsWorld;
 pub use spawning::CreatureManager;
 pub use traits::{WorldAccess, WorldMutAccess};

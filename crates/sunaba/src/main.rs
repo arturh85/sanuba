@@ -32,6 +32,10 @@ struct Args {
     /// Use simple morphology (fewer body parts, viability filter)
     #[arg(long)]
     simple: bool,
+
+    /// Creature archetype: all (default), evolved, spider, snake, worm, flyer
+    #[arg(long, default_value = "all")]
+    archetype: String,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -76,10 +80,23 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "headless")]
 fn run_training(args: &Args) -> anyhow::Result<()> {
+    use sunaba::creature::morphology::CreatureArchetype;
     use sunaba::headless::{Scenario, TrainingConfig, TrainingEnv};
+
+    // Parse archetype(s)
+    let archetypes: Vec<CreatureArchetype> = if args.archetype.to_lowercase() == "all" {
+        CreatureArchetype::all_with_evolved().to_vec()
+    } else {
+        let arch: CreatureArchetype = args.archetype.parse().unwrap_or_else(|e| {
+            log::warn!("{}, using Evolved", e);
+            CreatureArchetype::Evolved
+        });
+        vec![arch]
+    };
 
     log::info!("Starting headless evolution training");
     log::info!("  Scenario: {}", args.scenario);
+    log::info!("  Archetypes: {:?}", archetypes.iter().map(|a| a.name()).collect::<Vec<_>>());
     log::info!("  Generations: {}", args.generations);
     log::info!("  Population: {}", args.population);
     log::info!("  Output: {}", args.output);
@@ -109,6 +126,8 @@ fn run_training(args: &Args) -> anyhow::Result<()> {
         population_size: args.population,
         output_dir: args.output.clone(),
         use_simple_morphology: use_simple,
+        archetypes: archetypes.clone(),
+        archetype: archetypes.first().copied().unwrap_or_default(),
         ..TrainingConfig::default()
     };
 

@@ -49,14 +49,26 @@ web: build-web
     cd web; python -m http.server 8080
 
 # Evolution training commands (RUST_LOG=warn for clean progress bar output)
-train scenario="parcour" generations="100" population="50" simple="":
+# Default trains ALL archetypes (evolved, spider, snake, worm, flyer) together
+# Use --archetype to train a single archetype: just train parcour 100 50 "" evolved
+[unix]
+train scenario="parcour" generations="100" population="50" simple="" archetype="all":
     rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}} {{simple}}
+    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}} --archetype {{archetype}} {{simple}}
 
-# Quick training with simple morphology (fewer body parts, viability filter, movement-focused fitness)
+[windows]
+train scenario="parcour" generations="100" population="50" simple="" archetype="all":
+    @if (Test-Path training_output) { Remove-Item -Recurse -Force training_output }
+    $env:RUST_LOG='warn'; cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}} --archetype {{archetype}} {{simple}}
+
+# Quick training with all archetypes (100 generations, 100 population)
 train-quick generations="100":
-    just train simple {{generations}} 50 "--simple"
+    just train parcour {{generations}} 100
 
-# Full training with default complex morphology
+# Full training with all archetypes (larger population, more generations)
 train-full:
-    just train parcour 500 100
+    just train parcour 500 200
+
+# Train a single archetype (e.g., just train-single spider 100)
+train-single archetype="evolved" generations="100":
+    just train parcour {{generations}} 50 "" {{archetype}}

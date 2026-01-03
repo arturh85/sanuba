@@ -8,6 +8,96 @@ use serde::{Deserialize, Serialize};
 
 use super::genome::CreatureGenome;
 
+/// Creature archetype for distinct body plans
+/// Each archetype produces a morphology optimized for different locomotion styles
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum CreatureArchetype {
+    /// Default: morphology generated from CPPN genome
+    #[default]
+    Evolved,
+    /// Spider: central body with 8 radial legs (fast multi-legged crawling)
+    Spider,
+    /// Snake: chain of 6 connected segments (slithering wave propagation)
+    Snake,
+    /// Worm: 4 segments with very flexible joints (accordion compression)
+    Worm,
+    /// Flyer: central body with wing appendages (oscillation-based flight)
+    Flyer,
+}
+
+impl CreatureArchetype {
+    /// Get all available archetypes (excluding Evolved)
+    pub fn all_fixed() -> &'static [CreatureArchetype] {
+        &[
+            CreatureArchetype::Spider,
+            CreatureArchetype::Snake,
+            CreatureArchetype::Worm,
+            CreatureArchetype::Flyer,
+        ]
+    }
+
+    /// Get all available archetypes (including Evolved)
+    pub fn all_with_evolved() -> &'static [CreatureArchetype] {
+        &[
+            CreatureArchetype::Evolved,
+            CreatureArchetype::Spider,
+            CreatureArchetype::Snake,
+            CreatureArchetype::Worm,
+            CreatureArchetype::Flyer,
+        ]
+    }
+
+    /// Create the morphology for this archetype
+    pub fn create_morphology(
+        &self,
+        genome: &CreatureGenome,
+        config: &MorphologyConfig,
+    ) -> CreatureMorphology {
+        match self {
+            CreatureArchetype::Evolved => CreatureMorphology::from_genome(genome, config),
+            CreatureArchetype::Spider => CreatureMorphology::archetype_spider(),
+            CreatureArchetype::Snake => CreatureMorphology::archetype_snake(),
+            CreatureArchetype::Worm => CreatureMorphology::archetype_worm(),
+            CreatureArchetype::Flyer => CreatureMorphology::archetype_flyer(),
+        }
+    }
+
+    /// Human-readable name
+    pub fn name(&self) -> &'static str {
+        match self {
+            CreatureArchetype::Evolved => "Evolved",
+            CreatureArchetype::Spider => "Spider",
+            CreatureArchetype::Snake => "Snake",
+            CreatureArchetype::Worm => "Worm",
+            CreatureArchetype::Flyer => "Flyer",
+        }
+    }
+}
+
+impl std::fmt::Display for CreatureArchetype {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+impl std::str::FromStr for CreatureArchetype {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "evolved" | "default" => Ok(CreatureArchetype::Evolved),
+            "spider" => Ok(CreatureArchetype::Spider),
+            "snake" => Ok(CreatureArchetype::Snake),
+            "worm" => Ok(CreatureArchetype::Worm),
+            "flyer" | "flying" => Ok(CreatureArchetype::Flyer),
+            _ => Err(format!(
+                "Unknown archetype: {}. Valid: evolved, spider, snake, worm, flyer",
+                s
+            )),
+        }
+    }
+}
+
 /// Joint type between body parts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum JointType {
@@ -22,6 +112,9 @@ pub struct BodyPart {
     pub radius: f32,
     pub density: f32,
     pub index: usize,
+    /// Whether this body part acts as a wing (generates lift when oscillating)
+    #[serde(default)]
+    pub is_wing: bool,
 }
 
 /// Joint connecting two body parts
@@ -74,6 +167,7 @@ impl CreatureMorphology {
                         radius,
                         density: output.density.max(0.1), // Ensure minimum density
                         index: part_index,
+                        is_wing: false, // Wings are specified by archetype, not CPPN (for now)
                     };
 
                     body_parts.push(body_part);
@@ -98,6 +192,7 @@ impl CreatureMorphology {
                 radius: 5.0,
                 density: 1.0,
                 index: 0,
+                is_wing: false,
             });
         }
 
@@ -187,6 +282,7 @@ impl CreatureMorphology {
             radius: 8.0,
             density: 1.0,
             index: 0,
+            is_wing: false,
         });
 
         // Left leg
@@ -195,6 +291,7 @@ impl CreatureMorphology {
             radius: 4.0,
             density: 0.8,
             index: 1,
+            is_wing: false,
         });
 
         // Right leg
@@ -203,6 +300,7 @@ impl CreatureMorphology {
             radius: 4.0,
             density: 0.8,
             index: 2,
+            is_wing: false,
         });
 
         // Connect body to legs with revolute joints
@@ -248,6 +346,7 @@ impl CreatureMorphology {
             radius: 10.0,
             density: 1.0,
             index: 0,
+            is_wing: false,
         });
 
         // Four legs
@@ -259,6 +358,7 @@ impl CreatureMorphology {
                 radius: 4.0,
                 density: 0.8,
                 index: i + 1,
+                is_wing: false,
             });
 
             joints.push(BodyJoint {
@@ -270,6 +370,242 @@ impl CreatureMorphology {
                 },
             });
         }
+
+        let total_mass = body_parts
+            .iter()
+            .map(|p| std::f32::consts::PI * p.radius * p.radius * p.density)
+            .sum();
+
+        Self {
+            body_parts,
+            joints,
+            root_part_index: 0,
+            total_mass,
+        }
+    }
+
+    // ===== Archetype Morphologies =====
+    // These create distinct body plans for creature diversity
+
+    /// Spider archetype: central body with 8 radial legs
+    /// Designed for fast, coordinated multi-legged locomotion
+    pub fn archetype_spider() -> Self {
+        let mut body_parts = Vec::new();
+        let mut joints = Vec::new();
+
+        // Large central body (spider cephalothorax)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(0.0, 0.0),
+            radius: 10.0,
+            density: 1.2,
+            index: 0,
+            is_wing: false,
+        });
+
+        // 8 legs distributed radially at 45° intervals
+        // Legs extend outward and slightly downward
+        for i in 0..8 {
+            let angle = i as f32 * std::f32::consts::PI / 4.0; // 45° apart
+            let leg_offset = 14.0; // Distance from center
+            let x = angle.cos() * leg_offset;
+            let y = angle.sin() * leg_offset + 2.0; // Slightly below center
+
+            body_parts.push(BodyPart {
+                local_position: Vec2::new(x, y),
+                radius: 3.0,
+                density: 0.6,
+                index: i + 1,
+                is_wing: false,
+            });
+
+            // Flexible revolute joints for leg movement
+            joints.push(BodyJoint {
+                parent_index: 0,
+                child_index: i + 1,
+                joint_type: JointType::Revolute {
+                    min_angle: -std::f32::consts::PI / 3.0, // 60° range
+                    max_angle: std::f32::consts::PI / 3.0,
+                },
+            });
+        }
+
+        let total_mass = body_parts
+            .iter()
+            .map(|p| std::f32::consts::PI * p.radius * p.radius * p.density)
+            .sum();
+
+        Self {
+            body_parts,
+            joints,
+            root_part_index: 0,
+            total_mass,
+        }
+    }
+
+    /// Snake archetype: chain of 6 connected segments
+    /// Designed for slithering wave propagation locomotion
+    pub fn archetype_snake() -> Self {
+        let mut body_parts = Vec::new();
+        let mut joints = Vec::new();
+
+        // Head (front, larger)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(0.0, 0.0),
+            radius: 6.0,
+            density: 1.0,
+            index: 0,
+            is_wing: false,
+        });
+
+        // Body segments (5 more, tapering toward tail)
+        let segment_spacing = 10.0;
+        for i in 1..6 {
+            let radius = 5.5 - (i as f32 * 0.5); // Taper from 5.0 to 3.0
+            body_parts.push(BodyPart {
+                local_position: Vec2::new(-(i as f32 * segment_spacing), 0.0),
+                radius: radius.max(3.0),
+                density: 0.8,
+                index: i,
+                is_wing: false,
+            });
+
+            // Connect to previous segment with flexible joint
+            joints.push(BodyJoint {
+                parent_index: i - 1,
+                child_index: i,
+                joint_type: JointType::Revolute {
+                    min_angle: -std::f32::consts::PI / 4.0, // 45° each way
+                    max_angle: std::f32::consts::PI / 4.0,
+                },
+            });
+        }
+
+        let total_mass = body_parts
+            .iter()
+            .map(|p| std::f32::consts::PI * p.radius * p.radius * p.density)
+            .sum();
+
+        Self {
+            body_parts,
+            joints,
+            root_part_index: 0,
+            total_mass,
+        }
+    }
+
+    /// Worm archetype: 4 segments with very flexible joints
+    /// Designed for accordion-style compression/expansion locomotion
+    pub fn archetype_worm() -> Self {
+        let mut body_parts = Vec::new();
+        let mut joints = Vec::new();
+
+        // 4 equal-sized segments
+        let segment_spacing = 10.0;
+        for i in 0..4 {
+            body_parts.push(BodyPart {
+                local_position: Vec2::new(-(i as f32 * segment_spacing), 0.0),
+                radius: 5.0,
+                density: 0.9,
+                index: i,
+                is_wing: false,
+            });
+
+            if i > 0 {
+                // Very flexible joints for accordion motion
+                joints.push(BodyJoint {
+                    parent_index: i - 1,
+                    child_index: i,
+                    joint_type: JointType::Revolute {
+                        min_angle: -std::f32::consts::PI / 2.5, // ~72° each way (very flexible)
+                        max_angle: std::f32::consts::PI / 2.5,
+                    },
+                });
+            }
+        }
+
+        let total_mass = body_parts
+            .iter()
+            .map(|p| std::f32::consts::PI * p.radius * p.radius * p.density)
+            .sum();
+
+        Self {
+            body_parts,
+            joints,
+            root_part_index: 0,
+            total_mass,
+        }
+    }
+
+    /// Flyer archetype: central body with wing appendages
+    /// Designed for flight via wing oscillation lift
+    pub fn archetype_flyer() -> Self {
+        let mut body_parts = Vec::new();
+        let mut joints = Vec::new();
+
+        // Central body (compact)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(0.0, 0.0),
+            radius: 7.0,
+            density: 1.0,
+            index: 0,
+            is_wing: false,
+        });
+
+        // Right wing (extends outward and slightly up)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(12.0, -3.0),
+            radius: 4.0,
+            density: 0.3, // Light wing
+            index: 1,
+            is_wing: true, // This is a wing!
+        });
+
+        // Left wing (mirror of right)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(-12.0, -3.0),
+            radius: 4.0,
+            density: 0.3,
+            index: 2,
+            is_wing: true, // This is a wing!
+        });
+
+        // Tail/stabilizer (below and behind)
+        body_parts.push(BodyPart {
+            local_position: Vec2::new(0.0, 8.0),
+            radius: 3.0,
+            density: 0.5,
+            index: 3,
+            is_wing: false,
+        });
+
+        // Wing joints (need good range of motion for flapping)
+        joints.push(BodyJoint {
+            parent_index: 0,
+            child_index: 1, // Right wing
+            joint_type: JointType::Revolute {
+                min_angle: -std::f32::consts::PI / 2.0, // 90° range for flapping
+                max_angle: std::f32::consts::PI / 2.0,
+            },
+        });
+
+        joints.push(BodyJoint {
+            parent_index: 0,
+            child_index: 2, // Left wing
+            joint_type: JointType::Revolute {
+                min_angle: -std::f32::consts::PI / 2.0,
+                max_angle: std::f32::consts::PI / 2.0,
+            },
+        });
+
+        // Tail joint (limited motion for steering)
+        joints.push(BodyJoint {
+            parent_index: 0,
+            child_index: 3,
+            joint_type: JointType::Revolute {
+                min_angle: -std::f32::consts::PI / 6.0, // 30° each way
+                max_angle: std::f32::consts::PI / 6.0,
+            },
+        });
 
         let total_mass = body_parts
             .iter()

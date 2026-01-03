@@ -2,12 +2,14 @@
 //!
 //! Main training loop with parallel evaluation and checkpointing.
 
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::creature::genome::{CreatureGenome, MutationConfig, crossover_genome};
-use crate::creature::morphology::{CreatureMorphology, MorphologyConfig};
+use crate::creature::morphology::{CreatureArchetype, CreatureMorphology, MorphologyConfig};
 use crate::creature::spawning::CreatureManager;
 use crate::creature::viability::analyze_viability;
 use crate::physics::PhysicsWorld;
@@ -47,6 +49,10 @@ pub struct TrainingConfig {
     pub use_simple_morphology: bool,
     /// Minimum viability score to accept a creature (0.0-1.0)
     pub min_viability: f32,
+    /// Single creature archetype (legacy, overridden by archetypes if set)
+    pub archetype: CreatureArchetype,
+    /// Multiple creature archetypes to train together (empty = use single archetype)
+    pub archetypes: Vec<CreatureArchetype>,
 }
 
 impl Default for TrainingConfig {
@@ -64,6 +70,20 @@ impl Default for TrainingConfig {
             output_dir: "training_output".to_string(),
             use_simple_morphology: false,
             min_viability: 0.3,
+            archetype: CreatureArchetype::default(),
+            archetypes: Vec::new(), // Empty = use single archetype field
+        }
+    }
+}
+
+impl TrainingConfig {
+    /// Get the effective list of archetypes to train
+    /// If archetypes is non-empty, use that; otherwise use single archetype
+    pub fn effective_archetypes(&self) -> Vec<CreatureArchetype> {
+        if self.archetypes.is_empty() {
+            vec![self.archetype]
+        } else {
+            self.archetypes.clone()
         }
     }
 }
@@ -73,22 +93,25 @@ impl Default for TrainingConfig {
 pub struct TrainingStats {
     /// Current generation
     pub generation: usize,
-    /// Best fitness so far
+    /// Best fitness so far (across all archetypes)
     pub best_fitness: f32,
     /// Average fitness this generation
     pub avg_fitness: f32,
-    /// Number of cells filled in MAP-Elites grid
+    /// Average grid coverage across all archetypes
     pub grid_coverage: f32,
-    /// New elites discovered this generation
+    /// New elites discovered this generation (across all archetypes)
     pub new_elites: usize,
     /// Maximum displacement this generation (for debugging)
     pub max_displacement: f32,
     /// Average displacement this generation
     pub avg_displacement: f32,
+    /// Best fitness per archetype
+    pub best_per_archetype: HashMap<CreatureArchetype, f32>,
 }
 
 /// Single creature evaluation result
 struct EvalResult {
+    archetype: CreatureArchetype,
     genome: CreatureGenome,
     fitness: f32,
     behavior: BehaviorDescriptor,
@@ -102,8 +125,8 @@ pub struct TrainingEnv {
     pub config: TrainingConfig,
     /// Training scenario
     pub scenario: Scenario,
-    /// MAP-Elites grid
-    pub grid: MapElitesGrid,
+    /// MAP-Elites grids (one per archetype)
+    pub grids: HashMap<CreatureArchetype, MapElitesGrid>,
     /// Current generation
     generation: usize,
     /// Statistics history
@@ -112,6 +135,8 @@ pub struct TrainingEnv {
     report_gen: ReportGenerator,
     /// Morphology configuration (simple or default)
     morphology_config: MorphologyConfig,
+    /// Archetypes being trained
+    archetypes: Vec<CreatureArchetype>,
 }
 
 impl TrainingEnv {
@@ -123,43 +148,83 @@ impl TrainingEnv {
         } else {
             MorphologyConfig::default()
         };
+        let archetypes = config.effective_archetypes();
+
+        // Create a separate MAP-Elites grid for each archetype
+        let mut grids = HashMap::new();
+        for archetype in &archetypes {
+            grids.insert(*archetype, MapElitesGrid::default_grid());
+        }
 
         Self {
             config,
             scenario,
-            grid: MapElitesGrid::default_grid(),
+            grids,
             generation: 0,
             stats_history: Vec::new(),
             report_gen,
             morphology_config,
+            archetypes,
         }
     }
 
-    /// Check if a genome produces a viable morphology
-    fn is_viable(&self, genome: &CreatureGenome) -> bool {
+    /// Helper to get best elite across all archetypes
+    pub fn best_elite(&self) -> Option<(&CreatureArchetype, &super::map_elites::Elite)> {
+        self.grids
+            .iter()
+            .filter_map(|(arch, grid)| grid.best_elite().map(|e| (arch, e)))
+            .max_by(|(_, a), (_, b)| {
+                a.fitness
+                    .partial_cmp(&b.fitness)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    }
+
+    /// Helper to get best elite for a specific archetype
+    pub fn best_elite_for(&self, archetype: &CreatureArchetype) -> Option<&super::map_elites::Elite> {
+        self.grids.get(archetype).and_then(|g| g.best_elite())
+    }
+
+    /// Check if a genome produces a viable morphology for a given archetype
+    fn is_viable(&self, genome: &CreatureGenome, archetype: CreatureArchetype) -> bool {
+        // For fixed archetypes, morphology is always viable (predetermined structure)
+        if archetype != CreatureArchetype::Evolved {
+            return true;
+        }
         let morphology = CreatureMorphology::from_genome(genome, &self.morphology_config);
         let viability = analyze_viability(&morphology);
         viability.overall >= self.config.min_viability && viability.has_locomotion
     }
 
-    /// Generate a viable genome (retries until viability threshold met)
-    fn generate_viable_genome(&self) -> CreatureGenome {
+    /// Create the base genome for a given archetype
+    fn base_genome_for(&self, archetype: CreatureArchetype) -> CreatureGenome {
+        match archetype {
+            CreatureArchetype::Evolved => CreatureGenome::test_biped(),
+            CreatureArchetype::Spider => CreatureGenome::archetype_spider(),
+            CreatureArchetype::Snake => CreatureGenome::archetype_snake(),
+            CreatureArchetype::Worm => CreatureGenome::archetype_worm(),
+            CreatureArchetype::Flyer => CreatureGenome::archetype_flyer(),
+        }
+    }
+
+    /// Generate a viable genome for a given archetype (retries until viability threshold met)
+    fn generate_viable_genome(&self, archetype: CreatureArchetype) -> CreatureGenome {
         const MAX_ATTEMPTS: usize = 100;
 
         for _ in 0..MAX_ATTEMPTS {
-            let mut genome = CreatureGenome::test_biped();
+            let mut genome = self.base_genome_for(archetype);
             genome.mutate(
                 &self.config.mutation_config,
                 self.config.controller_mutation_rate,
             );
 
-            if self.is_viable(&genome) {
+            if self.is_viable(&genome, archetype) {
                 return genome;
             }
         }
 
-        // Fallback: return test_biped without mutation (known to be viable)
-        CreatureGenome::test_biped()
+        // Fallback: return base genome without mutation
+        self.base_genome_for(archetype)
     }
 
     /// Create a progress bar style
@@ -180,9 +245,11 @@ impl TrainingEnv {
         pb.set_style(Self::progress_style());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
+        let archetype_names: Vec<_> = self.archetypes.iter().map(|a| a.name()).collect();
         pb.println(format!(
-            "Starting training: {} generations, {} population",
-            self.config.generations, self.config.population_size
+            "Starting training: {} generations, {} population, {} archetypes: {:?}",
+            self.config.generations, self.config.population_size,
+            self.archetypes.len(), archetype_names
         ));
 
         // Initialize with random population
@@ -200,11 +267,11 @@ impl TrainingEnv {
                 ));
             }
 
-            // Generate offspring population
+            // Generate offspring population (archetype, genome pairs)
             let offspring = self.generate_offspring();
 
             // Evaluate offspring in parallel
-            let results = self.evaluate_population_with_progress(&offspring, &pb)?;
+            let results = self.evaluate_population_with_archetypes(&offspring, &pb)?;
 
             // Update grid and collect stats
             let stats = self.update_grid(results);
@@ -233,22 +300,25 @@ impl TrainingEnv {
         }
 
         // Evaluate champion displacement for verification with detailed logging
-        let champion_displacement = if let Some(best) = self.grid.best_elite() {
+        let champion_displacement = if let Some((champion_archetype, best)) = self.best_elite() {
+            let champion_archetype = *champion_archetype;
             // Set up world and evaluate champion with position tracking
             let (mut world, food_positions) = self.scenario.setup_world();
             let mut physics_world = PhysicsWorld::new();
             let mut creature_manager = CreatureManager::new(1);
             let spawn_pos = self.scenario.config.spawn_position;
 
-            let creature_id = creature_manager.spawn_creature_with_config(
+            let creature_id = creature_manager.spawn_creature_with_archetype_and_hunger(
                 best.genome.clone(),
                 spawn_pos,
+                1.0, // Full hunger
                 &mut physics_world,
                 &self.morphology_config,
+                champion_archetype,
             );
 
             // Log initial state
-            pb.println(format!("=== Champion Debug ==="));
+            pb.println(format!("=== Champion Debug ({}) ===", champion_archetype.name()));
             pb.println(format!(
                 "  Spawn position: ({:.1}, {:.1})",
                 spawn_pos.x, spawn_pos.y
@@ -288,12 +358,13 @@ impl TrainingEnv {
             let final_displacement = if let Some(creature) = creature_manager.get(creature_id) {
                 let disp = (creature.position - spawn_pos).length();
                 let debug_info = format!(
-                    "=== Champion Debug ===\n\
+                    "=== Champion Debug ({}) ===\n\
                      Spawn position: ({:.1}, {:.1})\n\
                      Final position: ({:.1}, {:.1})\n\
                      Displacement: {:.1}px\n\
                      X range: {:.1} to {:.1} (width: {:.1})\n\
                      Position samples: {:?}",
+                    champion_archetype.name(),
                     spawn_pos.x,
                     spawn_pos.y,
                     creature.position.x,
@@ -319,7 +390,7 @@ impl TrainingEnv {
                 0.0
             };
 
-            let result = self.evaluate_single(best.genome.clone());
+            let result = self.evaluate_single(best.genome.clone(), champion_archetype);
             let eval_info = format!(
                 "Fitness from evaluate_single: {:.2}\n\
                  Displacement from evaluate_single: {:.1}px",
@@ -351,9 +422,9 @@ impl TrainingEnv {
         // Capture GIFs of evolved creatures
         let gifs = self.capture_all_gifs(&pb);
 
-        // Final report with GIFs
+        // Final report with GIFs - pass all grids
         self.report_gen
-            .generate_final_report(&self.grid, &self.stats_history, &gifs)?;
+            .generate_final_report_multi(&self.grids, &self.stats_history, &gifs)?;
 
         pb.finish_with_message("Training complete!");
         Ok(())
@@ -367,112 +438,146 @@ impl TrainingEnv {
             "default morphology"
         };
         pb.println(format!(
-            "Initializing population with {} creatures ({})",
-            self.config.population_size, mode
+            "Initializing population with {} creatures ({}) across {} archetypes",
+            self.config.population_size, mode, self.archetypes.len()
         ));
 
-        // Generate viable genomes (or default if simple morphology disabled)
-        let genomes: Vec<CreatureGenome> = if self.config.use_simple_morphology {
-            (0..self.config.population_size)
-                .map(|_| self.generate_viable_genome())
-                .collect()
-        } else {
-            // Use test_biped as a starting point and mutate for variety
-            (0..self.config.population_size)
-                .map(|_| {
-                    let mut genome = CreatureGenome::test_biped();
-                    genome.mutate(
+        // Distribute population evenly across archetypes
+        let num_archetypes = self.archetypes.len();
+        let per_archetype = self.config.population_size / num_archetypes;
+        let remainder = self.config.population_size % num_archetypes;
+
+        // Generate (archetype, genome) pairs
+        let mut archetype_genomes: Vec<(CreatureArchetype, CreatureGenome)> = Vec::new();
+
+        for (idx, &archetype) in self.archetypes.iter().enumerate() {
+            // Give remainder creatures to first archetypes
+            let count = per_archetype + if idx < remainder { 1 } else { 0 };
+
+            for _ in 0..count {
+                let genome = if self.config.use_simple_morphology {
+                    self.generate_viable_genome(archetype)
+                } else {
+                    let mut g = self.base_genome_for(archetype);
+                    g.mutate(
                         &self.config.mutation_config,
                         self.config.controller_mutation_rate,
                     );
-                    genome
-                })
-                .collect()
-        };
-
-        let results = self.evaluate_population_with_progress(&genomes, pb)?;
-
-        for result in results {
-            self.grid
-                .try_insert(result.genome, result.fitness, &result.behavior, 0);
+                    g
+                };
+                archetype_genomes.push((archetype, genome));
+            }
         }
 
+        let results = self.evaluate_population_with_archetypes(&archetype_genomes, pb)?;
+
+        for result in results {
+            if let Some(grid) = self.grids.get_mut(&result.archetype) {
+                grid.try_insert(result.genome, result.fitness, &result.behavior, 0, result.archetype);
+            }
+        }
+
+        // Calculate average coverage across all grids
+        let total_coverage: f32 = self.grids.values().map(|g| g.coverage()).sum();
+        let avg_coverage = total_coverage / self.grids.len() as f32;
+
         pb.println(format!(
-            "Initial grid coverage: {:.1}%",
-            self.grid.coverage() * 100.0
+            "Initial grid coverage: {:.1}% average across {} archetypes",
+            avg_coverage * 100.0, self.grids.len()
         ));
         Ok(())
     }
 
-    /// Generate offspring from current grid
-    fn generate_offspring(&self) -> Vec<CreatureGenome> {
+    /// Generate offspring from current grids (balanced across archetypes)
+    fn generate_offspring(&self) -> Vec<(CreatureArchetype, CreatureGenome)> {
         let mut offspring = Vec::with_capacity(self.config.population_size);
 
-        for _ in 0..self.config.population_size {
-            // Try to generate a viable child (up to 10 attempts if using simple morphology)
-            let max_attempts = if self.config.use_simple_morphology {
-                10
-            } else {
-                1
-            };
+        // Distribute offspring evenly across archetypes
+        let num_archetypes = self.archetypes.len();
+        let per_archetype = self.config.population_size / num_archetypes;
+        let remainder = self.config.population_size % num_archetypes;
 
-            let mut child = None;
-            for _ in 0..max_attempts {
-                let candidate = if let Some((parent1, parent2)) = self.grid.sample_parents() {
-                    // Crossover
-                    let mut c = crossover_genome(
-                        &parent1.genome,
-                        &parent2.genome,
-                        parent1.fitness,
-                        parent2.fitness,
-                    );
-                    c.mutate(
-                        &self.config.mutation_config,
-                        self.config.controller_mutation_rate,
-                    );
-                    c
-                } else if let Some(parent) = self.grid.sample_elite() {
-                    // Mutation only
-                    let mut c = parent.genome.clone();
-                    c.mutate(
-                        &self.config.mutation_config,
-                        self.config.controller_mutation_rate,
-                    );
-                    c
+        for (idx, &archetype) in self.archetypes.iter().enumerate() {
+            let count = per_archetype + if idx < remainder { 1 } else { 0 };
+            let grid = self.grids.get(&archetype);
+
+            for _ in 0..count {
+                // Try to generate a viable child (up to 10 attempts if using simple morphology)
+                let max_attempts = if self.config.use_simple_morphology {
+                    10
                 } else {
-                    // Random (shouldn't happen after initialization)
-                    let mut genome = CreatureGenome::test_biped();
-                    genome.mutate(
-                        &self.config.mutation_config,
-                        self.config.controller_mutation_rate,
-                    );
-                    genome
+                    1
                 };
 
-                // Check viability if using simple morphology
-                if !self.config.use_simple_morphology || self.is_viable(&candidate) {
-                    child = Some(candidate);
-                    break;
-                }
-            }
+                let mut child = None;
+                for _ in 0..max_attempts {
+                    let candidate = if let Some(grid) = grid {
+                        if let Some((parent1, parent2)) = grid.sample_parents() {
+                            // Crossover
+                            let mut c = crossover_genome(
+                                &parent1.genome,
+                                &parent2.genome,
+                                parent1.fitness,
+                                parent2.fitness,
+                            );
+                            c.mutate(
+                                &self.config.mutation_config,
+                                self.config.controller_mutation_rate,
+                            );
+                            c
+                        } else if let Some(parent) = grid.sample_elite() {
+                            // Mutation only
+                            let mut c = parent.genome.clone();
+                            c.mutate(
+                                &self.config.mutation_config,
+                                self.config.controller_mutation_rate,
+                            );
+                            c
+                        } else {
+                            // Random (shouldn't happen after initialization)
+                            let mut genome = self.base_genome_for(archetype);
+                            genome.mutate(
+                                &self.config.mutation_config,
+                                self.config.controller_mutation_rate,
+                            );
+                            genome
+                        }
+                    } else {
+                        // No grid for this archetype - random
+                        let mut genome = self.base_genome_for(archetype);
+                        genome.mutate(
+                            &self.config.mutation_config,
+                            self.config.controller_mutation_rate,
+                        );
+                        genome
+                    };
 
-            // Use fallback if no viable child found
-            offspring.push(child.unwrap_or_else(|| self.generate_viable_genome()));
+                    // Check viability if using simple morphology
+                    if !self.config.use_simple_morphology || self.is_viable(&candidate, archetype) {
+                        child = Some(candidate);
+                        break;
+                    }
+                }
+
+                // Use fallback if no viable child found
+                let genome = child.unwrap_or_else(|| self.generate_viable_genome(archetype));
+                offspring.push((archetype, genome));
+            }
         }
 
         offspring
     }
 
-    /// Evaluate a population of genomes in parallel
-    fn evaluate_population_with_progress(
+    /// Evaluate a population of genomes in parallel (with archetypes)
+    fn evaluate_population_with_archetypes(
         &self,
-        genomes: &[CreatureGenome],
+        archetype_genomes: &[(CreatureArchetype, CreatureGenome)],
         pb: &ProgressBar,
     ) -> Result<Vec<EvalResult>> {
-        let results: Vec<EvalResult> = genomes
+        let results: Vec<EvalResult> = archetype_genomes
             .par_iter()
-            .map(|genome| {
-                let result = self.evaluate_single(genome.clone());
+            .map(|(archetype, genome)| {
+                let result = self.evaluate_single(genome.clone(), *archetype);
                 pb.inc(1);
                 result
             })
@@ -482,31 +587,27 @@ impl TrainingEnv {
     }
 
     /// Evaluate a single creature
-    fn evaluate_single(&self, genome: CreatureGenome) -> EvalResult {
+    fn evaluate_single(&self, genome: CreatureGenome, archetype: CreatureArchetype) -> EvalResult {
         // Set up world with cached food positions
         let (mut world, food_positions) = self.scenario.setup_world();
         let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
 
-        // Spawn creature using the configured morphology
+        // Spawn creature using the configured morphology and archetype
         let spawn_pos = self.scenario.config.spawn_position;
-        let creature_id = if self.scenario.config.name == "Parcour" {
-            // Start with 50% hunger for parcour - creates survival pressure
-            creature_manager.spawn_creature_with_hunger_and_config(
-                genome.clone(),
-                spawn_pos,
-                0.5,
-                &mut physics_world,
-                &self.morphology_config,
-            )
+        let initial_hunger = if self.scenario.config.name == "Parcour" {
+            0.5 // Start with 50% hunger for parcour - creates survival pressure
         } else {
-            creature_manager.spawn_creature_with_config(
-                genome.clone(),
-                spawn_pos,
-                &mut physics_world,
-                &self.morphology_config,
-            )
+            1.0 // Full hunger for other scenarios
         };
+        let creature_id = creature_manager.spawn_creature_with_archetype_and_hunger(
+            genome.clone(),
+            spawn_pos,
+            initial_hunger,
+            &mut physics_world,
+            &self.morphology_config,
+            archetype,
+        );
 
         // Run simulation (physics only - skip world.update() for speed)
         let dt = 1.0 / 60.0;
@@ -561,6 +662,7 @@ impl TrainingEnv {
         };
 
         EvalResult {
+            archetype,
             genome,
             fitness,
             behavior,
@@ -568,7 +670,7 @@ impl TrainingEnv {
         }
     }
 
-    /// Update grid with evaluation results
+    /// Update grids with evaluation results
     fn update_grid(&mut self, results: Vec<EvalResult>) -> TrainingStats {
         let mut new_elites = 0;
         let mut total_fitness = 0.0;
@@ -576,31 +678,51 @@ impl TrainingEnv {
         let mut max_displacement = 0.0f32;
 
         for result in &results {
-            if self.grid.try_insert(
-                result.genome.clone(),
-                result.fitness,
-                &result.behavior,
-                self.generation,
-            ) {
-                new_elites += 1;
+            if let Some(grid) = self.grids.get_mut(&result.archetype) {
+                if grid.try_insert(
+                    result.genome.clone(),
+                    result.fitness,
+                    &result.behavior,
+                    self.generation,
+                    result.archetype,
+                ) {
+                    new_elites += 1;
+                }
             }
             total_fitness += result.fitness;
             total_displacement += result.displacement;
             max_displacement = max_displacement.max(result.displacement);
         }
 
-        let stats = self.grid.stats();
+        // Compute aggregate stats across all grids
+        let mut best_fitness = f32::NEG_INFINITY;
+        let mut total_coverage = 0.0;
+        let mut best_per_archetype = HashMap::new();
+
+        for (archetype, grid) in &self.grids {
+            let stats = grid.stats();
+            best_fitness = best_fitness.max(stats.best_fitness);
+            total_coverage += stats.coverage;
+            best_per_archetype.insert(*archetype, stats.best_fitness);
+        }
+
+        let avg_coverage = if self.grids.is_empty() {
+            0.0
+        } else {
+            total_coverage / self.grids.len() as f32
+        };
+
         let n = results.len() as f32;
 
         TrainingStats {
             generation: self.generation,
-            best_fitness: stats.best_fitness,
+            best_fitness,
             avg_fitness: if results.is_empty() {
                 0.0
             } else {
                 total_fitness / n
             },
-            grid_coverage: stats.coverage,
+            grid_coverage: avg_coverage,
             new_elites,
             max_displacement,
             avg_displacement: if results.is_empty() {
@@ -608,6 +730,7 @@ impl TrainingEnv {
             } else {
                 total_displacement / n
             },
+            best_per_archetype,
         }
     }
 
@@ -617,9 +740,9 @@ impl TrainingEnv {
         std::fs::create_dir_all(&checkpoint_dir)
             .context("Failed to create checkpoint directory")?;
 
-        // Save best genome
-        if let Some(best) = self.grid.best_elite() {
-            let path = format!("{}/gen_{:04}_best.genome", checkpoint_dir, self.generation);
+        // Save best genome (overall champion)
+        if let Some((archetype, best)) = self.best_elite() {
+            let path = format!("{}/gen_{:04}_best_{}.genome", checkpoint_dir, self.generation, archetype.name().to_lowercase());
             let data =
                 bincode_next::serde::encode_to_vec(&best.genome, bincode_next::config::standard())
                     .context("Failed to serialize genome")?;
@@ -637,6 +760,7 @@ impl TrainingEnv {
     fn capture_elite_gif(
         &self,
         genome: &CreatureGenome,
+        archetype: CreatureArchetype,
         label: &str,
         fitness: f32,
         behavior: &[f32],
@@ -655,22 +779,19 @@ impl TrainingEnv {
         let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
         let spawn_pos = self.scenario.config.spawn_position;
-        let creature_id = if self.scenario.config.name == "Parcour" {
-            creature_manager.spawn_creature_with_hunger_and_config(
-                genome.clone(),
-                spawn_pos,
-                0.5,
-                &mut physics_world,
-                &self.morphology_config,
-            )
+        let initial_hunger = if self.scenario.config.name == "Parcour" {
+            0.5
         } else {
-            creature_manager.spawn_creature_with_config(
-                genome.clone(),
-                spawn_pos,
-                &mut physics_world,
-                &self.morphology_config,
-            )
+            1.0
         };
+        let creature_id = creature_manager.spawn_creature_with_archetype_and_hunger(
+            genome.clone(),
+            spawn_pos,
+            initial_hunger,
+            &mut physics_world,
+            &self.morphology_config,
+            archetype,
+        );
 
         // Simulation with frame capture
         let dt = 1.0 / 60.0;
@@ -785,33 +906,55 @@ impl TrainingEnv {
         })
     }
 
-    /// Capture GIFs for the best and diverse elites
+    /// Capture GIFs for the best creature from each archetype
     fn capture_all_gifs(&self, pb: &ProgressBar) -> Vec<CapturedGif> {
         let mut gifs = Vec::new();
 
-        pb.println("Capturing GIFs of evolved creatures...");
+        pb.println(format!(
+            "Capturing GIFs of best creatures from {} archetypes...",
+            self.archetypes.len()
+        ));
 
-        // Capture best elite
-        if let Some(best) = self.grid.best_elite() {
-            pb.println("  Capturing: Champion (best fitness)");
-            match self.capture_elite_gif(&best.genome, "Champion", best.fitness, &best.behavior) {
-                Ok(gif) => gifs.push(gif),
-                Err(e) => log::warn!("Failed to capture champion GIF: {}", e),
+        // Capture best elite from each archetype
+        for &archetype in &self.archetypes {
+            if let Some(grid) = self.grids.get(&archetype) {
+                if let Some(best) = grid.best_elite() {
+                    let label = format!("Best {}", archetype.name());
+                    pb.println(format!("  Capturing: {} (fitness: {:.2})", label, best.fitness));
+                    match self.capture_elite_gif(
+                        &best.genome,
+                        archetype,
+                        &label,
+                        best.fitness,
+                        &best.behavior,
+                    ) {
+                        Ok(gif) => gifs.push(gif),
+                        Err(e) => log::warn!("Failed to capture {} GIF: {}", label, e),
+                    }
+                }
             }
         }
 
-        // Capture diverse elites
-        let diverse = self.grid.sample_diverse_elites();
-        for diverse_elite in diverse {
-            pb.println(format!("  Capturing: {}", diverse_elite.label));
-            match self.capture_elite_gif(
-                &diverse_elite.elite.genome,
-                &diverse_elite.label,
-                diverse_elite.elite.fitness,
-                &diverse_elite.elite.behavior,
-            ) {
-                Ok(gif) => gifs.push(gif),
-                Err(e) => log::warn!("Failed to capture {} GIF: {}", diverse_elite.label, e),
+        // Also capture overall champion if there are multiple archetypes
+        if self.archetypes.len() > 1 {
+            if let Some((champion_archetype, best)) = self.best_elite() {
+                // Only add if not already captured (i.e., if it's different from individual archetype bests)
+                let overall_label = format!("Champion ({})", champion_archetype.name());
+                let already_have_champion = gifs.iter().any(|g| g.label == format!("Best {}", champion_archetype.name()) && (g.fitness - best.fitness).abs() < 0.01);
+
+                if !already_have_champion {
+                    pb.println(format!("  Capturing: {} (fitness: {:.2})", overall_label, best.fitness));
+                    match self.capture_elite_gif(
+                        &best.genome,
+                        *champion_archetype,
+                        &overall_label,
+                        best.fitness,
+                        &best.behavior,
+                    ) {
+                        Ok(gif) => gifs.push(gif),
+                        Err(e) => log::warn!("Failed to capture overall champion GIF: {}", e),
+                    }
+                }
             }
         }
 

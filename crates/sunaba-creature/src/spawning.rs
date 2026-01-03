@@ -12,6 +12,7 @@ use crate::PhysicsWorld;
 
 use super::creature::Creature;
 use super::genome::CreatureGenome;
+use super::morphology::CreatureArchetype;
 
 /// Manages creature population
 pub struct CreatureManager {
@@ -111,6 +112,29 @@ impl CreatureManager {
         physics_world: &mut PhysicsWorld,
         morph_config: &super::morphology::MorphologyConfig,
     ) -> EntityId {
+        self.spawn_creature_with_archetype_and_hunger(
+            genome,
+            position,
+            initial_hunger_percent,
+            physics_world,
+            morph_config,
+            CreatureArchetype::Evolved, // Default: use CPPN-generated morphology
+        )
+    }
+
+    /// Spawn creature from genome with archetype, hunger, and morphology config
+    ///
+    /// This is the most complete spawn method. The archetype determines whether
+    /// to use the CPPN-generated morphology (Evolved) or a fixed body plan.
+    pub fn spawn_creature_with_archetype_and_hunger(
+        &mut self,
+        genome: CreatureGenome,
+        position: Vec2,
+        initial_hunger_percent: f32,
+        physics_world: &mut PhysicsWorld,
+        morph_config: &super::morphology::MorphologyConfig,
+        archetype: CreatureArchetype,
+    ) -> EntityId {
         // Check if we can spawn
         if !self.can_spawn() {
             log::warn!(
@@ -120,8 +144,9 @@ impl CreatureManager {
             return EntityId::new(); // Return dummy ID
         }
 
-        // Create creature from genome with the specified morphology config
-        let mut creature = Creature::from_genome_with_config(genome, position, morph_config);
+        // Create creature from genome with archetype morphology
+        let mut creature =
+            Creature::from_genome_with_archetype(genome, position, morph_config, archetype);
         let id = creature.id;
 
         // Set initial hunger level
@@ -137,7 +162,8 @@ impl CreatureManager {
         self.creatures.insert(id, creature);
 
         log::info!(
-            "Spawned creature {} at ({:.1}, {:.1}) with {:.0}% hunger. Population: {}/{}",
+            "Spawned {} creature {} at ({:.1}, {:.1}) with {:.0}% hunger. Population: {}/{}",
+            archetype.name(),
             id,
             position.x,
             position.y,

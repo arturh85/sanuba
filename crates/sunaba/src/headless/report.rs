@@ -2,9 +2,12 @@
 //!
 //! Generates visual reports with embedded GIFs and fitness charts.
 
+use std::collections::HashMap;
 use std::fs;
 
 use anyhow::{Context, Result};
+
+use crate::creature::morphology::CreatureArchetype;
 
 use super::map_elites::MapElitesGrid;
 use super::scenario::ScenarioConfig;
@@ -40,7 +43,7 @@ impl ReportGenerator {
         }
     }
 
-    /// Generate the final HTML report
+    /// Generate the final HTML report (legacy single-grid version)
     pub fn generate_final_report(
         &self,
         grid: &MapElitesGrid,
@@ -57,6 +60,30 @@ impl ReportGenerator {
 
         // Generate summary JSON
         let json = self.generate_summary_json(grid, stats_history);
+        let json_path = format!("{}/summary.json", self.output_dir);
+        fs::write(&json_path, json).context("Failed to write summary JSON")?;
+
+        log::info!("Report generated: {}", path);
+        Ok(())
+    }
+
+    /// Generate the final HTML report for multi-archetype training
+    pub fn generate_final_report_multi(
+        &self,
+        grids: &HashMap<CreatureArchetype, MapElitesGrid>,
+        stats_history: &[TrainingStats],
+        gifs: &[CapturedGif],
+    ) -> Result<()> {
+        // Create output directory
+        fs::create_dir_all(&self.output_dir).context("Failed to create output directory")?;
+
+        // Generate index.html with multi-archetype content
+        let html = self.generate_html_multi(grids, stats_history, gifs);
+        let path = format!("{}/index.html", self.output_dir);
+        fs::write(&path, html).context("Failed to write report HTML")?;
+
+        // Generate summary JSON with multi-archetype info
+        let json = self.generate_summary_json_multi(grids, stats_history);
         let json_path = format!("{}/summary.json", self.output_dir);
         fs::write(&json_path, json).context("Failed to write summary JSON")?;
 
@@ -473,6 +500,306 @@ impl ReportGenerator {
             stats.coverage,
             stats.cell_count,
             stats.total_cells,
+            stats_history
+                .iter()
+                .map(|s| format!("{:.2}", s.best_fitness))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+
+    /// Generate HTML content for multi-archetype training
+    fn generate_html_multi(
+        &self,
+        grids: &HashMap<CreatureArchetype, MapElitesGrid>,
+        stats_history: &[TrainingStats],
+        gifs: &[CapturedGif],
+    ) -> String {
+        // Aggregate stats across all grids
+        let mut total_cells = 0;
+        let mut total_coverage = 0.0;
+        let mut best_fitness = f32::NEG_INFINITY;
+        let mut archetype_stats = Vec::new();
+
+        for (archetype, grid) in grids {
+            let stats = grid.stats();
+            total_cells += stats.cell_count;
+            total_coverage += stats.coverage;
+            best_fitness = best_fitness.max(stats.best_fitness);
+            archetype_stats.push((archetype.name(), stats.best_fitness, stats.coverage * 100.0));
+        }
+
+        let num_archetypes = grids.len();
+        let avg_coverage = if num_archetypes > 0 {
+            total_coverage / num_archetypes as f32 * 100.0
+        } else {
+            0.0
+        };
+
+        let fitness_chart = self.generate_fitness_svg(stats_history);
+        let gif_section = self.generate_gif_section(gifs);
+
+        // Generate per-archetype stats cards
+        let mut archetype_cards = String::new();
+        for (name, fitness, coverage) in &archetype_stats {
+            archetype_cards.push_str(&format!(
+                r#"<div class="stat-card">
+                    <div class="stat-value">{:.1}</div>
+                    <div class="stat-label">{} Best</div>
+                    <div class="stat-label" style="color: #666;">Coverage: {:.0}%</div>
+                </div>"#,
+                fitness, name, coverage
+            ));
+        }
+
+        format!(
+            r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunaba Training Report - {scenario_name}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }}
+        h1, h2, h3 {{ color: #4ecdc4; }}
+        .header {{
+            border-bottom: 2px solid #4ecdc4;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .scenario-info {{
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }}
+        .stat-card {{
+            background: #16213e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #4ecdc4;
+        }}
+        .stat-label {{
+            color: #888;
+            font-size: 0.85em;
+        }}
+        .chart-container {{
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }}
+        svg {{
+            display: block;
+            margin: 0 auto;
+        }}
+        .description {{
+            color: #aaa;
+            line-height: 1.6;
+        }}
+        .gif-section {{
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }}
+        .gif-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .gif-card {{
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }}
+        .gif-card img {{
+            width: 368px;
+            height: 368px;
+            border-radius: 5px;
+            image-rendering: pixelated;
+            background: #000;
+        }}
+        .gif-label {{
+            font-weight: bold;
+            color: #4ecdc4;
+            margin-top: 10px;
+            font-size: 1.1em;
+        }}
+        .gif-stats {{
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }}
+        .archetype-section {{
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧬 Sunaba Multi-Archetype Training Report</h1>
+        <p class="description">Creature evolution results across {num_archetypes} archetypes</p>
+    </div>
+
+    <div class="scenario-info">
+        <h2>Scenario: {scenario_name}</h2>
+        <p class="description"><strong>Description:</strong> {scenario_desc}</p>
+        <p class="description"><strong>Expected Behavior:</strong> {expected_behavior}</p>
+        <p class="description"><strong>Evaluation Duration:</strong> {eval_duration}s per creature</p>
+    </div>
+
+    <div class="archetype-section">
+        <h3>Per-Archetype Performance</h3>
+        <div class="stats-grid">
+            {archetype_cards}
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{generations}</div>
+            <div class="stat-label">Generations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{num_archetypes}</div>
+            <div class="stat-label">Archetypes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{best_fitness:.2}</div>
+            <div class="stat-label">Overall Best</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{avg_coverage:.1}%</div>
+            <div class="stat-label">Avg Coverage</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{total_cells}</div>
+            <div class="stat-label">Total Elites</div>
+        </div>
+    </div>
+
+    {gif_section}
+
+    <div class="chart-container">
+        <h3>Fitness Over Generations</h3>
+        {fitness_chart}
+    </div>
+
+    <footer style="text-align: center; color: #666; margin-top: 40px;">
+        Generated by Sunaba Multi-Archetype Training
+    </footer>
+</body>
+</html>"#,
+            scenario_name = self.scenario_config.name,
+            scenario_desc = self.scenario_config.description,
+            expected_behavior = self.scenario_config.expected_behavior,
+            eval_duration = self.scenario_config.eval_duration,
+            generations = stats_history.len(),
+            num_archetypes = num_archetypes,
+            best_fitness = best_fitness,
+            avg_coverage = avg_coverage,
+            total_cells = total_cells,
+            archetype_cards = archetype_cards,
+            gif_section = gif_section,
+            fitness_chart = fitness_chart,
+        )
+    }
+
+    /// Generate summary JSON for multi-archetype training
+    fn generate_summary_json_multi(
+        &self,
+        grids: &HashMap<CreatureArchetype, MapElitesGrid>,
+        stats_history: &[TrainingStats],
+    ) -> String {
+        use std::fmt::Write;
+
+        let mut per_archetype = String::new();
+        let mut first = true;
+        for (archetype, grid) in grids {
+            if !first {
+                per_archetype.push_str(",\n        ");
+            }
+            first = false;
+            let stats = grid.stats();
+            let _ = write!(
+                per_archetype,
+                r#""{name}": {{ "best_fitness": {best:.2}, "coverage": {cov:.2}, "cell_count": {cells} }}"#,
+                name = archetype.name(),
+                best = stats.best_fitness,
+                cov = stats.coverage,
+                cells = stats.cell_count,
+            );
+        }
+
+        let mut best_fitness = f32::NEG_INFINITY;
+        let mut total_cells = 0;
+        let mut total_coverage = 0.0;
+        for grid in grids.values() {
+            let stats = grid.stats();
+            best_fitness = best_fitness.max(stats.best_fitness);
+            total_cells += stats.cell_count;
+            total_coverage += stats.coverage;
+        }
+        let avg_coverage = if !grids.is_empty() {
+            total_coverage / grids.len() as f32
+        } else {
+            0.0
+        };
+
+        format!(
+            r#"{{
+    "scenario": {{
+        "name": "{}",
+        "description": "{}",
+        "expected_behavior": "{}",
+        "eval_duration": {}
+    }},
+    "results": {{
+        "generations": {},
+        "num_archetypes": {},
+        "best_fitness": {:.2},
+        "avg_coverage": {:.4},
+        "total_cells": {}
+    }},
+    "per_archetype": {{
+        {}
+    }},
+    "fitness_history": [{}]
+}}"#,
+            self.scenario_config.name,
+            self.scenario_config.description,
+            self.scenario_config.expected_behavior,
+            self.scenario_config.eval_duration,
+            stats_history.len(),
+            grids.len(),
+            best_fitness,
+            avg_coverage,
+            total_cells,
+            per_archetype,
             stats_history
                 .iter()
                 .map(|s| format!("{:.2}", s.best_fitness))

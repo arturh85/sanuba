@@ -112,6 +112,56 @@ impl Creature {
         Self::from_genome_with_config(genome, position, &MorphologyConfig::default())
     }
 
+    /// Create creature from genome with archetype morphology
+    ///
+    /// For fixed archetypes (Spider, Snake, Worm, Flyer), uses the predefined body plan.
+    /// For Evolved archetype, generates morphology from CPPN genome.
+    pub fn from_genome_with_archetype(
+        genome: CreatureGenome,
+        position: Vec2,
+        config: &super::morphology::MorphologyConfig,
+        archetype: super::morphology::CreatureArchetype,
+    ) -> Self {
+        // Generate morphology based on archetype
+        let morphology = archetype.create_morphology(&genome, config);
+
+        // Create neural controller from genome
+        let num_raycasts = 8;
+        let num_materials = 5;
+        let input_dim = morphology.body_parts.len()
+            * super::neural::BodyPartFeatures::feature_dim(num_raycasts, num_materials);
+        let output_dim = morphology.joints.len(); // One motor command per joint
+
+        let brain = DeepNeuralController::from_genome(&genome.controller, input_dim, output_dim);
+
+        // Create planner
+        let planner = GoalPlanner::new();
+
+        Self {
+            id: EntityId::new(),
+            genome,
+            morphology,
+            physics: None, // Will be built when spawned
+            health: Health::new(100.0),
+            hunger: Hunger::new(100.0, 0.5, 5.0), // max=100, drain=0.5/s, starvation_dmg=5/s
+            needs: CreatureNeeds::new(),
+            planner: Some(planner),
+            brain: Some(brain),
+            current_action: None,
+            action_timer: 0.0,
+            sensor_config: SensorConfig::default(),
+            position,
+            generation: 0,
+            food_eaten: 0,
+            velocity: Vec2::ZERO,
+            wander_target: None,
+            wander_timer: 0.0,
+            facing_direction: 1.0,
+            grounded: false,
+            pending_motor_commands: None,
+        }
+    }
+
     /// Update creature state
     /// Returns true if the creature died
     pub fn update(
@@ -524,6 +574,17 @@ impl Creature {
                         if self.grounded && angular_vel.abs() > 2.0 {
                             thrust_y += angular_vel.abs() * height_factor * 0.5;
                         }
+
+                        // Wing lift physics: wings oscillating in air create upward lift
+                        // Higher angular velocity = more lift
+                        if part.is_wing && !self.grounded {
+                            // Wing oscillation creates lift proportional to angular velocity
+                            // The faster the wing flaps, the more lift is generated
+                            const WING_LIFT_FACTOR: f32 = 15.0;
+                            let oscillation_intensity = angular_vel.abs();
+                            let lift = oscillation_intensity * WING_LIFT_FACTOR;
+                            thrust_y += lift;
+                        }
                     }
                 }
 
@@ -536,9 +597,16 @@ impl Creature {
             self.velocity.x = self.velocity.x * 0.9 + thrust_x * delta_time * 100.0;
             self.velocity.x = self.velocity.x.clamp(-MAX_SPEED, MAX_SPEED);
 
-            // Small upward thrust when grounded and motors are active
-            if self.grounded && thrust_y > 0.5 {
-                self.velocity.y += thrust_y * delta_time * 50.0;
+            // Vertical thrust: jump from ground or wing lift while airborne
+            if thrust_y > 0.5 {
+                if self.grounded {
+                    // Jump or take off from ground
+                    self.velocity.y += thrust_y * delta_time * 50.0;
+                } else {
+                    // Airborne: wing lift counters gravity (partial or full)
+                    // This allows sustained flight if wings oscillate fast enough
+                    self.velocity.y += thrust_y * delta_time * 40.0;
+                }
             }
 
             // Update facing direction based on velocity

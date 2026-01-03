@@ -1046,6 +1046,113 @@ impl CreatureGenome {
         }
     }
 
+    // ===== Archetype Genome Constructors =====
+    // These create genomes optimized for specific morphology archetypes
+
+    /// Spider archetype genome: 8 motor outputs for 8 legs
+    pub fn archetype_spider() -> Self {
+        let cppn = CppnGenome::minimal();
+        // 8 legs = 8 motor outputs, larger hidden dim for coordination
+        let controller = ControllerGenome::random(32, 3);
+        let traits = BehavioralTraits {
+            aggression: 0.4,
+            curiosity: 0.6,
+            sociality: 0.3,
+            territoriality: 0.5,
+        };
+        let metabolic = MetabolicParams {
+            hunger_rate: 0.12,
+            temperature_tolerance: (-5.0, 45.0),
+            oxygen_requirement: 0.06,
+        };
+
+        Self {
+            cppn,
+            controller,
+            traits,
+            metabolic,
+            generation: 0,
+        }
+    }
+
+    /// Snake archetype genome: 5 motor outputs for 5 body segment joints
+    pub fn archetype_snake() -> Self {
+        let cppn = CppnGenome::minimal();
+        // 5 joints between 6 segments, need coordination for wave propagation
+        let controller = ControllerGenome::random(24, 3);
+        let traits = BehavioralTraits {
+            aggression: 0.3,
+            curiosity: 0.5,
+            sociality: 0.2,
+            territoriality: 0.4,
+        };
+        let metabolic = MetabolicParams {
+            hunger_rate: 0.08,
+            temperature_tolerance: (0.0, 40.0),
+            oxygen_requirement: 0.04,
+        };
+
+        Self {
+            cppn,
+            controller,
+            traits,
+            metabolic,
+            generation: 0,
+        }
+    }
+
+    /// Worm archetype genome: 3 motor outputs for accordion motion
+    pub fn archetype_worm() -> Self {
+        let cppn = CppnGenome::minimal();
+        // 3 joints between 4 segments, simple but flexible
+        let controller = ControllerGenome::random(12, 2);
+        let traits = BehavioralTraits {
+            aggression: 0.1,
+            curiosity: 0.4,
+            sociality: 0.3,
+            territoriality: 0.1,
+        };
+        let metabolic = MetabolicParams {
+            hunger_rate: 0.04,
+            temperature_tolerance: (5.0, 35.0),
+            oxygen_requirement: 0.02,
+        };
+
+        Self {
+            cppn,
+            controller,
+            traits,
+            metabolic,
+            generation: 0,
+        }
+    }
+
+    /// Flyer archetype genome: 3 motor outputs (2 wings + tail)
+    pub fn archetype_flyer() -> Self {
+        let cppn = CppnGenome::minimal();
+        // 2 wings + 1 tail, need fast coordination for flight
+        let controller = ControllerGenome::random(20, 2);
+        let traits = BehavioralTraits {
+            aggression: 0.2,
+            curiosity: 0.8, // Curious/exploratory
+            sociality: 0.4,
+            territoriality: 0.3,
+        };
+        let metabolic = MetabolicParams {
+            hunger_rate: 0.15, // Flying is energy-intensive
+            temperature_tolerance: (10.0, 35.0),
+            oxygen_requirement: 0.1,
+        };
+
+        Self {
+            cppn,
+            controller,
+            traits,
+            metabolic,
+            generation: 0,
+        }
+    }
+
     /// Mutate the complete genome
     pub fn mutate(&mut self, cppn_config: &MutationConfig, controller_rate: f32) {
         use rand::Rng;

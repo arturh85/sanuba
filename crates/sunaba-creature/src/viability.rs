@@ -304,6 +304,7 @@ mod tests {
                 radius: 5.0,
                 density: 1.0,
                 index: 0,
+                is_wing: false,
             }],
             joints: vec![],
             root_part_index: 0,
