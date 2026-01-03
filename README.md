@@ -114,13 +114,41 @@ where complex behavior arises naturally from fundamental rules rather than scrip
 
 ## Development Status
 
-🚧 **In Development**
-- ✅ Core physics simulation (falling sand, temperature, chemistry, structural integrity)
-- ✅ Persistent world with procedural generation
-- ✅ World enhancement for creature interactions (resources, light, advanced materials)
-- ✅ ML creature architecture (CPPN-NEAT morphology, neural control, GOAP behavior)
-- ✅ Offline evolution pipeline (MAP-Elites, training scenarios, HTML reports)
-- 🔨 Survival integration (taming, breeding, creature persistence)
+🔬 **Research Phase** — Evolving the first viable creatures
+
+### Foundation (Stable)
+The simulation core is complete and battle-tested:
+- Pixel physics: 32 materials with temperature, reactions, state changes
+- Structural integrity with rapier2d falling debris
+- Persistent world with procedural cave generation
+- Player systems: mining, crafting, inventory
+
+### Creature Evolution (Active Research)
+Building the ML creature pipeline—currently exploring:
+- **Locomotion**: Tuning motor control and body physics for reliable movement
+- **Self-sustaining behaviors**: Creatures that find food and survive autonomously
+- **Training pipeline**: MAP-Elites behavioral diversity, fitness functions
+- **Morphology-controller coupling**: Bodies and brains that co-evolve together
+
+What's working: CPPN-NEAT genomes, morphology generation, neural controllers,
+6 training scenarios, HTML reports with GIF captures.
+
+What we're learning: How to get creatures that actually walk, feed themselves,
+and exhibit meaningful behaviors rather than twitching in place.
+
+### Research Roadmap
+These are experimental milestones, not promises:
+
+**Near-term exploration:**
+- Viable locomotion (creatures that reliably move across terrain)
+- Foraging behavior (find and consume food sources)
+- Survival pressure (avoid hazards, manage hunger)
+
+**Future directions:**
+- Multi-agent dynamics (predator-prey, competition, cooperation)
+- Tool use and manipulation (mining, building)
+- Pre-evolved creature library (diverse archetypes for gameplay)
+- Survival integration (taming, breeding, player interaction)
 
 ## License
 

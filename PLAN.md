@@ -116,28 +116,88 @@
 - [x] **CPPN graph serialization** (sync_to_serializable, rebuild_graph preserves structure)
 - [ ] **Player-creature interaction foundation** (detection, targeting) - deferred to Phase 8
 
-### Phase 7: Offline Evolution Pipeline (In Progress)
-- [x] **Headless training environment** (`src/headless/` module with feature flag)
-- [x] **MAP-Elites implementation** (10x10 behavioral diversity grid, locomotion × foraging)
-- [x] **Fitness functions** (DistanceFitness, ForagingFitness, SurvivalFitness, CompositeFitness)
-- [x] **Training scenarios** (Locomotion, Foraging, Survival, Balanced with world setup)
-- [x] **Parallel simulation infrastructure** (rayon parallel creature evaluation)
-- [x] **Checkpoint system** (genome serialization with bincode)
-- [x] **HTML report generator** (fitness charts, MAP-Elites grid visualization)
-- [x] **GIF capture system** (pixel buffer renderer, frame capture, gif encoding)
-- [x] **CLI entry point for training** (`--train`, `--scenario`, `--generations`, `--population`, `--output` flags)
-- [ ] Multi-agent training scenarios (predator-prey, competition, hide-and-seek, tool use)
-- [ ] Pre-evolved creature library (100+ behavioral archetypes across niches)
-- [ ] **GPU-accelerated CA simulation** (wgpu compute shaders for faster training)
+### Phase 7: Creature Evolution Research (Active)
 
-### Phase 8: Survival Integration & Creature Deployment
-- [ ] Creature spawning from pre-trained library
-- [ ] Regional specialization (biome-appropriate creatures, population limits)
-- [ ] **Tool system** (pickaxe, weapons for mining/combat)c
-- [ ] **Advanced crafting** (recipes, workstations)
-- [ ] **Taming mechanics** (knockout/feeding, taming effectiveness)
-- [ ] **Breeding system** (sexual reproduction, NEAT crossover, mutation, inheritance UI)
-- [ ] **Player health and needs** (hunger, health, creature attacks)
-- [ ] Runtime neural inference optimization (model compression for many creatures)
+This phase is iterative experimentation, not linear completion. Success is measured by creature behaviors, not checkboxes.
+
+**Infrastructure (Complete):**
+- [x] Headless training environment (`src/headless/` module with feature flag)
+- [x] MAP-Elites implementation (10x10 behavioral diversity grid)
+- [x] Fitness functions (Distance, Foraging, Survival, Movement, FoodCollection, Composite)
+- [x] Training scenarios (Locomotion, SimpleLocomotion, Foraging, Survival, Balanced, Parcour)
+- [x] Parallel simulation (rayon), checkpoints (bincode), HTML reports, GIF capture
+- [x] CLI training (`--train`, `--scenario`, `--generations`, `--population`, `--output`)
+
+#### 7a: Locomotion Research 🔬
+Goal: Creatures that reliably move across flat terrain.
+- [ ] Motor control tuning (joint forces, damping, friction)
+- [ ] Body physics calibration (mass distribution, ground contact)
+- [ ] Simple morphology experiments (biped, quadruped, worm)
+- [ ] Fitness function refinement (distance vs energy efficiency)
+- [ ] Baseline: creature moves >100px in 30 seconds consistently
+
+#### 7b: Self-Sustaining Creatures 🔬
+Goal: Creatures that find food and survive without intervention.
+- [ ] Hunger-driven behavior (foraging when hungry)
+- [ ] Food detection tuning (sensor range, gradient following)
+- [ ] Energy economics (movement cost vs nutrition gain)
+- [ ] Survival duration experiments (how long can they last?)
+- [ ] Baseline: creature survives >60 seconds in foraging scenario
+
+#### 7c: Training Pipeline Refinement 🔬
+Goal: MAP-Elites produces genuinely diverse, viable creatures.
+- [ ] Behavioral descriptor tuning (what axes matter?)
+- [ ] Tournament vs uniform selection experiments
+- [ ] Mutation rate calibration (exploration vs exploitation)
+- [ ] Checkpoint analysis (when do good behaviors emerge?)
+- [ ] Baseline: 50%+ grid coverage with viable creatures
+
+#### 7d: Advanced Behaviors (Future)
+Goal: Complex, goal-directed creature behaviors.
+- [ ] Obstacle navigation (parcour scenario refinement)
+- [ ] Mining behavior (break through walls to reach food)
+- [ ] Multi-objective optimization (move AND eat AND survive)
+- [ ] Tool use experiments (if applicable)
+
+#### 7e: Multi-Agent Dynamics (Future)
+Goal: Creatures that interact meaningfully with each other.
+- [ ] Predator-prey scenarios
+- [ ] Competition for resources
+- [ ] Cooperative behaviors (if they emerge)
+- [ ] Population dynamics
+
+#### Future Infrastructure
+- [ ] GPU-accelerated CA simulation (wgpu compute shaders for faster training)
+- [ ] Pre-evolved creature library (100+ behavioral archetypes across niches)
+
+### Phase 8: Survival Integration
+Requires stable creature behaviors from Phase 7.
+
+#### 8a: Creature Deployment
+- [ ] Spawn pre-trained creatures in persistent world
+- [ ] Regional creature populations (biome specialization)
 - [ ] Creature persistence (save/load with world)
-- [ ] **Creature management UI** (stats, genetics, commands, breeding visualization)
+- [ ] Population limits and respawning
+- [ ] Runtime neural inference optimization (model compression for many creatures)
+
+#### 8b: Player Interaction
+- [ ] Player-creature collision and combat
+- [ ] Player health and needs (hunger, health, creature attacks)
+- [ ] Taming mechanics (knockout, feeding, trust levels)
+- [ ] Creature commands (follow, stay, attack)
+- [ ] Tamed creature persistence
+
+#### 8c: Breeding System
+- [ ] Sexual reproduction (mate selection, NEAT crossover)
+- [ ] Mutation during breeding
+- [ ] Inheritance visualization UI
+- [ ] Selective breeding for traits
+
+#### 8d: Creature Management
+- [ ] Creature stats panel (health, hunger, genetics)
+- [ ] Breeding pen / incubation
+- [ ] Creature inventory / storage
+
+#### 8e: Advanced Systems (Future)
+- [ ] Tool system (pickaxe, weapons for mining/combat)
+- [ ] Advanced crafting (recipes, workstations)
