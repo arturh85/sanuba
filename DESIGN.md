@@ -291,8 +291,8 @@ pub fn compute_fitness(metrics: &FitnessMetrics) -> f32 {
 
 - [CPPN-NEAT](http://eplex.cs.ucf.edu/papers/stanley_gpem07.pdf) - "Compositional Pattern Producing Networks" (Stanley, 2007)
 - [MAP-Elites](https://arxiv.org/abs/1504.04909) - "Illuminating the Space of Possible Behaviors" (Mouret & Clune, 2015)
-- [NerveNet](https://arxiv.org/abs/1809.08693) - "Learning Transferable Graph Neural Networks"
-- [AMORPHEUS](https://arxiv.org/abs/2302.14543) - "Transformer for Morphological Control"
+- [NerveNet](https://openreview.net/forum?id=S1sqHMZCb) - "Learning Structured Policy with Graph Neural Networks" (Wang et al., ICLR 2018)
+- [Amorpheus](https://arxiv.org/abs/2010.01856) - "My Body is a Cage: the Role of Morphology in Graph-Based Incompatible Control" (Kurin et al., ICLR 2021)
 - [Multi-Agent Autocurricula](https://arxiv.org/abs/1909.07528) - "Emergent Tool Use" (OpenAI, 2019)
 - [GOAP](http://alumni.media.mit.edu/~jorkin/goap.html) - "Goal-Oriented Action Planning" (Orkin, 2006)
 - [Quality-Diversity](https://quality-diversity.github.io/) - QD algorithms overview

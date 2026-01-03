@@ -8,14 +8,6 @@ Sunaba is a research-oriented sandbox exploring the intersection of **emergent p
 
 The playable web version is available at [/game/](game/).
 
-## Slides
-
-A deck of slides describing the project is available at [/sunaba_slides.pdf](/sunaba_slides.pdf).
-
-## Notebook LM Explainer Video
-
-A Notebook LM generated Video explaining the project is available in [english](https://youtu.be/40-xBt8KpDY) and [german](https://youtu.be/5yHAeTaHZjY).
-
 ## The Core Question
 
 Can complex, adaptive behaviors emerge from the interaction of simple rules and evolutionary pressure?
@@ -76,9 +68,9 @@ flowchart LR
 
 This project builds on decades of research in artificial life, neuroevolution, and emergent simulation. Key influences include:
 
-- Stanley, K.O. (2007). Compositional Pattern Producing Networks
-- Mouret, J.-B. & Clune, J. (2015). Illuminating search spaces by mapping elites
-- Sims, K. (1994). Evolved Virtual Creatures
-- Nolla Games (2019). Noita — Falling sand physics
+- Stanley, K.O. (2007). [Compositional Pattern Producing Networks](https://doi.org/10.1007/s10710-007-9028-8)
+- Mouret, J.-B. & Clune, J. (2015). [Illuminating search spaces by mapping elites](https://arxiv.org/abs/1504.04909)
+- Sims, K. (1994). [Evolved Virtual Creatures](https://www.karlsims.com/evolved-virtual-creatures.html)
+- Nolla Games (2019). [Noita — Falling sand physics](https://www.gdcvault.com/play/1025695/)
 
 See [Prior Work](prior-work.md) for a comprehensive literature review.

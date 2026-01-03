@@ -27,7 +27,7 @@ John von Neumann asked: what are the logical requirements for a machine to repro
 
 ### Tierra (1990)
 
-Thomas Ray created Tierra, a virtual world where self-replicating computer programs competed for CPU time and memory. Amazingly, evolution produced:
+Thomas Ray created [Tierra](https://en.wikipedia.org/wiki/Tierra_(computer_simulation)), a virtual world where self-replicating computer programs competed for CPU time and memory. Amazingly, evolution produced:
 - Parasites (programs that hijack others' reproduction)
 - Hyper-parasites (programs that exploit parasites)
 - Social organisms (programs that cooperate)
@@ -52,7 +52,7 @@ The resulting creatures exhibited:
 This work directly inspired Sunaba's approach to creature evolution.
 
 ### Paper
-Sims, K. (1994). "Evolving Virtual Creatures." *SIGGRAPH 94 Proceedings*.
+Sims, K. (1994). ["Evolving Virtual Creatures."](https://www.karlsims.com/papers/siggraph94.pdf) *SIGGRAPH '94 Proceedings*.
 
 ## Falling Sand Games
 
@@ -132,14 +132,14 @@ Lehman and Stanley's Novelty Search abandoned fitness entirely:
 
 ### MAP-Elites (2015)
 
-Mouret and Clune's MAP-Elites combined novelty and fitness:
+Mouret and Clune's [MAP-Elites](https://arxiv.org/abs/1504.04909) combined novelty and fitness:
 - Maintain archive of diverse solutions
 - Each solution is elite for its behavioral niche
 - Illuminates the space of possible behaviors
 
 ### Applications to Robotics
 
-Cully et al. (2015) used MAP-Elites for robot damage recovery:
+[Cully et al. (2015)](https://arxiv.org/abs/1407.3501) used MAP-Elites for robot damage recovery:
 - Pre-compute archive of walking behaviors
 - When damaged, robot searches archive for working alternatives
 - Recovery in under 2 minutes
@@ -150,7 +150,7 @@ This demonstrated QD's practical value for adaptive systems.
 
 ### The Golem Project (2000)
 
-Lipson and Pollack automatically designed and fabricated robots:
+[Lipson and Pollack](http://www.demo.cs.brandeis.edu/golem/) automatically designed and fabricated robots:
 - Simulated evolution of body and brain
 - Physical robots built from evolved designs
 - Demonstrated simulation-to-reality transfer
@@ -164,7 +164,7 @@ Recent work evolves soft robots from voxel grids:
 - CPPN-generated morphologies
 - Demonstrated complex locomotion
 
-**Kriegman et al. (2020) — Xenobots**
+**[Kriegman et al. (2020)](https://doi.org/10.1073/pnas.1910837117) — Xenobots**
 - Evolved cell configurations
 - Built from biological cells
 - First living robots
@@ -196,7 +196,7 @@ Challenges:
 
 ### POET (2019)
 
-Wang et al.'s POET (Paired Open-Ended Trailblazer) co-evolves environments and agents:
+Wang et al.'s [POET](https://arxiv.org/abs/1901.01753) (Paired Open-Ended Trailblazer) co-evolves environments and agents:
 - Environments become harder as agents improve
 - Agents transfer between environments
 - Produces generalist agents
@@ -222,12 +222,12 @@ Sunaba uses Rapier for rigid body physics:
 
 The computer graphics community has developed techniques for physically simulated characters:
 
-**DeepMimic (2018)**
+**[DeepMimic (2018)](https://arxiv.org/abs/1804.02717)**
 - Neural networks learn from motion capture
 - Physically simulated execution
 - Robust to perturbations
 
-**Character Controllers (Peng et al.)**
+**[Character Controllers (Peng et al.)](https://arxiv.org/abs/1905.09808)**
 - Hierarchical policies
 - Reusable skills library
 - Transfer to new morphologies
@@ -268,42 +268,42 @@ An alternative to GOAP, behavior trees provide:
 
 ### Foundational
 
-- Von Neumann, J. (1966). *Theory of Self-Reproducing Automata*.
-- Wolfram, S. (2002). *A New Kind of Science*.
-- Ray, T. (1991). "An Approach to the Synthesis of Life." *Artificial Life II*.
+- Von Neumann, J. (1966). [*Theory of Self-Reproducing Automata*](https://cba.mit.edu/events/03.11.ASE/docs/VonNeumann.pdf). Ed. Arthur W. Burks.
+- Wolfram, S. (2002). [*A New Kind of Science*](https://www.wolframscience.com/nks/).
+- Ray, T. (1991). ["An Approach to the Synthesis of Life."](http://tomray.me/pubs/alife2/Ray1991AnApproachToTheSynthesisOfLife.pdf) *Artificial Life II*.
 
 ### Evolution
 
-- Stanley, K.O. & Miikkulainen, R. (2002). "Evolving Neural Networks through Augmenting Topologies."
-- Stanley, K.O. (2007). "Compositional Pattern Producing Networks."
-- Mouret, J.-B. & Clune, J. (2015). "Illuminating search spaces by mapping elites."
+- Stanley, K.O. & Miikkulainen, R. (2002). ["Evolving Neural Networks through Augmenting Topologies."](https://direct.mit.edu/evco/article/10/2/99/1123/) *Evolutionary Computation*.
+- Stanley, K.O. (2007). ["Compositional Pattern Producing Networks."](https://doi.org/10.1007/s10710-007-9028-8) *Genetic Programming and Evolvable Machines*.
+- Mouret, J.-B. & Clune, J. (2015). ["Illuminating search spaces by mapping elites."](https://arxiv.org/abs/1504.04909) *arXiv:1504.04909*.
 
 ### Creatures
 
-- Sims, K. (1994). "Evolving Virtual Creatures."
-- Cheney, N., et al. (2013). "Unshackling Evolution."
-- Wang, T., et al. (2018). "NerveNet."
+- Sims, K. (1994). ["Evolving Virtual Creatures."](https://www.karlsims.com/evolved-virtual-creatures.html) *SIGGRAPH '94*.
+- Cheney, N., MacCurdy, R., Clune, J., & Lipson, H. (2013). ["Unshackling Evolution."](http://jeffclune.com/publications/2013_Softbots_GECCO.pdf) *GECCO '13*.
+- Wang, T., Liao, R., Ba, J., & Fidler, S. (2018). ["NerveNet."](https://openreview.net/forum?id=S1sqHMZCb) *ICLR 2018*.
 
 ### Games
 
-- Nolla Games. (2019). "Exploring the Tech and Design of Noita." GDC.
-- Orkin, J. (2006). "Three States and a Plan: The A.I. of F.E.A.R." GDC.
+- Nolla Games. (2019). ["Exploring the Tech and Design of Noita."](https://www.gdcvault.com/play/1025695/) GDC.
+- Orkin, J. (2006). ["Three States and a Plan: The A.I. of F.E.A.R."](https://archive.org/details/GDC2006Orkin) GDC.
 
 ## Recommended Reading
 
 For those wanting to dive deeper:
 
 **Books:**
-- Floreano, D. & Mattiussi, C. (2008). *Bio-Inspired Artificial Intelligence*.
-- Stanley, K.O. & Lehman, J. (2015). *Why Greatness Cannot Be Planned*.
-- Mitchell, M. (2009). *Complexity: A Guided Tour*.
+- Floreano, D. & Mattiussi, C. (2008). [*Bio-Inspired Artificial Intelligence*](https://mitpress.mit.edu/9780262547734/). MIT Press.
+- Stanley, K.O. & Lehman, J. (2015). [*Why Greatness Cannot Be Planned*](https://link.springer.com/book/10.1007/978-3-319-15524-1). Springer.
+- Mitchell, M. (2009). [*Complexity: A Guided Tour*](https://global.oup.com/academic/product/complexity-9780199798100). Oxford UP.
 
 **Survey Papers:**
-- Pugh, J.K., et al. (2016). "Quality Diversity: A New Frontier."
-- Doncieux, S., et al. (2015). "Evolutionary Robotics: What, Why, and Where to."
-- Stanley, K.O., et al. (2019). "Designing Neural Networks through Neuroevolution."
+- Pugh, J.K., Soros, L.B., & Stanley, K.O. (2016). ["Quality Diversity: A New Frontier."](https://www.frontiersin.org/articles/10.3389/frobt.2016.00040/full) *Frontiers in Robotics and AI*.
+- Doncieux, S., Bredeche, N., Mouret, J.-B., & Eiben, A.E. (2015). ["Evolutionary Robotics: What, Why, and Where to."](https://www.frontiersin.org/articles/10.3389/frobt.2015.00004/full) *Frontiers in Robotics and AI*.
+- Stanley, K.O., Clune, J., Lehman, J., & Miikkulainen, R. (2019). ["Designing Neural Networks through Neuroevolution."](https://www.nature.com/articles/s42256-018-0006-z) *Nature Machine Intelligence*.
 
 **Video:**
-- Karl Sims' "Evolved Virtual Creatures" (1994) — YouTube
-- Noita GDC Talk (2019) — GDC Vault
+- Karl Sims' ["Evolved Virtual Creatures" (1994)](https://www.youtube.com/watch?v=JBgG_VSP7f8) — YouTube
+- [Noita GDC Talk (2019)](https://www.gdcvault.com/play/1025695/) — GDC Vault
 - NEAT Explained — Various YouTube tutorials
