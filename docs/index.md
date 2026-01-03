@@ -2,11 +2,25 @@
 
 Sunaba is a research-oriented sandbox exploring the intersection of **emergent physics simulation** and **evolutionary artificial life**. This documentation provides scientific context for the algorithms and techniques employed.
 
+![sunaba_infographic.png](sunaba_infographic.png)
+
+## Play the Game
+
+The playable web version is available at [/game/](game/).
+
+## Slides
+
+A deck of slides describing the project is available at [/sunaba_slides.pdf](/sunaba_slides.pdf).
+
+## Notebook LM Explainer Video
+
+A Notebook LM generated Video explaining the project is available in [english](https://youtu.be/40-xBt8KpDY) and [german](https://youtu.be/5yHAeTaHZjY).
+
 ## The Core Question
 
 Can complex, adaptive behaviors emerge from the interaction of simple rules and evolutionary pressure?
 
-This question has driven artificial life research since the field's inception. Sunaba approaches it by combining two powerful paradigms:
+This question has driven artificial life research since the field's start. Sunaba approaches it by combining two powerful paradigms:
 
 1. **Pixel-based physics simulation** — where material behaviors emerge from cellular automata rules rather than hand-coded interactions
 2. **Neuroevolution** — where creature morphologies and neural controllers co-evolve to survive in this emergent world
@@ -57,10 +71,6 @@ flowchart LR
         Sensors --> N
     end
 ```
-
-## Play the Game
-
-The playable web version is available at [/game/](game/).
 
 ## References
 
