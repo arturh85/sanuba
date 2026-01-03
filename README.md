@@ -32,19 +32,16 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 Development works on Windows, Linux and MacOS.
 
-Requires [Rust](https://www.rust-lang.org/tools/install) 1.56 or later and [Just](https://github.com/casey/just) as a command runner (optional).
+Requires [Rust](https://www.rust-lang.org/tools/install) 1.56 or later and [Just](https://github.com/casey/just) as a command runner.
 
 ### Native Builds
 
 ```bash
-# Debug build
-cargo run
-
-# Release build (faster simulation)
-cargo run --release
-
-# Using just command runner
+# Start the game using a newly generated world
 just start
+
+# Start the game loading the existing world
+just load
 ```
 
 ### Web Build (WASM)
@@ -52,7 +49,6 @@ just start
 The game can run in browsers that support WebGPU (Chrome 113+, Edge 113+, Firefox/Safari with WebGPU enabled).
 
 ```bash
-# Using just command runner
 just web
 ```
 
@@ -61,7 +57,6 @@ just web
 To run all checks and tests, run before submitting a PR:
 
 ```bash
-# Using just command runner
 just test
 ```
 
