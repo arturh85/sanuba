@@ -49,16 +49,14 @@ web: build-web
     cd web; python -m http.server 8080
 
 # Evolution training commands (RUST_LOG=warn for clean progress bar output)
-train scenario="parcour" generations="100" population="50":
+train scenario="parcour" generations="100" population="50" simple="":
     rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}}
+    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario {{scenario}} --generations {{generations}} --population {{population}} {{simple}}
 
 # Quick training with simple morphology (fewer body parts, viability filter, movement-focused fitness)
 train-quick generations="100":
-    rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --scenario simple --simple --generations {{generations}} --population 50
+    just train simple {{generations}} 50 "--simple"
 
 # Full training with default complex morphology
 train-full:
-    rm -rf training_output
-    RUST_LOG=warn cargo run -p sunaba --bin sunaba --features headless --release -- --train --generations 500 --population 100
+    just train parcour 500 100
