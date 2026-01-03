@@ -1,5 +1,10 @@
 # Sunaba 砂場（すなば）
 
+[![CI](https://github.com/arturh85/sunaba/actions/workflows/ci.yml/badge.svg)](https://github.com/arturh85/sunaba/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/arturh85/sunaba/graph/badge.svg)](https://codecov.io/gh/arturh85/sunaba)
+[![Docs](https://img.shields.io/badge/docs-github.io-blue)](https://arturh85.github.io/sunaba/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ![sunaba.jpg](sunaba.jpg)
 
 A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures with articulated bodies and emergent behaviors, inspired by Noita and Terraria.
