@@ -11,9 +11,10 @@ use crate::entity::player::Player;
 use crate::entity::tools::ToolRegistry;
 use crate::physics::PhysicsWorld;
 use crate::simulation::{
-    LightPropagation, MaterialId, MaterialType, Materials, ReactionRegistry, RegenerationSystem,
-    StateChangeSystem, StructuralIntegritySystem, TemperatureSimulator, add_heat_at_pixel,
-    get_temperature_at_pixel, mining::calculate_mining_time,
+    ChunkRenderData, FallingChunk, FallingChunkSystem, LightPropagation, MaterialId, MaterialType,
+    Materials, ReactionRegistry, RegenerationSystem, StateChangeSystem, StructuralIntegritySystem,
+    TemperatureSimulator, WorldCollisionQuery, add_heat_at_pixel, get_temperature_at_pixel,
+    mining::calculate_mining_time,
 };
 
 /// The game world, composed of chunks
@@ -45,8 +46,11 @@ pub struct World {
     /// Resource regeneration system
     regeneration_system: RegenerationSystem,
 
-    /// Physics world for rigid bodies
+    /// Physics world for rigid bodies (used by creatures)
     physics_world: PhysicsWorld,
+
+    /// Kinematic falling chunks (simple debris physics, WASM-compatible)
+    falling_chunks: FallingChunkSystem,
 
     /// Creature manager (spawning, AI, behavior)
     pub creature_manager: crate::creature::spawning::CreatureManager,
@@ -98,6 +102,7 @@ impl World {
             light_propagation: LightPropagation::new(),
             regeneration_system: RegenerationSystem::new(),
             physics_world: PhysicsWorld::new(),
+            falling_chunks: FallingChunkSystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             active_chunks: Vec::new(),
@@ -1055,18 +1060,25 @@ impl World {
             log::debug!("Processed {} structural integrity checks", checks_processed);
         }
 
-        // 7. Update rigid body physics
+        // 7. Update rigid body physics (still needed for creatures until Phase 3)
         {
             #[cfg(feature = "profiling")]
             puffin::profile_scope!("physics");
             self.physics_world.step();
         }
 
-        // 8. Check for settled debris and reconstruct as pixels
-        let settled = self.physics_world.get_settled_debris();
-        for handle in settled {
-            self.reconstruct_debris(handle);
+        // 7.5 Update falling chunks (kinematic debris physics)
+        // Temporarily take falling_chunks to avoid borrow checker issues with self as WorldCollisionQuery
+        let mut falling_chunks = std::mem::take(&mut self.falling_chunks);
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("falling_chunks");
+            let settled_chunks = falling_chunks.update(1.0 / 60.0, self);
+            for chunk in settled_chunks {
+                self.reconstruct_falling_chunk(chunk);
+            }
         }
+        self.falling_chunks = falling_chunks;
 
         // 9. Resource regeneration (fruit spawning)
         self.regeneration_system
@@ -1603,9 +1615,19 @@ impl World {
         &self.materials
     }
 
-    /// Get active debris for rendering
+    /// Get active debris for rendering (legacy - uses rapier2d physics)
     pub fn get_active_debris(&self) -> Vec<crate::physics::DebrisRenderData> {
         self.physics_world.get_debris_render_data()
+    }
+
+    /// Get falling chunks for rendering (new kinematic system)
+    pub fn get_falling_chunks(&self) -> Vec<ChunkRenderData> {
+        self.falling_chunks.get_render_data()
+    }
+
+    /// Get count of active falling chunks (for debug stats)
+    pub fn falling_chunk_count(&self) -> usize {
+        self.falling_chunks.chunk_count()
     }
 
     /// Get creature render data for rendering
@@ -1619,12 +1641,9 @@ impl World {
     }
 
     /// Create falling debris from a pixel region
-    /// Removes pixels from world and creates a rigid body
-    pub fn create_debris(
-        &mut self,
-        region: std::collections::HashSet<IVec2>,
-    ) -> rapier2d::dynamics::RigidBodyHandle {
-        log::info!("Creating debris from {} pixels", region.len());
+    /// Removes pixels from world and creates a falling chunk
+    pub fn create_debris(&mut self, region: std::collections::HashSet<IVec2>) -> u64 {
+        log::info!("Creating falling chunk from {} pixels", region.len());
 
         // Build pixel map with materials
         let mut pixels = std::collections::HashMap::new();
@@ -1637,9 +1656,8 @@ impl World {
         }
 
         if pixels.is_empty() {
-            log::warn!("No valid pixels to create debris");
-            // Return a dummy handle (this shouldn't happen in practice)
-            return rapier2d::dynamics::RigidBodyHandle::from_raw_parts(0, 0);
+            log::warn!("No valid pixels to create falling chunk");
+            return 0;
         }
 
         // Remove pixels from world (convert to air)
@@ -1647,10 +1665,10 @@ impl World {
             self.set_pixel_direct(pos.x, pos.y, MaterialId::AIR);
         }
 
-        // Create rigid body in physics world
-        let handle = self.physics_world.create_debris(pixels);
-        log::debug!("Created rigid body handle: {:?}", handle);
-        handle
+        // Create falling chunk (kinematic, WASM-compatible)
+        let id = self.falling_chunks.create_chunk(pixels);
+        log::debug!("Created falling chunk id: {}", id);
+        id
     }
 
     /// Set pixel without triggering structural checks (internal use)
@@ -1740,6 +1758,50 @@ impl World {
                 "Reconstruction: {} pixels placed successfully",
                 placed_count
             );
+        }
+    }
+
+    /// Reconstruct a settled falling chunk back into static pixels
+    fn reconstruct_falling_chunk(&mut self, chunk: FallingChunk) {
+        let center_i = glam::IVec2::new(
+            chunk.center.x.round() as i32,
+            chunk.center.y.round() as i32,
+        );
+
+        log::info!(
+            "Reconstructing falling chunk {} ({} pixels) at ({}, {})",
+            chunk.id,
+            chunk.pixels.len(),
+            center_i.x,
+            center_i.y
+        );
+
+        let mut placed = 0;
+        let mut failed = 0;
+
+        for (relative_pos, material_id) in chunk.pixels {
+            let world_pos = center_i + relative_pos;
+
+            // Only place if target position is empty (air)
+            if let Some(existing) = self.get_pixel(world_pos.x, world_pos.y) {
+                if existing.is_empty() {
+                    if self.set_pixel_direct_checked(world_pos.x, world_pos.y, material_id) {
+                        placed += 1;
+                    } else {
+                        failed += 1;
+                    }
+                }
+            }
+        }
+
+        if failed > 0 {
+            log::warn!(
+                "Falling chunk reconstruction: {} pixels placed, {} failed",
+                placed,
+                failed
+            );
+        } else {
+            log::debug!("Placed {} pixels from falling chunk", placed);
         }
     }
 
@@ -2248,6 +2310,20 @@ impl World {
 impl Default for World {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// Implement WorldCollisionQuery for falling chunks collision detection
+impl WorldCollisionQuery for World {
+    fn is_solid_at(&self, x: i32, y: i32) -> bool {
+        match self.get_pixel(x, y) {
+            Some(pixel) if !pixel.is_empty() => {
+                let material = self.materials().get(pixel.material_id);
+                material.material_type == MaterialType::Solid
+            }
+            Some(_) => false, // Empty pixel
+            None => true,     // Out of bounds = solid (prevents falling forever)
+        }
     }
 }
 
