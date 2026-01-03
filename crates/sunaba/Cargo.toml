@@ -32,9 +32,6 @@ egui-wgpu = "0.33"
 egui_dock = "0.18"
 egui-notify = "0.21"
 
-# Physics (needed for rapier types in app)
-rapier2d = "0.18"
-
 # Math
 glam = { version = "0.25", features = ["serde"] }
 

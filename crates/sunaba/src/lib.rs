@@ -19,7 +19,6 @@ pub mod headless;
 pub use sunaba_core::creature;
 pub use sunaba_core::entity;
 pub use sunaba_core::levels;
-pub use sunaba_core::physics;
 pub use sunaba_core::simulation;
 pub use sunaba_core::world;
 

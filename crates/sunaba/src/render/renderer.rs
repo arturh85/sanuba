@@ -975,14 +975,14 @@ impl Renderer {
             }
         }
 
-        // Render active debris on top of chunks
-        let debris_list = world.get_active_debris();
-        if !debris_list.is_empty() {
-            log::debug!("Rendering {} active debris", debris_list.len());
+        // Render falling chunks on top of static chunks
+        let falling_chunks = world.get_falling_chunks();
+        if !falling_chunks.is_empty() {
+            log::debug!("Rendering {} falling chunks", falling_chunks.len());
         }
 
-        for debris_data in &debris_list {
-            self.render_debris_to_buffer(debris_data, world.materials());
+        for chunk_data in &falling_chunks {
+            self.render_falling_chunk_to_buffer(chunk_data, world.materials());
         }
 
         // Render creatures on top of debris
@@ -1485,20 +1485,17 @@ impl Renderer {
         (self.size.width, self.size.height)
     }
 
-    /// Render a single debris to the pixel buffer
-    fn render_debris_to_buffer(
+    /// Render a falling chunk to the pixel buffer
+    fn render_falling_chunk_to_buffer(
         &mut self,
-        debris: &crate::physics::DebrisRenderData,
+        chunk: &crate::simulation::ChunkRenderData,
         materials: &crate::simulation::Materials,
     ) {
-        // For each pixel in the debris
-        for (local_pos, material_id) in &debris.pixels {
-            // Apply rotation
-            let rotated = Self::rotate_point(*local_pos, debris.rotation);
-
-            // Translate to world position
-            let world_x = (debris.position.x + rotated.x as f32).round() as i32;
-            let world_y = (debris.position.y + rotated.y as f32).round() as i32;
+        // For each pixel in the falling chunk
+        for (local_pos, material_id) in &chunk.pixels {
+            // No rotation for falling chunks - just translate to world position
+            let world_x = (chunk.center.x + local_pos.x as f32).round() as i32;
+            let world_y = (chunk.center.y + local_pos.y as f32).round() as i32;
 
             // Convert world coordinates to texture coordinates using dynamic texture origin
             let tex_x = world_x - self.texture_origin.x as i32;
@@ -1519,15 +1516,6 @@ impl Renderer {
                 self.pixel_buffer[idx + 3] = color[3];
             }
         }
-    }
-
-    /// Rotate a point around origin
-    fn rotate_point(point: glam::IVec2, angle: f32) -> glam::IVec2 {
-        let cos = angle.cos();
-        let sin = angle.sin();
-        let x = point.x as f32 * cos - point.y as f32 * sin;
-        let y = point.x as f32 * sin + point.y as f32 * cos;
-        glam::IVec2::new(x.round() as i32, y.round() as i32)
     }
 
     /// Render a single creature to the pixel buffer

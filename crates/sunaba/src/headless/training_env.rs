@@ -12,7 +12,6 @@ use crate::creature::genome::{CreatureGenome, MutationConfig, crossover_genome};
 use crate::creature::morphology::{CreatureArchetype, CreatureMorphology, MorphologyConfig};
 use crate::creature::spawning::CreatureManager;
 use crate::creature::viability::analyze_viability;
-use crate::physics::PhysicsWorld;
 use crate::simulation::Materials;
 
 use super::fitness::BehaviorDescriptor;
@@ -309,7 +308,6 @@ impl TrainingEnv {
             let champion_archetype = *champion_archetype;
             // Set up world and evaluate champion with position tracking
             let (mut world, food_positions) = self.scenario.setup_world();
-            let mut physics_world = PhysicsWorld::new();
             let mut creature_manager = CreatureManager::new(1);
             let spawn_pos = self.scenario.config.spawn_position;
 
@@ -317,7 +315,6 @@ impl TrainingEnv {
                 best.genome.clone(),
                 spawn_pos,
                 1.0, // Full hunger
-                &mut physics_world,
                 &self.morphology_config,
                 champion_archetype,
             );
@@ -346,11 +343,9 @@ impl TrainingEnv {
                     creature_manager.update_with_cache(
                         dt * SENSORY_SKIP as f32,
                         &mut world,
-                        &mut physics_world,
                         &food_positions,
                     );
                 }
-                physics_world.step();
 
                 // Sample position every 5 seconds
                 if step % (60 * 5) == 0 {
@@ -607,7 +602,6 @@ impl TrainingEnv {
     fn evaluate_single(&self, genome: CreatureGenome, archetype: CreatureArchetype) -> EvalResult {
         // Set up world with cached food positions
         let (mut world, food_positions) = self.scenario.setup_world();
-        let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
 
         // Spawn creature using the configured morphology and archetype
@@ -621,7 +615,6 @@ impl TrainingEnv {
             genome.clone(),
             spawn_pos,
             initial_hunger,
-            &mut physics_world,
             &self.morphology_config,
             archetype,
         );
@@ -639,11 +632,9 @@ impl TrainingEnv {
                 creature_manager.update_with_cache(
                     dt * SENSORY_SKIP as f32,
                     &mut world,
-                    &mut physics_world,
                     &food_positions,
                 );
             }
-            physics_world.step();
         }
 
         // Get final creature state for evaluation
@@ -798,7 +789,6 @@ impl TrainingEnv {
 
         // Set up world with cached food positions
         let (mut world, food_positions) = self.scenario.setup_world();
-        let mut physics_world = PhysicsWorld::new();
         let mut creature_manager = CreatureManager::new(1);
         let spawn_pos = self.scenario.config.spawn_position;
         let initial_hunger = if self.scenario.config.name == "Parcour" {
@@ -810,7 +800,6 @@ impl TrainingEnv {
             genome.clone(),
             spawn_pos,
             initial_hunger,
-            &mut physics_world,
             &self.morphology_config,
             archetype,
         );
@@ -833,16 +822,14 @@ impl TrainingEnv {
                 creature_manager.update_with_cache(
                     dt * SENSORY_SKIP as f32,
                     &mut world,
-                    &mut physics_world,
                     &food_positions,
                 );
             }
-            physics_world.step();
 
             // Capture frame at intervals
             if step % capture_interval == 0 {
                 if let Some(creature) = creature_manager.get(creature_id) {
-                    let render_data = creature.get_render_data(&physics_world);
+                    let render_data = creature.get_render_data();
                     let creatures: Vec<_> = render_data.into_iter().collect();
 
                     // Center camera on creature
