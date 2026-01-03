@@ -1,5 +1,6 @@
 //! Simulation systems - materials, reactions, temperature, pressure
 
+pub mod falling_chunks;
 pub mod light;
 pub mod mining;
 pub mod regeneration;
@@ -13,6 +14,7 @@ pub use sunaba_simulation::{
     Reaction, ReactionRegistry, pixel_flags,
 };
 
+pub use falling_chunks::{ChunkRenderData, FallingChunk, FallingChunkSystem, WorldCollisionQuery};
 pub use light::LightPropagation;
 pub use regeneration::RegenerationSystem;
 pub use state_changes::StateChangeSystem;
