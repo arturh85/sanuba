@@ -120,7 +120,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-coverage-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-coverage-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Generate coverage
         run: cargo llvm-cov --workspace --codecov --output-path codecov.json
