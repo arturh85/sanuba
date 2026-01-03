@@ -4,6 +4,7 @@ members = [
     "crates/sunaba-creature",
     "crates/sunaba-core",
     "crates/sunaba",
+    "crates/sunaba-server",
 ]
 resolver = "2"
 

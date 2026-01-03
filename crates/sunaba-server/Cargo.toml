@@ -1,0 +1,27 @@
+[package]
+name = "sunaba-server"
+version.workspace = true
+edition.workspace = true
+description = "SpacetimeDB multiplayer server module for Sunaba"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# SpacetimeDB
+spacetimedb = "1.0"
+
+# Sunaba crates (WASM-compatible)
+sunaba-simulation = { path = "../sunaba-simulation" }
+sunaba-creature = { path = "../sunaba-creature" }
+sunaba-core = { path = "../sunaba-core" }
+
+# Serialization
+bincode-next = { version = "2.0", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+
+# Math
+glam = { version = "0.25", features = ["serde"] }
+
+# Logging
+log = "0.4"

@@ -309,8 +309,11 @@ impl Creature {
     fn apply_motor_commands_to_physics(&mut self, delta_time: f32) {
         if let Some(motor_commands) = self.pending_motor_commands.take() {
             // Apply motor commands to update target angles
-            self.physics_state
-                .apply_all_motor_commands(&motor_commands, &self.morphology, delta_time);
+            self.physics_state.apply_all_motor_commands(
+                &motor_commands,
+                &self.morphology,
+                delta_time,
+            );
 
             // Apply motor rotations to update body part positions
             self.physics_state
@@ -431,7 +434,9 @@ impl Creature {
                         .motor_part_indices
                         .iter()
                         .position(|&idx| idx == joint.child_index)
-                        .and_then(|motor_idx| self.physics_state.motor_angles.get(motor_idx).copied())
+                        .and_then(|motor_idx| {
+                            self.physics_state.motor_angles.get(motor_idx).copied()
+                        })
                         .unwrap_or(0.0)
                 } else {
                     0.0

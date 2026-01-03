@@ -387,11 +387,7 @@ pub fn extract_body_part_features_simple(
     };
 
     // Get root orientation for relative calculations
-    let root_orientation = physics_state
-        .part_rotations
-        .first()
-        .copied()
-        .unwrap_or(0.0);
+    let root_orientation = physics_state.part_rotations.first().copied().unwrap_or(0.0);
 
     for (i, _part) in morphology.body_parts.iter().enumerate() {
         // Get this body part's data from physics_state
@@ -400,11 +396,7 @@ pub fn extract_body_part_features_simple(
             .get(i)
             .copied()
             .unwrap_or(Vec2::ZERO);
-        let orientation = physics_state
-            .part_rotations
-            .get(i)
-            .copied()
-            .unwrap_or(0.0);
+        let orientation = physics_state.part_rotations.get(i).copied().unwrap_or(0.0);
 
         // Joint angle (from motor angles if this is a motorized part)
         let joint_angle = physics_state
@@ -419,7 +411,12 @@ pub fn extract_body_part_features_simple(
             .motor_part_indices
             .iter()
             .position(|&idx| idx == i)
-            .and_then(|motor_idx| physics_state.motor_angular_velocities.get(motor_idx).copied())
+            .and_then(|motor_idx| {
+                physics_state
+                    .motor_angular_velocities
+                    .get(motor_idx)
+                    .copied()
+            })
             .unwrap_or(0.0);
 
         // Ground contact: raycast downward from body part

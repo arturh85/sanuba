@@ -83,3 +83,106 @@ train-full:
 # Train a single archetype (e.g., just train-single spider 100)
 train-single archetype="evolved" generations="100":
     just train parcour {{generations}} 50 "" {{archetype}}
+
+# ============================================================================
+# SpacetimeDB Commands
+# ============================================================================
+
+# Install SpacetimeDB CLI
+[unix]
+spacetime-install:
+    curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh
+
+[windows]
+spacetime-install:
+    irm https://windows.spacetimedb.com | iex
+
+# Check SpacetimeDB CLI version
+spacetime-version:
+    spacetime version
+
+# Build the SpacetimeDB module (WASM)
+[unix]
+spacetime-build:
+    @echo "Building SpacetimeDB module..."
+    spacetime build crates/sunaba-server --release
+    @echo "Build complete!"
+
+[windows]
+spacetime-build:
+    @echo "Building SpacetimeDB module..."
+    spacetime build crates/sunaba-server --release
+    @echo "Build complete!"
+
+# Start local SpacetimeDB instance
+[unix]
+spacetime-start:
+    spacetime start &
+    @sleep 2
+    @echo "SpacetimeDB local instance started"
+
+[windows]
+spacetime-start:
+    Start-Process spacetime -ArgumentList "start" -NoNewWindow
+    Start-Sleep -Seconds 2
+    @echo "SpacetimeDB local instance started"
+
+# Stop local SpacetimeDB instance
+spacetime-stop:
+    spacetime stop
+
+# Publish to local SpacetimeDB instance
+spacetime-publish-local name="sunaba":
+    spacetime publish --skip-clippy -c local {{name}} crates/sunaba-server
+
+# Publish to SpacetimeDB cloud (requires auth)
+spacetime-publish-cloud name="sunaba":
+    spacetime publish --skip-clippy {{name}} crates/sunaba-server
+
+# View SpacetimeDB logs
+spacetime-logs name="sunaba":
+    spacetime logs -c local {{name}}
+
+# Follow SpacetimeDB logs (tail -f style)
+spacetime-logs-tail name="sunaba":
+    spacetime logs -c local {{name}} -f
+
+# Generate TypeScript client SDK
+spacetime-generate-ts name="sunaba" output="web/src/spacetime":
+    spacetime generate -c local --lang typescript --out-dir {{output}} {{name}}
+
+# Generate Rust client SDK
+spacetime-generate-rust name="sunaba" output="crates/sunaba/src/spacetime_client":
+    spacetime generate -c local --lang rust --out-dir {{output}} {{name}}
+
+# Call a reducer manually (for testing)
+spacetime-call name="sunaba" reducer="init":
+    spacetime call -c local {{name}} {{reducer}}
+
+# Full local development setup: build, start, publish
+[unix]
+spacetime-dev name="sunaba":
+    @echo "Setting up SpacetimeDB local development..."
+    just spacetime-build
+    just spacetime-start
+    just spacetime-publish-local {{name}}
+    @echo "SpacetimeDB ready! Module published as '{{name}}'"
+    @echo "Run 'just spacetime-logs-tail {{name}}' to watch logs"
+
+[windows]
+spacetime-dev name="sunaba":
+    @echo "Setting up SpacetimeDB local development..."
+    just spacetime-build
+    just spacetime-start
+    just spacetime-publish-local {{name}}
+    @echo "SpacetimeDB ready! Module published as '{{name}}'"
+    @echo "Run 'just spacetime-logs-tail {{name}}' to watch logs"
+
+# Reset database (delete and republish)
+spacetime-reset name="sunaba":
+    spacetime delete -c local {{name}} || true
+    just spacetime-publish-local {{name}}
+
+# Show database status
+spacetime-status name="sunaba":
+    spacetime describe -c local {{name}}

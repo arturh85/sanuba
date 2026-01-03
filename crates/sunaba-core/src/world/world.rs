@@ -121,20 +121,18 @@ impl World {
         // Spawn 3 test creatures near spawn point with spacing
         use crate::creature::genome::CreatureGenome;
 
-        world.creature_manager.spawn_creature(
-            CreatureGenome::test_biped(),
-            glam::Vec2::new(-20.0, 100.0),
-        );
+        world
+            .creature_manager
+            .spawn_creature(CreatureGenome::test_biped(), glam::Vec2::new(-20.0, 100.0));
 
         world.creature_manager.spawn_creature(
             CreatureGenome::test_quadruped(),
             glam::Vec2::new(0.0, 100.0),
         );
 
-        world.creature_manager.spawn_creature(
-            CreatureGenome::test_worm(),
-            glam::Vec2::new(20.0, 100.0),
-        );
+        world
+            .creature_manager
+            .spawn_creature(CreatureGenome::test_worm(), glam::Vec2::new(20.0, 100.0));
 
         log::info!("Spawned 3 test creatures at startup");
 
@@ -1668,10 +1666,8 @@ impl World {
 
     /// Reconstruct a settled falling chunk back into static pixels
     fn reconstruct_falling_chunk(&mut self, chunk: FallingChunk) {
-        let center_i = glam::IVec2::new(
-            chunk.center.x.round() as i32,
-            chunk.center.y.round() as i32,
-        );
+        let center_i =
+            glam::IVec2::new(chunk.center.x.round() as i32, chunk.center.y.round() as i32);
 
         log::info!(
             "Reconstructing falling chunk {} ({} pixels) at ({}, {})",
@@ -1688,15 +1684,14 @@ impl World {
             let world_pos = center_i + relative_pos;
 
             // Only place if target position is empty (air)
-            if let Some(existing) = self.get_pixel(world_pos.x, world_pos.y) {
-                if existing.is_empty() {
+            if let Some(existing) = self.get_pixel(world_pos.x, world_pos.y)
+                && existing.is_empty() {
                     if self.set_pixel_direct_checked(world_pos.x, world_pos.y, material_id) {
                         placed += 1;
                     } else {
                         failed += 1;
                     }
                 }
-            }
         }
 
         if failed > 0 {

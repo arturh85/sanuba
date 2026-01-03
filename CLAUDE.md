@@ -20,6 +20,11 @@ just load    # Run release (load existing world)
 just profile # Run with puffin profiler (F3 to toggle flamegraph)
 just web     # Build and serve web version at localhost:8080
 
+# SpacetimeDB Multiplayer
+just spacetime-dev       # Full local setup (build, start, publish)
+just spacetime-build     # Build WASM module
+just spacetime-logs-tail # Follow server logs
+
 # Individual commands (prefer just test)
 cargo run -p sunaba --release
 cargo test --workspace
@@ -29,14 +34,15 @@ cargo fmt --all
 
 ## Workspace Structure
 
-sunaba is organized as a Cargo workspace with 4 crates:
+sunaba is organized as a Cargo workspace with 5 crates:
 
 | Crate | Purpose | Key Dependencies |
 |-------|---------|------------------|
 | `sunaba-simulation` | Material definitions, reactions, pixel data | serde, log |
-| `sunaba-creature` | ML-evolved creatures, physics, neural control | sunaba-simulation, rapier2d, petgraph, rand |
+| `sunaba-creature` | ML-evolved creatures, simple physics, neural control | sunaba-simulation, petgraph, rand |
 | `sunaba-core` | World, entity, levels (re-exports simulation + creature) | sunaba-simulation, sunaba-creature, noise |
 | `sunaba` | Main binary, rendering, UI, headless training | wgpu, egui, winit, sunaba-core |
+| `sunaba-server` | SpacetimeDB multiplayer server module | spacetimedb, sunaba-simulation, sunaba-creature |
 
 ### Crate Dependency Graph
 ```
@@ -46,6 +52,11 @@ sunaba (main binary + cdylib for WASM)
 │   └── sunaba-creature
 │       └── sunaba-simulation
 └── (render deps: wgpu, egui, winit)
+
+sunaba-server (SpacetimeDB cdylib for WASM)
+├── sunaba-simulation
+├── sunaba-creature
+└── spacetimedb
 ```
 
 ### Developing Individual Crates
@@ -124,7 +135,7 @@ pub fn load_chunk(&self, x: i32, y: i32) -> Result<Chunk> {
 | Graphics | wgpu 27.0 |
 | Windowing | winit 0.30 |
 | UI | egui 0.33 |
-| Physics | rapier2d 0.18 |
+| Physics | Simple kinematic (no external physics engine) |
 | Math | glam 0.25 |
 | Serialization | serde + bincode + ron |
 | Compression | lz4_flex |
@@ -148,7 +159,7 @@ World
 1. **Cellular Automata** (per-pixel, 60fps) - material movement, reactions
 2. **Temperature** (8x8 grid, 30fps) - heat diffusion, state changes
 3. **Structural Integrity** (event-driven) - debris conversion on disconnect
-4. **Rigid Body Physics** (rapier2d, 60fps) - player, creatures, debris
+4. **Falling Chunks** (kinematic, 60fps) - debris falls with gravity, settles into world
 
 ## Project Structure
 
@@ -166,7 +177,7 @@ crates/
 │       ├── lib.rs
 │       ├── traits.rs             # WorldAccess, WorldMutAccess traits
 │       ├── types.rs              # EntityId, Health, Hunger
-│       ├── physics.rs            # PhysicsWorld (rapier2d integration)
+│       ├── simple_physics.rs     # CreaturePhysicsState (no external engine)
 │       ├── genome.rs             # CPPN-NEAT genome
 │       ├── morphology.rs         # Body generation from CPPN
 │       ├── neural.rs             # DeepNeuralController brain
@@ -224,6 +235,12 @@ crates/
             ├── training_env.rs
             ├── scenario.rs
             └── map_elites.rs
+│
+└── sunaba-server/          # SpacetimeDB multiplayer server
+    └── src/
+        ├── lib.rs                # Tables, reducers, tick handlers
+        ├── world_access.rs       # WorldAccess impl over SpacetimeDB
+        └── encoding.rs           # Bincode serialization helpers
 ```
 
 ## Development Phases
@@ -309,3 +326,5 @@ fn check_integrity(world, removed_pos) {
 8. **Deterministic evolution**: Seeded RNG for reproducible training runs
 9. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
 10. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
+11. **WASM-compatible physics**: Uses simple kinematic physics (no rapier2d) for SpacetimeDB compatibility
+12. **SpacetimeDB server**: Creature AI runs server-side with neural network inference in reducers
