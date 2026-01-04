@@ -13,6 +13,10 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 - **Emergent Physics**: Every pixel is simulated with material properties
 - **Chemistry System**: Materials react with each other (fire spreads, water evaporates, acid dissolves)
+- **Multiplayer Support**: Real-time multiplayer via SpacetimeDB with server-side simulation
+  - Server-side creature AI and physics
+  - Feature-gated architecture (evolution offline, runtime on server)
+  - Deterministic RNG for server-client consistency
 - **ML-Evolved Creatures**: Pre-evolved populations with diverse morphologies and behaviors
   - Articulated bodies controlled by neural networks (CPPN-NEAT + MAP-Elites)
   - Emergent survival strategies: hunting, building, tool use, social behaviors
@@ -56,6 +60,40 @@ The game can run in browsers that support WebGPU (Chrome 113+, Edge 113+, Firefo
 ```bash
 just web
 ```
+
+### Multiplayer (SpacetimeDB)
+
+Sunaba supports real-time multiplayer via [SpacetimeDB](https://spacetimedb.com/), a database-centric server framework.
+
+**Quick Start:**
+
+```bash
+# Install SpacetimeDB CLI (first time only)
+curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh
+
+# Start local server
+spacetime start
+
+# Build and publish the server module
+spacetime build -p crates/sunaba-server
+cd crates/sunaba-server && spacetime publish -s http://localhost:3000 sunaba-server
+
+# Test it works - spawn a creature
+spacetime call sunaba-server spawn_creature --server http://localhost:3000 -- spider 0.0 100.0
+
+# Query the database
+spacetime sql sunaba-server --server http://localhost:3000 "SELECT * FROM creature_data"
+```
+
+**Architecture:**
+
+The multiplayer server runs the same simulation code as the native game:
+- ✅ Full CA physics (falling sand, fire, reactions)
+- ✅ Server-side creature AI (neural network inference)
+- ✅ Deterministic RNG via `ctx.rng()` for consistency
+- ❌ No evolution/training (feature-gated out for WASM)
+
+See [CLAUDE.md](CLAUDE.md#spacetimedb-multiplayer-architecture) for detailed multiplayer architecture.
 
 ### Tests
 
@@ -124,9 +162,10 @@ where complex behavior arises naturally from fundamental rules rather than scrip
 ### Foundation (Stable)
 The simulation core is complete and battle-tested:
 - Pixel physics: 32 materials with temperature, reactions, state changes
-- Structural integrity with rapier2d falling debris
+- Structural integrity with kinematic falling debris
 - Persistent world with procedural cave generation
 - Player systems: mining, crafting, inventory
+- **Multiplayer**: SpacetimeDB server module with server-side simulation and creature AI
 
 ### Creature Evolution (Active Research)
 Building the ML creature pipeline—currently exploring:

@@ -12,7 +12,7 @@ A 2D falling-sand survival game combining Noita's emergent physics simulation wi
 
 ```bash
 # Primary command - run this to validate all changes
-just test    # fmt, clippy --fix, tests, release build, web build
+just test    # fmt, clippy --fix, tests, release build, web build, spacetime build
 
 # Development
 just start   # Run with --regenerate (new world)
@@ -21,9 +21,11 @@ just profile # Run with puffin profiler (F3 to toggle flamegraph)
 just web     # Build and serve web version at localhost:8080
 
 # SpacetimeDB Multiplayer
-just spacetime-dev       # Full local setup (build, start, publish)
-just spacetime-build     # Build WASM module
-just spacetime-logs-tail # Follow server logs
+just spacetime-build      # Build WASM module
+just spacetime-start      # Start local instance
+just spacetime-stop       # Stop local instance
+just spacetime-publish-local  # Publish to local server
+just spacetime-logs-tail  # Follow server logs
 
 # Individual commands (prefer just test)
 cargo run -p sunaba --release
@@ -31,6 +33,119 @@ cargo test --workspace
 cargo clippy --workspace
 cargo fmt --all
 ```
+
+## SpacetimeDB Multiplayer Architecture
+
+Sunaba supports real-time multiplayer via SpacetimeDB, a database-centric server framework that compiles Rust modules to WASM.
+
+### Feature Flags
+
+The codebase uses feature flags to separate runtime code from evolution/training code:
+
+| Feature | Crate | Purpose | Includes |
+|---------|-------|---------|----------|
+| `evolution` | sunaba-creature | Mutation, crossover, archetype generation | Evolution code, test genomes |
+| `regeneration` | sunaba-core | Fruit spawning, resource regeneration | Regeneration system |
+| `profiling` | sunaba-core, sunaba-creature | Performance profiling | puffin integration |
+
+**Key Insight:** The SpacetimeDB server builds **without** `evolution` and `regeneration` features, eliminating the `rand` dependency. This allows WASM compilation without `getrandom`, as SpacetimeDB provides its own deterministic RNG via `ctx.rng()`.
+
+### Random Number Generation
+
+Three categories of randomness in Sunaba:
+
+1. **Server-side Simulation** (`ctx.rng()` in SpacetimeDB)
+   - CA updates: falling sand direction, fire decay, material burning, chemical reactions
+   - Uses SpacetimeDB's replicated deterministic RNG for server-client consistency
+   - Implemented via `WorldRng` trait
+
+2. **Client-side Simulation** (`thread_rng()` in native game)
+   - Same CA logic as server, but uses `rand::rng()` for single-player
+   - Also uses `WorldRng` trait for consistency
+
+3. **Genome → Brain Initialization** (`DeterministicRng`)
+   - Seeded from genome weights for reproducibility
+   - Same genome always produces same neural network
+   - Works identically on server and client
+   - **Not random** - deterministic by design!
+
+### WorldRng Trait
+
+Abstraction that allows World simulation to work with any RNG:
+
+```rust
+pub trait WorldRng {
+    fn gen_bool(&mut self) -> bool;
+    fn gen_f32(&mut self) -> f32;
+    fn check_probability(&mut self, probability: f32) -> bool;
+}
+
+// Blanket impl for any rand::Rng (covers thread_rng AND ctx.rng)
+impl<T: ?Sized + rand::Rng> WorldRng for T { ... }
+
+// Usage in World methods
+pub fn update<R: WorldRng>(&mut self, dt: f32, stats: &mut dyn SimStats, rng: &mut R) {
+    self.step_simulation(stats, rng);
+}
+```
+
+### Server vs Client Code Separation
+
+| Component | Native Game | SpacetimeDB Server |
+|-----------|-------------|-------------------|
+| CA Simulation | ✅ Full | ✅ Full (active chunks) |
+| Creature AI | ✅ Full | ✅ Neural inference only |
+| Evolution/Training | ✅ Offline training | ❌ Feature-gated out |
+| Regeneration | ✅ Fruit spawning | ❌ Feature-gated out |
+| RNG Source | `rand::rng()` | `ctx.rng()` |
+| Physics | Kinematic | Kinematic |
+
+### Building for SpacetimeDB
+
+The server module (`sunaba-server`) is a SpacetimeDB reducer module:
+
+```bash
+# Build the WASM module
+just spacetime-build
+
+# Or manually
+spacetime build -p crates/sunaba-server
+
+# The module uses:
+# - No default features (no evolution, no regeneration)
+# - SpacetimeDB's rand 0.8 for RNG
+# - Same sunaba-creature/sunaba-core as native game
+```
+
+### Testing SpacetimeDB Locally
+
+```bash
+# Start local instance (http://localhost:3000)
+spacetime start
+
+# Build and publish module
+spacetime build -p crates/sunaba-server
+cd crates/sunaba-server && spacetime publish -s http://localhost:3000 sunaba-server
+
+# Test spawning a creature
+spacetime call sunaba-server spawn_creature --server http://localhost:3000 -- spider 0.0 100.0
+
+# Query database
+spacetime sql sunaba-server --server http://localhost:3000 "SELECT * FROM creature_data"
+
+# View logs
+spacetime logs -c local sunaba-server -f
+```
+
+### Server Tables (SpacetimeDB)
+
+Key tables in the multiplayer server:
+
+- `world_config` - Global settings (seed, tick_count, pause state)
+- `chunk_data` - Compressed pixel data for chunks
+- `player` - Player state (position, inventory, health, hunger)
+- `creature_data` - Server-side creatures (genome, morphology, physics state)
+- `world_tick_timer` / `creature_tick_timer` - Scheduled reducers
 
 ## Workspace Structure
 
