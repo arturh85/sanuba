@@ -17,14 +17,14 @@ profile:
 [unix]
 test: fmt clippy
     @cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
-    cargo build --workspace --release
+    cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build
 
 [windows]
 test: fmt clippy
     cargo test --workspace --quiet
-    cargo build --workspace --release
+    cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build
 

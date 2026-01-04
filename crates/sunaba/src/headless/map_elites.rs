@@ -224,16 +224,16 @@ impl MapElitesGrid {
 
     /// Uniform random selection (original behavior)
     fn sample_uniform(&self) -> Option<&Elite> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let keys: Vec<_> = self.cells.keys().collect();
-        let idx = rng.random_range(0..keys.len());
+        let idx = rng.gen_range(0..keys.len());
         self.cells.get(keys[idx])
     }
 
     /// Tournament selection - pick best from k random candidates
     /// This creates selection pressure toward higher fitness elites
     fn sample_tournament(&self) -> Option<&Elite> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let keys: Vec<_> = self.cells.keys().collect();
 
         let mut best: Option<&Elite> = None;
@@ -242,7 +242,7 @@ impl MapElitesGrid {
         // Sample tournament_size random candidates
         let actual_size = self.tournament_size.min(keys.len());
         for _ in 0..actual_size {
-            let idx = rng.random_range(0..keys.len());
+            let idx = rng.gen_range(0..keys.len());
             if let Some(elite) = self.cells.get(keys[idx]) {
                 if elite.fitness > best_fitness {
                     best_fitness = elite.fitness;
@@ -279,10 +279,10 @@ impl MapElitesGrid {
         }
 
         // Fallback: uniform random different parent
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let keys: Vec<_> = self.cells.keys().collect();
         for _ in 0..keys.len() {
-            let idx = rng.random_range(0..keys.len());
+            let idx = rng.gen_range(0..keys.len());
             if let Some(parent2) = self.cells.get(keys[idx]) {
                 if !std::ptr::eq(parent1, parent2) {
                     return Some((parent1, parent2));

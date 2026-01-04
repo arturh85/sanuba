@@ -7,6 +7,9 @@ use ahash::HashMap;
 use petgraph::graph::{DiGraph, NodeIndex};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "evolution")]
+use rand::{prelude::SliceRandom, Rng};
+
 /// Activation functions for CPPN nodes
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum ActivationFunction {
@@ -306,23 +309,23 @@ impl CppnGenome {
     #[cfg(feature = "evolution")]
     pub fn mutate_weights(&mut self, mutation_rate: f32, mutation_power: f32) -> usize {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let mut mutated_count = 0;
 
         for edge_idx in self.graph.edge_indices() {
-            if rng.random::<f32>() < mutation_rate {
+            if rng.r#gen::<f32>() < mutation_rate {
                 let connection = &mut self.graph[edge_idx];
 
                 // 90% chance to perturb, 10% chance to replace
-                if rng.random::<f32>() < 0.9 {
+                if rng.r#gen::<f32>() < 0.9 {
                     // Perturb weight
-                    let perturbation = rng.random_range(-mutation_power..mutation_power);
+                    let perturbation = rng.gen_range(-mutation_power..mutation_power);
                     connection.weight += perturbation;
                     // Clamp to prevent extreme values
                     connection.weight = connection.weight.clamp(-4.0, 4.0);
                 } else {
                     // Replace with new random weight
-                    connection.weight = rng.random_range(-2.0..2.0);
+                    connection.weight = rng.gen_range(-2.0..2.0);
                 }
                 mutated_count += 1;
             }
@@ -336,8 +339,8 @@ impl CppnGenome {
     #[cfg(feature = "evolution")]
     pub fn add_connection(&mut self) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         // Get all non-input nodes (can be targets)
         let target_nodes: Vec<NodeIndex> = self
@@ -390,7 +393,7 @@ impl CppnGenome {
 
             // Add the connection
             let connection = CppnConnection {
-                weight: rng.random_range(-1.0..1.0),
+                weight: rng.gen_range(-1.0..1.0),
                 enabled: true,
                 innovation_number: innovation,
             };
@@ -408,8 +411,8 @@ impl CppnGenome {
     #[cfg(feature = "evolution")]
     pub fn add_node(&mut self) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         // Get enabled edges
         let enabled_edges: Vec<_> = self
@@ -442,7 +445,7 @@ impl CppnGenome {
             ActivationFunction::Sine,
             ActivationFunction::Relu,
         ];
-        let activation = activations[rng.random_range(0..activations.len())];
+        let activation = activations[rng.gen_range(0..activations.len())];
 
         let new_node_id = self.next_node_id;
         self.next_node_id += 1;
@@ -495,8 +498,8 @@ impl CppnGenome {
     #[cfg(feature = "evolution")]
     pub fn toggle_connection(&mut self, disable_rate: f32) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         let edges: Vec<_> = self.graph.edge_indices().collect();
         if edges.is_empty() {
@@ -508,13 +511,13 @@ impl CppnGenome {
 
         if connection.enabled {
             // Disable with given probability
-            if rng.random::<f32>() < disable_rate {
+            if rng.r#gen::<f32>() < disable_rate {
                 connection.enabled = false;
                 return true;
             }
         } else {
             // Re-enable with 25% chance
-            if rng.random::<f32>() < 0.25 {
+            if rng.r#gen::<f32>() < 0.25 {
                 connection.enabled = true;
                 return true;
             }
@@ -527,21 +530,21 @@ impl CppnGenome {
     #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, config: &MutationConfig) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Weight mutations (most common)
         self.mutate_weights(config.weight_mutation_rate, config.weight_mutation_power);
 
         // Structural mutations (less common)
-        if rng.random::<f32>() < config.add_connection_rate {
+        if rng.r#gen::<f32>() < config.add_connection_rate {
             self.add_connection();
         }
 
-        if rng.random::<f32>() < config.add_node_rate {
+        if rng.r#gen::<f32>() < config.add_node_rate {
             self.add_node();
         }
 
-        if rng.random::<f32>() < config.toggle_connection_rate {
+        if rng.r#gen::<f32>() < config.toggle_connection_rate {
             self.toggle_connection(0.5);
         }
 
@@ -585,7 +588,7 @@ pub fn crossover_cppn(
     parent2_fitness: f32,
 ) -> CppnGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     // Determine which parent is more fit
     let (more_fit, less_fit, more_fit_first) = if parent1_fitness >= parent2_fitness {
@@ -669,7 +672,7 @@ pub fn crossover_cppn(
         let gene = match (in_p1, in_p2) {
             // Matching gene - randomly inherit from either parent
             (Some(g1), Some(g2)) => {
-                if rng.random::<bool>() {
+                if rng.r#gen::<bool>() {
                     g1.clone()
                 } else {
                     g2.clone()
@@ -730,7 +733,7 @@ pub fn crossover_controller(
     parent2_fitness: f32,
 ) -> ControllerGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     // Determine bias toward more fit parent
     let bias = if parent1_fitness > parent2_fitness {
@@ -749,7 +752,7 @@ pub fn crossover_controller(
                 let v1 = w1.get(i).copied().unwrap_or(0.0);
                 let v2 = w2.get(i).copied().unwrap_or(0.0);
 
-                if rng.random::<f32>() < bias { v1 } else { v2 }
+                if rng.r#gen::<f32>() < bias { v1 } else { v2 }
             })
             .collect()
     };
@@ -758,12 +761,12 @@ pub fn crossover_controller(
         message_weights: crossover_weights(&parent1.message_weights, &parent2.message_weights),
         update_weights: crossover_weights(&parent1.update_weights, &parent2.update_weights),
         output_weights: crossover_weights(&parent1.output_weights, &parent2.output_weights),
-        message_passing_steps: if rng.random::<f32>() < bias {
+        message_passing_steps: if rng.r#gen::<f32>() < bias {
             parent1.message_passing_steps
         } else {
             parent2.message_passing_steps
         },
-        hidden_dim: if rng.random::<f32>() < bias {
+        hidden_dim: if rng.r#gen::<f32>() < bias {
             parent1.hidden_dim
         } else {
             parent2.hidden_dim
@@ -780,7 +783,7 @@ pub fn crossover_genome(
     parent2_fitness: f32,
 ) -> CreatureGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     let bias = if parent1_fitness >= parent2_fitness {
         0.6
@@ -802,22 +805,22 @@ pub fn crossover_genome(
             parent2_fitness,
         ),
         traits: BehavioralTraits {
-            aggression: if rng.random::<f32>() < bias {
+            aggression: if rng.r#gen::<f32>() < bias {
                 parent1.traits.aggression
             } else {
                 parent2.traits.aggression
             },
-            curiosity: if rng.random::<f32>() < bias {
+            curiosity: if rng.r#gen::<f32>() < bias {
                 parent1.traits.curiosity
             } else {
                 parent2.traits.curiosity
             },
-            sociality: if rng.random::<f32>() < bias {
+            sociality: if rng.r#gen::<f32>() < bias {
                 parent1.traits.sociality
             } else {
                 parent2.traits.sociality
             },
-            territoriality: if rng.random::<f32>() < bias {
+            territoriality: if rng.r#gen::<f32>() < bias {
                 parent1.traits.territoriality
             } else {
                 parent2.traits.territoriality
@@ -889,7 +892,7 @@ impl ControllerGenome {
     #[cfg(feature = "evolution")]
     pub fn random(hidden_dim: usize, message_passing_steps: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // For a simple feedforward network:
         // message_weights: input_dim -> hidden_dim
@@ -905,15 +908,15 @@ impl ControllerGenome {
         let output_weight_count = hidden_dim * output_dim_estimate;
 
         let message_weights: Vec<f32> = (0..message_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         let update_weights: Vec<f32> = (0..update_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         let output_weights: Vec<f32> = (0..output_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -929,7 +932,7 @@ impl ControllerGenome {
     #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, mutation_rate: f32, mutation_power: f32) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Mutate all weight vectors
         for weights in [
@@ -938,14 +941,14 @@ impl ControllerGenome {
             &mut self.output_weights,
         ] {
             for weight in weights.iter_mut() {
-                if rng.random::<f32>() < mutation_rate {
-                    if rng.random::<f32>() < 0.9 {
+                if rng.r#gen::<f32>() < mutation_rate {
+                    if rng.r#gen::<f32>() < 0.9 {
                         // Perturb
-                        *weight += rng.random_range(-mutation_power..mutation_power);
+                        *weight += rng.gen_range(-mutation_power..mutation_power);
                         *weight = weight.clamp(-4.0, 4.0);
                     } else {
                         // Replace
-                        *weight = rng.random_range(-2.0..2.0);
+                        *weight = rng.gen_range(-2.0..2.0);
                     }
                 }
             }
@@ -1194,7 +1197,7 @@ impl CreatureGenome {
     #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, cppn_config: &MutationConfig, controller_rate: f32) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Mutate CPPN (morphology)
         self.cppn.mutate(cppn_config);
@@ -1203,27 +1206,27 @@ impl CreatureGenome {
         self.controller.mutate(controller_rate, 0.5);
 
         // Mutate behavioral traits (small perturbations)
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.aggression =
-                (self.traits.aggression + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.aggression + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.curiosity =
-                (self.traits.curiosity + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.curiosity + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.sociality =
-                (self.traits.sociality + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.sociality + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.territoriality =
-                (self.traits.territoriality + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.territoriality + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
 
         // Mutate metabolic params (small perturbations)
-        if rng.random::<f32>() < 0.05 {
+        if rng.r#gen::<f32>() < 0.05 {
             self.metabolic.hunger_rate =
-                (self.metabolic.hunger_rate + rng.random_range(-0.02..0.02)).clamp(0.01, 1.0);
+                (self.metabolic.hunger_rate + rng.gen_range(-0.02..0.02)).clamp(0.01, 1.0);
         }
 
         // Increment generation

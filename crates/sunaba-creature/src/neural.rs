@@ -7,6 +7,9 @@ use glam::Vec2;
 use super::genome::ControllerGenome;
 use super::morphology::CreatureMorphology;
 
+#[cfg(feature = "evolution")]
+use rand::Rng;
+
 /// Input features per body part (fed into GNN)
 #[derive(Debug, Clone)]
 pub struct BodyPartFeatures {
@@ -123,7 +126,7 @@ impl SimpleNeuralController {
 
         // Initialize with Xavier/Glorot uniform distribution
         let weights: Vec<f32> = (0..total_weights)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -271,7 +274,7 @@ impl DeepNeuralController {
 
         // Xavier/Glorot initialization
         let weights: Vec<f32> = (0..total_weights)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {

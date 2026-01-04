@@ -82,19 +82,19 @@ impl ParticleSystem {
 
     /// Spawn a burst of flight exhaust particles (Noita-style)
     pub fn spawn_flight_burst(&mut self, player_pos: Vec2, player_height: f32) {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let foot_y = player_pos.y - player_height / 2.0;
 
         // Spawn 2-4 particles per frame
-        let count = rng.random_range(2..=4);
+        let count = rng.gen_range(2..=4);
         for _ in 0..count {
-            let offset_x = rng.random_range(-3.0..3.0);
+            let offset_x = rng.gen_range(-3.0..3.0);
             let position = Vec2::new(player_pos.x + offset_x, foot_y - 1.0);
 
             // Velocity: mostly down with some horizontal spread (exhaust effect)
             let velocity = Vec2::new(
-                rng.random_range(-20.0..20.0),
-                rng.random_range(-80.0..-40.0), // Downward
+                rng.gen_range(-20.0..20.0),
+                rng.gen_range(-80.0..-40.0), // Downward
             );
 
             // Warm color palette (yellow → orange → white-yellow)
@@ -103,73 +103,73 @@ impl ParticleSystem {
                 [255, 180, 80, 255],  // Orange
                 [255, 255, 200, 255], // White-yellow
             ];
-            let color = colors[rng.random_range(0..colors.len())];
+            let color = colors[rng.gen_range(0..colors.len())];
 
-            let lifetime = rng.random_range(0.15..0.35);
+            let lifetime = rng.gen_range(0.15..0.35);
             self.spawn(position, velocity, color, lifetime);
         }
     }
 
     /// Spawn impact particles when placing a material
     pub fn spawn_impact_burst(&mut self, position: Vec2, color: [u8; 4]) {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Spawn 3-6 particles in a radial burst
-        let count = rng.random_range(3..=6);
+        let count = rng.gen_range(3..=6);
         for _ in 0..count {
-            let angle = rng.random_range(0.0..std::f32::consts::TAU);
-            let speed = rng.random_range(30.0..80.0);
+            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+            let speed = rng.gen_range(30.0..80.0);
             let velocity = Vec2::new(angle.cos() * speed, angle.sin() * speed);
 
             // Slightly vary the color
             let varied_color = [
-                (color[0] as i16 + rng.random_range(-20..20)).clamp(0, 255) as u8,
-                (color[1] as i16 + rng.random_range(-20..20)).clamp(0, 255) as u8,
-                (color[2] as i16 + rng.random_range(-20..20)).clamp(0, 255) as u8,
+                (color[0] as i16 + rng.gen_range(-20..20)).clamp(0, 255) as u8,
+                (color[1] as i16 + rng.gen_range(-20..20)).clamp(0, 255) as u8,
+                (color[2] as i16 + rng.gen_range(-20..20)).clamp(0, 255) as u8,
                 color[3],
             ];
 
-            let lifetime = rng.random_range(0.15..0.3);
+            let lifetime = rng.gen_range(0.15..0.3);
             self.spawn(position, velocity, varied_color, lifetime);
         }
     }
 
     /// Spawn splash particles for liquid placement
     pub fn spawn_liquid_splash(&mut self, position: Vec2, color: [u8; 4]) {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Spawn 4-8 droplets arcing upward then falling
-        let count = rng.random_range(4..=8);
+        let count = rng.gen_range(4..=8);
         for _ in 0..count {
-            let angle: f32 = rng.random_range(-2.5..-0.6); // Mostly upward arc
-            let speed = rng.random_range(40.0..100.0);
+            let angle: f32 = rng.gen_range(-2.5..-0.6); // Mostly upward arc
+            let speed = rng.gen_range(40.0..100.0);
             let velocity = Vec2::new(
-                rng.random_range(-40.0..40.0),
+                rng.gen_range(-40.0..40.0),
                 speed * angle.sin(), // Upward
             );
 
             // Make slightly translucent
             let splash_color = [color[0], color[1], color[2], 200];
 
-            let lifetime = rng.random_range(0.2..0.5);
+            let lifetime = rng.gen_range(0.2..0.5);
             self.spawn(position, velocity, splash_color, lifetime);
         }
     }
 
     /// Spawn dust cloud particles for mining/digging
     pub fn spawn_dust_cloud(&mut self, position: Vec2, color: [u8; 4]) {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Spawn 5-10 dust particles drifting upward
-        let count = rng.random_range(5..=10);
+        let count = rng.gen_range(5..=10);
         for _ in 0..count {
-            let offset = Vec2::new(rng.random_range(-4.0..4.0), rng.random_range(-4.0..4.0));
+            let offset = Vec2::new(rng.gen_range(-4.0..4.0), rng.gen_range(-4.0..4.0));
             let pos = position + offset;
 
             // Slow, upward drift with some horizontal spread
             let velocity = Vec2::new(
-                rng.random_range(-15.0..15.0),
-                rng.random_range(-30.0..-10.0), // Upward (negative Y)
+                rng.gen_range(-15.0..15.0),
+                rng.gen_range(-30.0..-10.0), // Upward (negative Y)
             );
 
             // Dusty brown-gray color mixed with material color
@@ -180,20 +180,20 @@ impl ParticleSystem {
                 180,
             ];
 
-            let lifetime = rng.random_range(0.3..0.6);
+            let lifetime = rng.gen_range(0.3..0.6);
             self.spawn(pos, velocity, dust_color, lifetime);
         }
     }
 
     /// Spawn spark particles for metal/stone impacts
     pub fn spawn_sparks(&mut self, position: Vec2) {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Spawn 2-5 bright sparks
-        let count = rng.random_range(2..=5);
+        let count = rng.gen_range(2..=5);
         for _ in 0..count {
-            let angle = rng.random_range(0.0..std::f32::consts::TAU);
-            let speed = rng.random_range(80.0..150.0);
+            let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+            let speed = rng.gen_range(80.0..150.0);
             let velocity = Vec2::new(angle.cos() * speed, angle.sin() * speed);
 
             // Bright yellow-white sparks
@@ -202,9 +202,9 @@ impl ParticleSystem {
                 [255, 220, 100, 255], // Yellow
                 [255, 200, 50, 255],  // Orange-yellow
             ];
-            let color = colors[rng.random_range(0..colors.len())];
+            let color = colors[rng.gen_range(0..colors.len())];
 
-            let lifetime = rng.random_range(0.1..0.25);
+            let lifetime = rng.gen_range(0.1..0.25);
             self.spawn(position, velocity, color, lifetime);
         }
     }
