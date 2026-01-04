@@ -387,22 +387,23 @@ pub fn load_chunk(&self, x: i32, y: i32) -> Result<Chunk> {
 ## Architecture Overview
 
 ### Tech Stack
-| Component       | Crate                                         |
-|-----------------|-----------------------------------------------|
-| Graphics        | wgpu 27.0                                     |
-| Windowing       | winit 0.30                                    |
-| UI              | egui 0.33                                     |
-| Physics         | Simple kinematic (no external physics engine) |
-| Math            | glam 0.25                                     |
-| Neural Networks | ndarray 0.16 (BLAS-accelerated)               |
-| Spatial Indexing| rstar 0.12 (R-tree for chunk queries)         |
-| Serialization   | serde + bincode + ron                         |
-| Compression     | lz4_flex                                      |
-| RNG             | rand + rand_xoshiro (deterministic)           |
-| Neural/Graph    | petgraph 0.6 (with serde-1 for CPPN)          |
-| Raycasting      | bresenham 0.1 (exact pixel traversal)         |
-| Stack Vectors   | smallvec 1.13 (avoid heap for small arrays)   |
-| Profiling       | puffin + puffin_egui (opt-in feature)         |
+| Component        | Crate                                         |
+|------------------|-----------------------------------------------|
+| Graphics         | wgpu 27.0                                     |
+| Windowing        | winit 0.30                                    |
+| UI               | egui 0.33                                     |
+| Physics          | Simple kinematic (no external physics engine) |
+| Math             | glam 0.25                                     |
+| Neural Networks  | ndarray 0.16 (BLAS-accelerated)               |
+| Spatial Indexing | rstar 0.12 (R-tree for chunk queries)         |
+| Serialization    | serde + bincode + ron                         |
+| Compression      | lz4_flex                                      |
+| RNG              | rand + rand_xoshiro (deterministic)           |
+| Neural/Graph     | petgraph 0.6 (with serde-1 for CPPN)          |
+| Raycasting       | bresenham 0.1 (exact pixel traversal)         |
+| Stack Vectors    | smallvec 1.13 (avoid heap for small arrays)   |
+| Noise Generation | fastnoise-lite 1.1 (WASM-compatible)          |
+| Profiling        | puffin + puffin_egui (opt-in feature)         |
 
 ### World Structure
 ```
@@ -528,34 +529,7 @@ crates/
 
 ## In-Game Controls
 
-```
-# Movement
-A/D            : Move left/right
-W              : Fly/Levitate (Noita-style)
-Space          : Jump
-
-# Camera
-+/-            : Zoom in/out
-Mouse Wheel    : Zoom in/out
-
-# Interaction
-0-9            : Select material
-Left Click     : Place material
-Right Click    : Instant mine
-
-# World
-L              : Level selector
-F5             : Manual save
-
-# UI Toggles
-H              : Help panel
-F1             : Debug stats
-F3             : Puffin profiler (requires --features profiling)
-M              : Multiplayer panel (connection UI, server selection, stats)
-T              : Temperature overlay
-```
-
-When adding new controls, update the above list in addition to the controls help in web/index.html
+When changing or adding new controls, update help in web/index.html.
 
 ## Notes for Claude
 
@@ -573,3 +547,4 @@ When adding new controls, update the above list in addition to the controls help
 12. **Multiplayer client sync**: Both Rust (native) and TypeScript (WASM) clients auto-generate from server schema. CI validates both via `just spacetime-verify-clients` and `just spacetime-verify-ts`.
 13. **Multiplayer runtime switching**: Game defaults to singleplayer. Press M to open connection panel, select server, and connect/disconnect at runtime. Singleplayer world is saved before connecting and restored on disconnect. Use `--server <url>` CLI arg or `just join`/`just join-prod` to connect on startup. Server metrics sampled at 6fps, ping at 1Hz, retention: 3600 samples (10 minutes).
 14. **Phase 2 optimizations (2026-01)**: Raycasting now uses Bresenham algorithm for exact pixel traversal (~2x faster). Neighbor queries use SmallVec for stack allocation (avoids heap for typical radii). CPPN genomes use petgraph's serde-1 feature directly (~100 lines removed, 50% memory reduction per genome, maintains SpacetimeDB bincode compatibility).
+15. **Phase 7 optimizations (2026-01)**: Noise generation now uses fastnoise-lite for WASM-compatible procedural terrain. OpenSimplex2 with FBm for biomes, terrain height, caves, ores, and vegetation. 2-4× faster than previous noise crate. Light propagation uses VecDeque-based BFS flood-fill (already optimal, no changes needed).

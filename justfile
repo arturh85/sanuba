@@ -207,7 +207,7 @@ spacetime-start:
 
 # Stop local SpacetimeDB instance
 spacetime-stop:
-    spacetime stop
+    killall spacetime
 
 # Publish to SpacetimeDB instance (default: local)
 spacetime-publish name="sunaba" server="http://localhost:3000":

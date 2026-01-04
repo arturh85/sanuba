@@ -18,6 +18,7 @@ jobs:
   publish-spacetimedb:
     name: Publish SpacetimeDB to Production
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +57,7 @@ jobs:
         run: just spacetime-build
 
       - name: Publish to production with timeout handling
+        id: publish_step
         run: |
           set +e  # Don't exit on error
           timeout 60 just spacetime-publish-prod sunaba
@@ -78,6 +80,16 @@ jobs:
           else
             echo "❌ Publish failed with exit code $EXIT_CODE"
             exit 1
+          fi
+
+      - name: Set job summary
+        if: always()
+        run: |
+          if [ "${{ steps.publish_step.outcome }}" = "success" ]; then
+            echo "✅ SpacetimeDB published successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Warning:** SpacetimeDB publish failed (server may be offline)" >> $GITHUB_STEP_SUMMARY
+            echo "GitHub Pages deployment will continue regardless" >> $GITHUB_STEP_SUMMARY
           fi
 
   build:
