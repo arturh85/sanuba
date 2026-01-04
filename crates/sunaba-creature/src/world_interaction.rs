@@ -4,7 +4,7 @@
 
 use glam::Vec2;
 
-use sunaba_simulation::{Pixel, pixel_flags};
+use sunaba_simulation::{MaterialId, Pixel, pixel_flags};
 
 /// Consume edible material at position
 /// Returns nutritional value gained
@@ -25,7 +25,7 @@ pub fn consume_edible_material(
             && nutrition > 0.0
         {
             // Remove the pixel (eat it)
-            world.set_pixel(pixel_x, pixel_y, 0); // Set to air
+            world.set_pixel(pixel_x, pixel_y, MaterialId::AIR);
             return Some(nutrition);
         }
     }
@@ -47,12 +47,12 @@ pub fn mine_world_pixel(
         let material_id = pixel.material_id;
 
         // Can't mine air or bedrock
-        if material_id == 0 || material_id == 14 {
+        if material_id == MaterialId::AIR || material_id == MaterialId::BEDROCK {
             return None;
         }
 
         // Mine the pixel (remove it)
-        world.set_pixel(pixel_x, pixel_y, 0); // Set to air
+        world.set_pixel(pixel_x, pixel_y, MaterialId::AIR);
         return Some(material_id);
     }
 
@@ -73,7 +73,7 @@ pub fn place_material(
 
     // Check if position is valid and currently air
     if let Some(pixel) = world.get_pixel(pixel_x, pixel_y)
-        && pixel.material_id == 0
+        && pixel.material_id == MaterialId::AIR
     {
         // Only place in air - set PLAYER_PLACED flag for structural integrity
         let mut new_pixel = Pixel::new(material_id);
@@ -99,14 +99,10 @@ pub fn apply_environmental_damage(
         let material_id = pixel.material_id;
 
         // Dangerous materials (fire, lava, acid)
-        const FIRE: u16 = 6;
-        const LAVA: u16 = 9;
-        const ACID: u16 = 11;
-
         let damage = match material_id {
-            FIRE => 5.0,  // Fire damage per frame
-            LAVA => 20.0, // High lava damage
-            ACID => 10.0, // Acid damage
+            MaterialId::FIRE => 5.0,  // Fire damage per frame
+            MaterialId::LAVA => 20.0, // High lava damage
+            MaterialId::ACID => 10.0, // Acid damage
             _ => 0.0,
         };
 
@@ -151,51 +147,7 @@ mod tests {
     // All tests in this module require World::new() from sunaba-core.
     // These tests are moved to sunaba-core as integration tests.
 
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_is_edible() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_get_nutritional_value() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_consume_edible_material() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_mine_air_fails() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_place_material() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_environmental_damage_safe_area() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_mine_and_place_cycle() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_cannot_mine_bedrock() {
-        // This test requires World::new() from sunaba-core
-    }
+    // The following tests require World::new() which is in sunaba-core.
+    // These tests are moved to sunaba-core as integration tests.
+    // See sunaba-core/tests/creature_world_interaction_test.rs
 }

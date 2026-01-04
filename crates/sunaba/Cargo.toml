@@ -29,10 +29,11 @@ winit = "0.30"
 bytemuck = { version = "1.14", features = ["derive"] }
 
 # UI
-egui = "0.33"
-egui-wgpu = "0.33"
+egui = "0.33.3"
+egui-wgpu = "0.33.3"
 egui_dock = "0.18"
 egui-notify = "0.21"
+egui_plot = "0.34.0"
 
 # Math
 glam = { version = "0.25", features = ["serde"] }
@@ -48,7 +49,7 @@ keyframe = "1.1"
 anyhow = "1.0"
 bitflags = "2.4"
 image = { version = "0.25", default-features = false, features = ["png"] }
-instant = { version = "0.1", features = ["wasm-bindgen"] }
+web-time = "1.1"  # WASM-compatible time (replaces unmaintained instant crate)
 log = "0.4"
 pollster = "0.3"
 rand = "0.8"

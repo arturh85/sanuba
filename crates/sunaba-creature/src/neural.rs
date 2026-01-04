@@ -7,9 +7,6 @@ use glam::Vec2;
 use super::genome::ControllerGenome;
 use super::morphology::CreatureMorphology;
 
-#[cfg(feature = "evolution")]
-use rand::Rng;
-
 /// Input features per body part (fed into GNN)
 #[derive(Debug, Clone)]
 pub struct BodyPartFeatures {
@@ -597,33 +594,9 @@ mod tests {
         assert_eq!(graph.edges.len(), 4);
     }
 
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_extract_body_part_features() {
-        use crate::morphology::CreatureMorphology;
-        use crate::sensors::SensorConfig;
-        // Tests need concrete World implementation - World::new() is in sunaba-core
-
-        let morphology = CreatureMorphology::test_biped();
-        // Note: World::new() is in sunaba-core, not available here
-        let config = SensorConfig::default();
-
-        // This test requires a concrete World implementation
-        // let world = World::new();
-        // let sensory_input = SensoryInput::gather(&world, Vec2::new(100.0, 100.0), &config);
-        // let physics_state = CreaturePhysicsState::new(&morphology, Vec2::ZERO);
-        // let features = extract_body_part_features_simple(&morphology, &physics_state, &sensory_input, &world);
-
-        // Should have features for each body part
-        // assert_eq!(features.len(), morphology.body_parts.len());
-
-        // Each feature should have raycast data
-        // for feature in &features {
-        //     assert_eq!(feature.raycast_distances.len(), config.num_raycasts);
-        //     assert_eq!(feature.contact_materials.len(), 5);
-        // }
-        let _ = (morphology, config);
-    }
+    // The following tests require World::new() which is in sunaba-core.
+    // These tests are moved to sunaba-core as integration tests.
+    // See sunaba-core/tests/creature_neural_test.rs
 
     #[test]
     fn test_neural_controller_deterministic() {

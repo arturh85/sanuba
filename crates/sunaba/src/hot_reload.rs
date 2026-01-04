@@ -6,8 +6,8 @@
 //!
 //! On WASM, hot-reloading is disabled (no filesystem access).
 
-use instant::Instant;
 use std::time::Duration;
+use web_time::Instant;
 
 /// Flags indicating which files need reloading.
 #[derive(Debug, Clone, Copy, Default)]

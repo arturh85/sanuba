@@ -14,12 +14,20 @@ load:
 profile:
     cargo run -p sunaba --bin sunaba --release --features profiling
 
+# Run multiplayer client (connects to local SpacetimeDB server)
+start-multiplayer server="http://localhost:3000":
+    @echo "Starting multiplayer client (connecting to {{server}})..."
+    @echo "Logs will appear in the game window - check the console there"
+    RUST_LOG=info cargo run -p sunaba --bin sunaba --release --features multiplayer_native
+
 [unix]
 test: fmt clippy
     @cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
     cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build
+    just spacetime-verify-clients
+    just spacetime-verify-ts
 
 [windows]
 test: fmt clippy
@@ -27,6 +35,8 @@ test: fmt clippy
     cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build
+    just spacetime-verify-clients
+    just spacetime-verify-ts
 
 fmt:
     cargo fmt --all
@@ -87,6 +97,64 @@ train-single archetype="evolved" generations="100":
     just train parcour {{generations}} 50 "" {{archetype}}
 
 # ============================================================================
+# Code Coverage Commands
+# ============================================================================
+
+# Check code coverage for a specific package and/or path filter
+# Usage: just coverage [package] [path_filter]
+# Examples:
+#   just coverage                           # Whole workspace summary
+#   just coverage sunaba-core               # Just sunaba-core package
+#   just coverage sunaba-core src/world     # sunaba-core package, only src/world files
+#   just coverage "" crates/sunaba-core     # Whole workspace, filter by path
+[unix]
+coverage package="" path_filter="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v cargo-llvm-cov >/dev/null 2>&1 || cargo install cargo-llvm-cov
+    if [ -z "{{package}}" ] && [ -z "{{path_filter}}" ]; then \
+        echo "Running coverage for entire workspace..."; \
+        cargo llvm-cov --workspace --all-features --summary-only; \
+    else \
+        PKG_FLAG=""; \
+        if [ -n "{{package}}" ]; then \
+            PKG_FLAG="-p {{package}}"; \
+            echo "Running coverage for package: {{package}}"; \
+        else \
+            echo "Running coverage for entire workspace..."; \
+        fi; \
+        cargo llvm-cov $PKG_FLAG --all-features 2>/dev/null > /tmp/coverage_output.txt; \
+        if [ -n "{{path_filter}}" ]; then \
+            echo "Filtering results for: {{path_filter}}"; \
+            echo ""; \
+            head -2 /tmp/coverage_output.txt; \
+            grep "{{path_filter}}" /tmp/coverage_output.txt | head -20; \
+            echo ""; \
+            echo "Summary for {{path_filter}}:"; \
+            grep "{{path_filter}}" /tmp/coverage_output.txt | awk '{gsub(/%/,"",$10); gsub(/%/,"",$4); gsub(/%/,"",$7); if($10!="Cover") {lines+=$10; regions+=$4; funcs+=$7; count++}} END {if(count>0) printf "  Lines: %.1f%% | Regions: %.1f%% | Functions: %.1f%%\n", lines/count, regions/count, funcs/count}'; \
+        else \
+            tail -10 /tmp/coverage_output.txt; \
+        fi; \
+        rm -f /tmp/coverage_output.txt; \
+    fi
+
+[windows]
+coverage package="" path_filter="":
+    @if (-not (Get-Command cargo-llvm-cov -ErrorAction SilentlyContinue)) { cargo install cargo-llvm-cov }
+    @if ("{{package}}" -eq "" -and "{{path_filter}}" -eq "") { \
+        Write-Host "Running coverage for entire workspace..."; \
+        cargo llvm-cov --workspace --all-features --summary-only; \
+    } else { \
+        if ("{{package}}" -ne "") { \
+            Write-Host "Running coverage for package: {{package}}"; \
+            cargo llvm-cov -p {{package}} --all-features --text 2>$null | Select-String "{{path_filter}}"; \
+        } else { \
+            Write-Host "Running coverage for entire workspace..."; \
+            cargo llvm-cov --workspace --all-features --text 2>$null | Select-String "{{path_filter}}"; \
+        } \
+    }
+
+# ============================================================================
 # SpacetimeDB Commands
 # ============================================================================
 
@@ -133,33 +201,65 @@ spacetime-start:
 spacetime-stop:
     spacetime stop
 
-# Publish to local SpacetimeDB instance
-spacetime-publish-local name="sunaba":
-    cd crates/sunaba-server && spacetime publish {{name}} -s http://localhost:3000
+# Publish to SpacetimeDB instance (default: local)
+spacetime-publish-local name="sunaba" server="http://localhost:3000":
+    cd crates/sunaba-server && spacetime publish {{name}} -s {{server}}
 
 # Publish to SpacetimeDB cloud (requires auth)
 spacetime-publish-cloud name="sunaba":
     cd crates/sunaba-server && spacetime publish {{name}}
 
 # View SpacetimeDB logs
-spacetime-logs name="sunaba":
-    spacetime logs {{name}}
+spacetime-logs name="sunaba" server="http://localhost:3000":
+    spacetime logs {{name}} -s {{server}}
 
 # Follow SpacetimeDB logs (tail -f style)
-spacetime-logs-tail name="sunaba":
-    spacetime logs {{name}} -f
+spacetime-logs-tail name="sunaba" server="http://localhost:3000":
+    spacetime logs {{name}} -s {{server}} -f
 
-# Generate TypeScript client SDK
-spacetime-generate-ts name="sunaba" output="web/src/spacetime":
-    spacetime generate -c local --lang typescript --out-dir {{output}} {{name}}
+# Generate TypeScript client SDK from server module
+spacetime-generate-ts:
+    @echo "Generating TypeScript client from server schema..."
+    spacetime generate --lang typescript --project-path crates/sunaba-server --out-dir web/src/spacetime
+    @echo "TypeScript client generated successfully"
 
-# Generate Rust client SDK
-spacetime-generate-rust name="sunaba" output="crates/sunaba/src/spacetime_client":
-    spacetime generate -c local --lang rust --out-dir {{output}} {{name}}
+# Generate Rust client SDK from server module
+spacetime-generate-rust:
+    @echo "Generating Rust client from server schema..."
+    spacetime generate --lang rust --project-path crates/sunaba-server --out-dir crates/sunaba/src/multiplayer/generated
+    @echo "Formatting generated Rust code..."
+    cargo fmt --manifest-path crates/sunaba/Cargo.toml
+    @echo "Rust client generated successfully"
+
+# Verify generated clients are up-to-date (auto-regenerates, gitignored)
+[unix]
+spacetime-verify-clients:
+    @echo "Verifying Rust client is current..."
+    @just spacetime-generate-rust > /dev/null 2>&1
+    @echo "✅ Rust client regenerated (gitignored)"
+
+[windows]
+spacetime-verify-clients:
+    @echo "Verifying Rust client is current..."
+    @just spacetime-generate-rust | Out-Null
+    @echo "✅ Rust client regenerated (gitignored)"
+
+# Verify TypeScript client is up-to-date (auto-regenerates, gitignored)
+[unix]
+spacetime-verify-ts:
+    @echo "Verifying TypeScript client is current..."
+    @just spacetime-generate-ts > /dev/null 2>&1
+    @echo "✅ TypeScript client regenerated (gitignored)"
+
+[windows]
+spacetime-verify-ts:
+    @echo "Verifying TypeScript client is current..."
+    @just spacetime-generate-ts | Out-Null
+    @echo "✅ TypeScript client regenerated (gitignored)"
 
 # Call a reducer manually (for testing)
-spacetime-call name="sunaba" reducer="init":
-    spacetime call -c local {{name}} {{reducer}}
+spacetime-call name="sunaba" reducer="init" server="http://localhost:3000":
+    spacetime call -s {{server}} {{name}} {{reducer}}
 
 # Full local development setup: build, start, publish
 [unix]
@@ -181,10 +281,46 @@ spacetime-dev name="sunaba":
     @echo "Run 'just spacetime-logs-tail {{name}}' to watch logs"
 
 # Reset database (delete and republish)
-spacetime-reset name="sunaba":
-    spacetime delete -c local {{name}} || true
-    just spacetime-publish-local {{name}}
+spacetime-reset name="sunaba" server="http://localhost:3000":
+    spacetime delete -s {{server}} {{name}} || true
+    just spacetime-publish-local {{name}} {{server}}
 
 # Show database status
-spacetime-status name="sunaba":
-    spacetime describe -c local {{name}}
+spacetime-status name="sunaba" server="http://localhost:3000":
+    spacetime describe -s {{server}} {{name}}
+
+# ============================================================================
+# Production Server Convenience Commands
+# ============================================================================
+
+# Publish to production server (IP)
+spacetime-publish-prod name="sunaba":
+    just spacetime-publish-local {{name}} http://10.10.10.23:3000
+
+# Publish to production server (domain)
+spacetime-publish-domain name="sunaba":
+    just spacetime-publish-local {{name}} https://sunaba.app42.blue
+
+# Tail logs from production server (IP)
+spacetime-logs-tail-prod name="sunaba":
+    just spacetime-logs-tail {{name}} http://10.10.10.23:3000
+
+# Tail logs from production server (domain)
+spacetime-logs-tail-domain name="sunaba":
+    just spacetime-logs-tail {{name}} https://sunaba.app42.blue
+
+# Show production database status (IP)
+spacetime-status-prod name="sunaba":
+    just spacetime-status {{name}} http://10.10.10.23:3000
+
+# Show production database status (domain)
+spacetime-status-domain name="sunaba":
+    just spacetime-status {{name}} https://sunaba.app42.blue
+
+# Reset production database (IP) - USE WITH CAUTION
+spacetime-reset-prod name="sunaba":
+    just spacetime-reset {{name}} http://10.10.10.23:3000
+
+# Reset production database (domain) - USE WITH CAUTION
+spacetime-reset-domain name="sunaba":
+    just spacetime-reset {{name}} https://sunaba.app42.blue

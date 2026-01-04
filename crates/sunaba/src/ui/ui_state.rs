@@ -7,7 +7,7 @@ use super::toasts::ToastManager;
 use super::tooltip::TooltipState;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::config::GameConfig;
-use instant::Instant;
+use web_time::Instant;
 
 /// Central UI state container
 pub struct UiState {
@@ -33,6 +33,13 @@ pub struct UiState {
     /// Track if parameters were changed (for propagation to renderer)
     #[cfg(not(target_arch = "wasm32"))]
     pub params_changed: bool,
+
+    /// Multiplayer metrics collector (both native and WASM)
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+        all(target_arch = "wasm32", feature = "multiplayer_wasm")
+    ))]
+    pub metrics_collector: Option<crate::multiplayer::metrics::MetricsCollector>,
 }
 
 impl UiState {
@@ -51,6 +58,8 @@ impl UiState {
             toasts: ToastManager::new(),
             dock: DockManager::new(),
             params_changed: false,
+            #[cfg(feature = "multiplayer_native")]
+            metrics_collector: None,
         }
     }
 
@@ -64,6 +73,8 @@ impl UiState {
             hud: Hud::new(),
             toasts: ToastManager::new(),
             dock: DockManager::new(),
+            #[cfg(feature = "multiplayer_wasm")]
+            metrics_collector: None,
         }
     }
 
@@ -150,6 +161,8 @@ impl UiState {
             recipe_registry,
             params: config,
             params_changed: &mut self.params_changed,
+            #[cfg(feature = "multiplayer_native")]
+            multiplayer_metrics: self.metrics_collector.as_ref().map(|c| c.metrics()),
         };
         super::dock::render_dock(ctx, &mut self.dock, dock_ctx);
 
@@ -200,6 +213,8 @@ impl UiState {
             player,
             tool_registry,
             recipe_registry,
+            #[cfg(feature = "multiplayer_wasm")]
+            multiplayer_metrics: self.metrics_collector.as_ref().map(|c| c.metrics()),
         };
         super::dock::render_dock(ctx, &mut self.dock, dock_ctx);
 

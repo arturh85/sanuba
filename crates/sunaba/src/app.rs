@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use glam::Vec2;
-use instant::{Duration, Instant};
+use web_time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, MouseButton, WindowEvent},
@@ -116,6 +116,13 @@ pub struct App {
         all(target_arch = "wasm32", feature = "multiplayer_wasm")
     ))]
     multiplayer_client: Option<crate::multiplayer::MultiplayerClient>,
+
+    /// Track whether initial spawn chunks have loaded (multiplayer only)
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+        all(target_arch = "wasm32", feature = "multiplayer_wasm")
+    ))]
+    multiplayer_initial_chunks_loaded: bool,
 }
 
 impl App {
@@ -191,13 +198,28 @@ impl App {
         let window = event_loop.create_window(window_attrs)?;
 
         let renderer = Renderer::new(&window).await?;
+        #[allow(unused_mut)] // mut only needed in singleplayer mode
         let mut world = World::new();
 
         // Initialize level manager (but don't load a level yet)
         let level_manager = LevelManager::new();
 
-        // Load persistent world instead of demo level
-        world.load_persistent_world();
+        // In multiplayer mode, don't load local world - we'll receive state from server
+        #[cfg(not(any(
+            all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+            all(target_arch = "wasm32", feature = "multiplayer_wasm")
+        )))]
+        {
+            world.load_persistent_world();
+            log::info!("Loaded persistent world (singleplayer mode)");
+        }
+
+        #[cfg(any(
+            all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+            all(target_arch = "wasm32", feature = "multiplayer_wasm")
+        ))]
+        log::info!("Multiplayer mode - waiting for world state from server");
+
         let game_mode = GameMode::PersistentWorld;
 
         // Initialize egui
@@ -214,10 +236,12 @@ impl App {
         log::info!("Loaded persistent world");
 
         #[cfg(not(target_arch = "wasm32"))]
-        let ui_state = UiState::new(&config);
+        #[allow(unused_mut)] // Mut needed for multiplayer_native feature
+        let mut ui_state = UiState::new(&config);
 
         #[cfg(target_arch = "wasm32")]
-        let ui_state = UiState::default();
+        #[allow(unused_mut)] // Mut needed for multiplayer_native feature
+        let mut ui_state = UiState::default();
 
         // Initialize multiplayer client (WASM only, requires multiplayer feature)
         #[cfg(any(
@@ -233,6 +257,7 @@ impl App {
         ))]
         {
             if let Some(ref mut client) = multiplayer_client {
+                log::info!("Attempting to connect to SpacetimeDB at http://localhost:3000...");
                 // TODO: Get server URL from environment or config
                 // For now, hardcode to localhost:3000
                 match client.connect("http://localhost:3000", "sunaba").await {
@@ -241,6 +266,17 @@ impl App {
                         // Subscribe to world state
                         if let Err(e) = client.subscribe_world().await {
                             log::error!("Failed to subscribe to world state: {}", e);
+                        }
+
+                        // Initialize metrics collector
+                        #[cfg(any(
+                            all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+                            all(target_arch = "wasm32", feature = "multiplayer_wasm")
+                        ))]
+                        {
+                            ui_state.metrics_collector =
+                                Some(crate::multiplayer::metrics::MetricsCollector::new());
+                            log::info!("Initialized multiplayer metrics collector");
                         }
                     }
                     Err(e) => {
@@ -271,6 +307,11 @@ impl App {
                 all(target_arch = "wasm32", feature = "multiplayer_wasm")
             ))]
             multiplayer_client,
+            #[cfg(any(
+                all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+                all(target_arch = "wasm32", feature = "multiplayer_wasm")
+            ))]
+            multiplayer_initial_chunks_loaded: false,
         };
 
         Ok((app, event_loop))
@@ -434,11 +475,81 @@ impl App {
             log::info!("Auto-saved world and player data");
         }
 
-        // Process SpacetimeDB messages (multiplayer only)
+        // Process SpacetimeDB messages (native multiplayer only)
         #[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer_native"))]
         {
             if let Some(ref client) = self.multiplayer_client {
                 client.frame_tick();
+
+                // Sync chunks from server to local world for rendering
+                if let Err(e) = client.sync_chunks_to_world(&mut self.world) {
+                    log::error!("Failed to sync chunks from server: {}", e);
+                }
+
+                // Wait for initial spawn chunks before rendering player
+                if !self.multiplayer_initial_chunks_loaded {
+                    use glam::IVec2;
+
+                    let spawn_chunk_positions = vec![
+                        IVec2::new(0, 0), // Center
+                        IVec2::new(-1, 0),
+                        IVec2::new(1, 0), // Sides
+                        IVec2::new(0, -1),
+                        IVec2::new(0, 1), // Top/bottom
+                    ];
+
+                    let all_loaded = spawn_chunk_positions
+                        .iter()
+                        .all(|pos| self.world.has_chunk(*pos));
+
+                    if all_loaded {
+                        self.multiplayer_initial_chunks_loaded = true;
+                        log::info!(
+                            "Initial spawn chunks loaded ({}), enabling player rendering",
+                            spawn_chunk_positions.len()
+                        );
+                    } else {
+                        // Chunks still loading - world will be empty but UI will render
+                        log::info!(
+                            "Waiting for spawn chunks to load... (have {} chunks)",
+                            self.world.active_chunks().count()
+                        );
+                        // Continue to render UI/egui so logs are visible
+                    }
+                }
+
+                // Update metrics collector
+                if let Some(ref mut collector) = self.ui_state.metrics_collector {
+                    // Record this update
+                    collector.record_update();
+
+                    // Send ping periodically
+                    collector.send_ping(client);
+
+                    // Update server metrics from latest data
+                    if let Some(server_metrics) = client.get_latest_server_metrics() {
+                        collector.update_server_metrics(&server_metrics);
+                    }
+                }
+            }
+        }
+
+        // Update metrics collector (WASM multiplayer only)
+        #[cfg(all(target_arch = "wasm32", feature = "multiplayer_wasm"))]
+        {
+            if let Some(ref client) = self.multiplayer_client {
+                if let Some(ref mut collector) = self.ui_state.metrics_collector {
+                    // Record this update
+                    collector.record_update();
+
+                    // Send ping periodically
+                    collector.send_ping(client);
+
+                    // Update server metrics from latest data
+                    if let Some(server_metrics) = client.get_latest_server_metrics() {
+                        collector.update_server_metrics(&server_metrics);
+                    }
+                }
             }
         }
 
@@ -559,16 +670,22 @@ impl App {
             }
         }
 
-        // Update simulation with timing
-        #[cfg(feature = "profiling")]
-        puffin::profile_scope!("simulation");
-        self.ui_state.stats.begin_sim();
-        self.world.update(
-            1.0 / 60.0,
-            &mut self.ui_state.stats,
-            &mut rand::thread_rng(),
-        );
-        self.ui_state.stats.end_sim();
+        // Update simulation with timing (disabled in multiplayer - server is authoritative)
+        #[cfg(not(any(
+            all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+            all(target_arch = "wasm32", feature = "multiplayer_wasm")
+        )))]
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("simulation");
+            self.ui_state.stats.begin_sim();
+            self.world.update(
+                1.0 / 60.0,
+                &mut self.ui_state.stats,
+                &mut rand::thread_rng(),
+            );
+            self.ui_state.stats.end_sim();
+        }
 
         // Collect world stats
         self.ui_state.stats.collect_world_stats(&self.world);
@@ -1021,6 +1138,16 @@ impl ApplicationHandler for App {
                         KeyCode::KeyL => {
                             if pressed {
                                 self.ui_state.toggle_tab(crate::ui::DockTab::LevelSelector);
+                            }
+                        }
+                        #[cfg(any(
+                            all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+                            all(target_arch = "wasm32", feature = "multiplayer_wasm")
+                        ))]
+                        KeyCode::KeyM => {
+                            if pressed {
+                                self.ui_state
+                                    .toggle_tab(crate::ui::DockTab::MultiplayerStats);
                             }
                         }
                         KeyCode::KeyI => {

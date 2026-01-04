@@ -22,6 +22,13 @@ pub mod headless;
 ))]
 pub mod multiplayer;
 
+// Encoding module for chunk synchronization (multiplayer only)
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+    all(target_arch = "wasm32", feature = "multiplayer_wasm")
+))]
+pub mod encoding;
+
 // Re-export core modules for convenience
 pub use sunaba_core::creature;
 pub use sunaba_core::entity;

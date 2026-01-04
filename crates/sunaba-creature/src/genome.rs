@@ -7,9 +7,6 @@ use ahash::HashMap;
 use petgraph::graph::{DiGraph, NodeIndex};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "evolution")]
-use rand::{prelude::SliceRandom, Rng};
-
 /// Activation functions for CPPN nodes
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum ActivationFunction {

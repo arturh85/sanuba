@@ -375,7 +375,7 @@ mod tests {
         let scenario = Scenario::parcour();
         assert_eq!(scenario.config.name, "Parcour");
         assert_eq!(scenario.fitness.name(), "DirectionalFood");
-        assert_eq!(scenario.config.spawn_position, Vec2::new(50.0, 50.0));
+        assert_eq!(scenario.config.spawn_position, Vec2::new(50.0, 40.0));
     }
 
     #[test]
@@ -386,24 +386,19 @@ mod tests {
         // Check that ground exists
         let ground_pixel = world.get_pixel(100, 10);
         assert!(ground_pixel.is_some());
-        assert_eq!(ground_pixel.unwrap().material_id, MaterialId::STONE);
+        assert_eq!(ground_pixel.unwrap().material_id, MaterialId::BEDROCK);
 
-        // Check that food exists before wall
-        let food_pixel = world.get_pixel(100, 25);
-        assert!(food_pixel.is_some());
-        assert_eq!(food_pixel.unwrap().material_id, MaterialId::FRUIT);
-
-        // Check that wall exists
-        let wall_pixel = world.get_pixel(255, 30);
+        // Check that wall exists (wall is at x=180-194, from ground to ceiling)
+        let wall_pixel = world.get_pixel(185, 30);
         assert!(wall_pixel.is_some());
         assert_eq!(wall_pixel.unwrap().material_id, MaterialId::STONE);
 
-        // Check that food exists after wall
-        let food_after = world.get_pixel(280, 25);
+        // Check that food exists after wall (food is at y=30, in 3x3 patches)
+        let food_after = world.get_pixel(280, 30);
         assert!(food_after.is_some());
         assert_eq!(food_after.unwrap().material_id, MaterialId::FRUIT);
 
         // Check food positions were returned
-        assert_eq!(food_positions.len(), 8); // 3 before + 5 after wall
+        assert_eq!(food_positions.len(), 6); // All food behind wall (must mine to reach)
     }
 }

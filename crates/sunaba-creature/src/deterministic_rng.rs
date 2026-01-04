@@ -58,7 +58,7 @@ mod tests {
     fn test_zero_seed() {
         let mut rng = DeterministicRng::from_seed(0);
         let val = rng.gen_f32();
-        assert!(val >= 0.0 && val < 1.0);
+        assert!((0.0..1.0).contains(&val));
     }
 
     #[test]
@@ -66,17 +66,28 @@ mod tests {
         let mut rng = DeterministicRng::from_seed(123);
         for _ in 0..100 {
             let val = rng.gen_range_f32(-1.0, 1.0);
-            assert!(val >= -1.0 && val < 1.0);
+            assert!((-1.0..1.0).contains(&val));
         }
     }
 
     #[test]
     fn test_different_seeds() {
-        let mut rng1 = DeterministicRng::from_seed(1);
-        let mut rng2 = DeterministicRng::from_seed(2);
+        let mut rng1 = DeterministicRng::from_seed(12345);
+        let mut rng2 = DeterministicRng::from_seed(67890);
 
-        let val1 = rng1.gen_f32();
-        let val2 = rng2.gen_f32();
-        assert_ne!(val1, val2);
+        // Check multiple values to ensure different sequences
+        let mut found_difference = false;
+        for _ in 0..10 {
+            let val1 = rng1.gen_f32();
+            let val2 = rng2.gen_f32();
+            if (val1 - val2).abs() > 1e-6 {
+                found_difference = true;
+                break;
+            }
+        }
+        assert!(
+            found_difference,
+            "Different seeds should produce different random sequences"
+        );
     }
 }

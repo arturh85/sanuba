@@ -1,8 +1,8 @@
 //! wgpu-based renderer for pixel world
 
 use anyhow::Result;
-use instant::Instant;
 use std::iter;
+use web_time::Instant;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -929,7 +929,7 @@ impl Renderer {
             for cy in min_chunk.y..=max_chunk.y {
                 for cx in min_chunk.x..=max_chunk.x {
                     let chunk_pos = glam::IVec2::new(cx, cy);
-                    if let Some(chunk) = world.chunks.get(&chunk_pos) {
+                    if let Some(chunk) = world.chunks().get(&chunk_pos) {
                         self.render_chunk_to_buffer(chunk, world);
                     }
                 }
@@ -944,7 +944,7 @@ impl Renderer {
                     let chunk_pos = glam::IVec2::new(cx, cy);
                     self.rendered_chunks.insert(chunk_pos);
                     // Clear dirty_rect after rendering
-                    if let Some(chunk) = world.chunks.get_mut(&chunk_pos) {
+                    if let Some(chunk) = world.chunks_mut().get_mut(&chunk_pos) {
                         chunk.clear_dirty_rect();
                     }
                 }
@@ -959,7 +959,7 @@ impl Renderer {
             // Render only dirty chunks
             let dirty_chunks: Vec<glam::IVec2> = self.render_dirty_chunks.iter().copied().collect();
             for chunk_pos in &dirty_chunks {
-                if let Some(chunk) = world.chunks.get(chunk_pos) {
+                if let Some(chunk) = world.chunks().get(chunk_pos) {
                     self.render_chunk_to_buffer(chunk, world);
                 }
                 // Mark chunk as rendered
@@ -969,7 +969,7 @@ impl Renderer {
             // Clear dirty_rect for rendered chunks - this is the key optimization!
             // Next frame, only chunks that changed AFTER rendering will be dirty
             for chunk_pos in &dirty_chunks {
-                if let Some(chunk) = world.chunks.get_mut(chunk_pos) {
+                if let Some(chunk) = world.chunks_mut().get_mut(chunk_pos) {
                     chunk.clear_dirty_rect();
                 }
             }
@@ -1097,7 +1097,7 @@ impl Renderer {
             for cx in min_chunk.x..=max_chunk.x {
                 let pos = glam::IVec2::new(cx, cy);
 
-                if let Some(chunk) = world.chunks.get(&pos) {
+                if let Some(chunk) = world.chunks().get(&pos) {
                     // Re-render if: newly visible OR dirty from simulation
                     if !self.rendered_chunks.contains(&pos) || chunk.dirty_rect.is_some() {
                         self.render_dirty_chunks.insert(pos);
@@ -1380,10 +1380,10 @@ impl Renderer {
                 // Don't flip here - shader handles Y-flip
                 let idx = ((tex_y as u32 * Self::WORLD_TEXTURE_SIZE + tex_x as u32) * 4) as usize;
 
-                if pixel.material_id == 0 {
+                if pixel.material_id == MaterialId::AIR {
                     // Foreground is air - check for background layer
                     let bg_material = chunk.get_background(x, y);
-                    if bg_material != 0 {
+                    if bg_material != MaterialId::AIR {
                         // Render background material with darkened color (40% brightness)
                         let color = world.materials.get_color(bg_material);
                         self.pixel_buffer[idx] = (color[0] as u32 * 40 / 100) as u8;

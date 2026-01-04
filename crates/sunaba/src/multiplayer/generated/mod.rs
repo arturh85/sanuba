@@ -20,11 +20,15 @@ pub mod player_place_material_reducer;
 pub mod player_table;
 pub mod player_type;
 pub mod player_update_position_reducer;
+pub mod request_ping_reducer;
+pub mod server_metrics_table;
+pub mod server_metrics_type;
 pub mod set_player_name_reducer;
 pub mod settle_tick_timer_table;
 pub mod settle_tick_timer_type;
 pub mod settle_world_tick_reducer;
 pub mod spawn_creature_reducer;
+pub mod test_terrain_generation_reducer;
 pub mod world_config_table;
 pub mod world_config_type;
 pub mod world_tick_reducer;
@@ -55,6 +59,9 @@ pub use player_type::Player;
 pub use player_update_position_reducer::{
     PlayerUpdatePositionCallbackId, player_update_position, set_flags_for_player_update_position,
 };
+pub use request_ping_reducer::{RequestPingCallbackId, request_ping, set_flags_for_request_ping};
+pub use server_metrics_table::*;
+pub use server_metrics_type::ServerMetrics;
 pub use set_player_name_reducer::{
     SetPlayerNameCallbackId, set_flags_for_set_player_name, set_player_name,
 };
@@ -65,6 +72,9 @@ pub use settle_world_tick_reducer::{
 };
 pub use spawn_creature_reducer::{
     SpawnCreatureCallbackId, set_flags_for_spawn_creature, spawn_creature,
+};
+pub use test_terrain_generation_reducer::{
+    TestTerrainGenerationCallbackId, set_flags_for_test_terrain_generation, test_terrain_generation,
 };
 pub use world_config_table::*;
 pub use world_config_type::WorldConfig;
@@ -100,6 +110,9 @@ pub enum Reducer {
         vel_x: f32,
         vel_y: f32,
     },
+    RequestPing {
+        client_timestamp_ms: u64,
+    },
     SetPlayerName {
         name: String,
     },
@@ -111,6 +124,7 @@ pub enum Reducer {
         x: f32,
         y: f32,
     },
+    TestTerrainGeneration,
     WorldTick {
         arg: WorldTickTimer,
     },
@@ -129,9 +143,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::PlayerMine { .. } => "player_mine",
             Reducer::PlayerPlaceMaterial { .. } => "player_place_material",
             Reducer::PlayerUpdatePosition { .. } => "player_update_position",
+            Reducer::RequestPing { .. } => "request_ping",
             Reducer::SetPlayerName { .. } => "set_player_name",
             Reducer::SettleWorldTick { .. } => "settle_world_tick",
             Reducer::SpawnCreature { .. } => "spawn_creature",
+            Reducer::TestTerrainGeneration => "test_terrain_generation",
             Reducer::WorldTick { .. } => "world_tick",
             _ => unreachable!(),
         }
@@ -168,6 +184,13 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
                 player_update_position_reducer::PlayerUpdatePositionArgs,
             >("player_update_position", &value.args)?
             .into()),
+            "request_ping" => Ok(
+                __sdk::parse_reducer_args::<request_ping_reducer::RequestPingArgs>(
+                    "request_ping",
+                    &value.args,
+                )?
+                .into(),
+            ),
             "set_player_name" => Ok(__sdk::parse_reducer_args::<
                 set_player_name_reducer::SetPlayerNameArgs,
             >("set_player_name", &value.args)?
@@ -179,6 +202,10 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
             "spawn_creature" => Ok(__sdk::parse_reducer_args::<
                 spawn_creature_reducer::SpawnCreatureArgs,
             >("spawn_creature", &value.args)?
+            .into()),
+            "test_terrain_generation" => Ok(__sdk::parse_reducer_args::<
+                test_terrain_generation_reducer::TestTerrainGenerationArgs,
+            >("test_terrain_generation", &value.args)?
             .into()),
             "world_tick" => Ok(
                 __sdk::parse_reducer_args::<world_tick_reducer::WorldTickArgs>(
@@ -205,6 +232,7 @@ pub struct DbUpdate {
     creature_data: __sdk::TableUpdate<CreatureData>,
     creature_tick_timer: __sdk::TableUpdate<CreatureTickTimer>,
     player: __sdk::TableUpdate<Player>,
+    server_metrics: __sdk::TableUpdate<ServerMetrics>,
     settle_tick_timer: __sdk::TableUpdate<SettleTickTimer>,
     world_config: __sdk::TableUpdate<WorldConfig>,
     world_tick_timer: __sdk::TableUpdate<WorldTickTimer>,
@@ -228,6 +256,9 @@ impl TryFrom<__ws::DatabaseUpdate<__ws::BsatnFormat>> for DbUpdate {
                 "player" => db_update
                     .player
                     .append(player_table::parse_table_update(table_update)?),
+                "server_metrics" => db_update
+                    .server_metrics
+                    .append(server_metrics_table::parse_table_update(table_update)?),
                 "settle_tick_timer" => db_update
                     .settle_tick_timer
                     .append(settle_tick_timer_table::parse_table_update(table_update)?),
@@ -278,6 +309,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.player = cache
             .apply_diff_to_table::<Player>("player", &self.player)
             .with_updates_by_pk(|row| &row.identity);
+        diff.server_metrics = cache
+            .apply_diff_to_table::<ServerMetrics>("server_metrics", &self.server_metrics)
+            .with_updates_by_pk(|row| &row.id);
         diff.settle_tick_timer = cache
             .apply_diff_to_table::<SettleTickTimer>("settle_tick_timer", &self.settle_tick_timer)
             .with_updates_by_pk(|row| &row.id);
@@ -300,6 +334,7 @@ pub struct AppliedDiff<'r> {
     creature_data: __sdk::TableAppliedDiff<'r, CreatureData>,
     creature_tick_timer: __sdk::TableAppliedDiff<'r, CreatureTickTimer>,
     player: __sdk::TableAppliedDiff<'r, Player>,
+    server_metrics: __sdk::TableAppliedDiff<'r, ServerMetrics>,
     settle_tick_timer: __sdk::TableAppliedDiff<'r, SettleTickTimer>,
     world_config: __sdk::TableAppliedDiff<'r, WorldConfig>,
     world_tick_timer: __sdk::TableAppliedDiff<'r, WorldTickTimer>,
@@ -328,6 +363,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Player>("player", &self.player, event);
+        callbacks.invoke_table_row_callbacks::<ServerMetrics>(
+            "server_metrics",
+            &self.server_metrics,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<SettleTickTimer>(
             "settle_tick_timer",
             &self.settle_tick_timer,
@@ -1066,6 +1106,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         creature_data_table::register_table(client_cache);
         creature_tick_timer_table::register_table(client_cache);
         player_table::register_table(client_cache);
+        server_metrics_table::register_table(client_cache);
         settle_tick_timer_table::register_table(client_cache);
         world_config_table::register_table(client_cache);
         world_tick_timer_table::register_table(client_cache);

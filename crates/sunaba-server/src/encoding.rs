@@ -4,7 +4,7 @@
 
 use bincode_next as bincode;
 use sunaba_creature::{CreatureGenome, CreatureMorphology, CreaturePhysicsState};
-use sunaba_simulation::{Pixel, CHUNK_SIZE};
+use sunaba_simulation::{CHUNK_SIZE, Pixel};
 
 /// Encode chunk pixels to bytes
 pub fn encode_chunk_pixels(pixels: &[Pixel]) -> Result<Vec<u8>, String> {

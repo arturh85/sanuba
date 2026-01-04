@@ -7,7 +7,6 @@
 //! - Provide nutrition to creatures that eat them
 
 use glam::Vec2;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// Critter behavior state

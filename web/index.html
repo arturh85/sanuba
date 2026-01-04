@@ -243,7 +243,9 @@
             updatePlayerPosition,
             placeMaterial,
             mineMaterial,
-            isConnected
+            isConnected,
+            requestPing,
+            getLatestServerMetrics
         } from './js/spacetime_bridge.js';
 
         // Expose spacetimeClient to global scope for WASM to call
@@ -254,8 +256,8 @@
             subscribeWorld: async () => {
                 await subscribeWorld();
             },
-            updatePlayerPosition: (x, y) => {
-                updatePlayerPosition(x, y);
+            updatePlayerPosition: (x, y, velX, velY) => {
+                updatePlayerPosition(x, y, velX, velY);
             },
             placeMaterial: (x, y, materialId) => {
                 placeMaterial(x, y, materialId);
@@ -265,6 +267,12 @@
             },
             isConnected: () => {
                 return isConnected();
+            },
+            requestPing: async (timestampMs) => {
+                await requestPing(timestampMs);
+            },
+            getLatestServerMetrics: () => {
+                return getLatestServerMetrics();
             }
         };
 

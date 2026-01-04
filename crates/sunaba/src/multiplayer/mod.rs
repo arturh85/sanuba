@@ -11,6 +11,12 @@ mod generated;
 #[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer_native"))]
 mod client;
 
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+    all(target_arch = "wasm32", feature = "multiplayer_wasm")
+))]
+pub mod metrics;
+
 #[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer_native"))]
 pub use client::MultiplayerClient;
 

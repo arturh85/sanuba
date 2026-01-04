@@ -261,3 +261,292 @@ impl Default for StructuralIntegritySystem {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::world::{Pixel, World, pixel_flags};
+
+    /// Helper to create a world with some terrain
+    fn make_test_world() -> World {
+        let mut world = World::new();
+        world.ensure_chunks_for_area(-100, -100, 100, 100);
+        world
+    }
+
+    /// Helper to place player-placed structural material
+    fn place_player_structure(world: &mut World, x: i32, y: i32, material_id: u16) {
+        let mut pixel = Pixel::new(material_id);
+        pixel.flags |= pixel_flags::PLAYER_PLACED;
+        world.set_pixel_full(x, y, pixel);
+    }
+
+    #[test]
+    fn test_new_system_empty_queue() {
+        let system = StructuralIntegritySystem::new();
+        assert_eq!(system.check_queue.len(), 0);
+    }
+
+    #[test]
+    fn test_schedule_check() {
+        let mut system = StructuralIntegritySystem::new();
+        system.schedule_check(10, 20);
+        assert_eq!(system.check_queue.len(), 1);
+        assert!(system.check_queue.contains(&IVec2::new(10, 20)));
+    }
+
+    #[test]
+    fn test_schedule_check_deduplicates() {
+        let mut system = StructuralIntegritySystem::new();
+        system.schedule_check(10, 20);
+        system.schedule_check(10, 20);
+        system.schedule_check(10, 20);
+        assert_eq!(system.check_queue.len(), 1);
+    }
+
+    #[test]
+    fn test_drain_queue() {
+        let mut system = StructuralIntegritySystem::new();
+        system.schedule_check(10, 20);
+        system.schedule_check(30, 40);
+
+        let positions = system.drain_queue();
+        assert_eq!(positions.len(), 2);
+        assert_eq!(system.check_queue.len(), 0);
+    }
+
+    #[test]
+    fn test_flood_fill_single_pixel() {
+        let mut world = make_test_world();
+        place_player_structure(&mut world, 50, 50, MaterialId::STONE);
+
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 50, 50);
+        assert_eq!(region.len(), 1);
+        assert!(region.contains(&IVec2::new(50, 50)));
+    }
+
+    #[test]
+    fn test_flood_fill_connected_structure() {
+        let mut world = make_test_world();
+
+        // Create a 3x3 player-placed structure
+        for y in 50..53 {
+            for x in 50..53 {
+                place_player_structure(&mut world, x, y, MaterialId::STONE);
+            }
+        }
+
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 51, 51);
+        assert_eq!(region.len(), 9); // 3x3 = 9 pixels
+    }
+
+    #[test]
+    fn test_flood_fill_ignores_natural_terrain() {
+        let mut world = make_test_world();
+
+        // Place player-placed stone
+        place_player_structure(&mut world, 50, 50, MaterialId::STONE);
+
+        // Place natural stone (no PLAYER_PLACED flag) next to it
+        world.set_pixel(51, 50, MaterialId::STONE);
+        // Don't set PLAYER_PLACED flag
+
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 50, 50);
+        // Should only include the player-placed pixel
+        assert_eq!(region.len(), 1);
+        assert!(region.contains(&IVec2::new(50, 50)));
+        assert!(!region.contains(&IVec2::new(51, 50)));
+    }
+
+    #[test]
+    fn test_flood_fill_respects_max_radius() {
+        let mut world = make_test_world();
+
+        // Create a long line of player-placed structures (> MAX_FLOOD_FILL_RADIUS)
+        for x in 0..100 {
+            place_player_structure(&mut world, x, 50, MaterialId::STONE);
+        }
+
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 0, 50);
+        // Should stop at MAX_FLOOD_FILL_RADIUS (64)
+        assert!(region.len() <= (MAX_FLOOD_FILL_RADIUS * 2 + 1) as usize);
+    }
+
+    #[test]
+    fn test_flood_fill_empty_pixel_returns_empty() {
+        let world = make_test_world();
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 50, 50);
+        assert_eq!(region.len(), 0);
+    }
+
+    #[test]
+    fn test_flood_fill_non_structural_returns_empty() {
+        let mut world = make_test_world();
+        // Sand is not structural
+        place_player_structure(&mut world, 50, 50, MaterialId::SAND);
+
+        let region = StructuralIntegritySystem::flood_fill_structural(&world, 50, 50);
+        assert_eq!(region.len(), 0);
+    }
+
+    #[test]
+    fn test_is_region_anchored_to_bedrock() {
+        let mut world = make_test_world();
+
+        // Create player-placed structure containing bedrock
+        place_player_structure(&mut world, 50, 50, MaterialId::BEDROCK);
+
+        let mut region = HashSet::new();
+        region.insert(IVec2::new(50, 50));
+
+        assert!(StructuralIntegritySystem::is_region_anchored(
+            &world, &region
+        ));
+    }
+
+    #[test]
+    fn test_is_region_anchored_to_natural_terrain() {
+        let mut world = make_test_world();
+
+        // Place natural stone
+        world.set_pixel(50, 49, MaterialId::STONE);
+
+        // Place player structure adjacent to it
+        place_player_structure(&mut world, 50, 50, MaterialId::STONE);
+
+        let mut region = HashSet::new();
+        region.insert(IVec2::new(50, 50));
+
+        // Should be anchored because it's touching natural terrain
+        assert!(StructuralIntegritySystem::is_region_anchored(
+            &world, &region
+        ));
+    }
+
+    #[test]
+    fn test_is_region_not_anchored_floating() {
+        let mut world = make_test_world();
+
+        // Create floating player-placed structure (no adjacent natural terrain)
+        place_player_structure(&mut world, 50, 50, MaterialId::STONE);
+
+        let mut region = HashSet::new();
+        region.insert(IVec2::new(50, 50));
+
+        // Should not be anchored (floating in air)
+        assert!(!StructuralIntegritySystem::is_region_anchored(
+            &world, &region
+        ));
+    }
+
+    #[test]
+    fn test_is_region_not_anchored_only_player_placed() {
+        let mut world = make_test_world();
+
+        // Create two connected player-placed structures
+        place_player_structure(&mut world, 50, 50, MaterialId::STONE);
+        place_player_structure(&mut world, 51, 50, MaterialId::STONE);
+
+        let mut region = HashSet::new();
+        region.insert(IVec2::new(50, 50));
+        region.insert(IVec2::new(51, 50));
+
+        // Should not be anchored (only connected to each other)
+        assert!(!StructuralIntegritySystem::is_region_anchored(
+            &world, &region
+        ));
+    }
+
+    #[test]
+    fn test_convert_to_particles_small_debris() {
+        let mut world = make_test_world();
+
+        // Create small structure (< SMALL_DEBRIS_THRESHOLD)
+        for x in 50..53 {
+            place_player_structure(&mut world, x, 50, MaterialId::STONE);
+        }
+
+        let mut region = HashSet::new();
+        for x in 50..53 {
+            region.insert(IVec2::new(x, 50));
+        }
+
+        StructuralIntegritySystem::convert_to_particles(&mut world, region);
+
+        // Should be converted to sand
+        for x in 50..53 {
+            let pixel = world.get_pixel(x, 50).unwrap();
+            assert_eq!(pixel.material_id, MaterialId::SAND);
+        }
+    }
+
+    #[test]
+    fn test_process_checks_empty_queue() {
+        let mut world = make_test_world();
+        let positions = vec![];
+
+        let count = StructuralIntegritySystem::process_checks(&mut world, positions);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_process_checks_converts_unanchored() {
+        let mut world = make_test_world();
+
+        // Create floating player structure
+        place_player_structure(&mut world, 50, 51, MaterialId::STONE);
+
+        // Remove the pixel below it (trigger structural check)
+        world.set_pixel(50, 50, MaterialId::AIR);
+
+        // Process structural check at the removed position
+        let positions = vec![IVec2::new(50, 50)];
+        StructuralIntegritySystem::process_checks(&mut world, positions);
+
+        // The floating structure should be converted to sand (small debris)
+        let pixel = world.get_pixel(50, 51).unwrap();
+        assert_eq!(pixel.material_id, MaterialId::SAND);
+    }
+
+    #[test]
+    fn test_process_checks_preserves_anchored() {
+        let mut world = make_test_world();
+
+        // Place natural terrain
+        world.set_pixel(50, 50, MaterialId::STONE);
+
+        // Place player structure on top of natural terrain
+        place_player_structure(&mut world, 50, 51, MaterialId::STONE);
+
+        // Trigger structural check
+        let positions = vec![IVec2::new(49, 51)];
+        StructuralIntegritySystem::process_checks(&mut world, positions);
+
+        // Should remain as stone (anchored to natural terrain below)
+        let pixel = world.get_pixel(50, 51).unwrap();
+        assert_eq!(pixel.material_id, MaterialId::STONE);
+        assert!(pixel.flags & pixel_flags::PLAYER_PLACED != 0);
+    }
+
+    #[test]
+    fn test_check_position_ignores_non_structural() {
+        let mut world = make_test_world();
+
+        // Place sand (non-structural) next to air
+        place_player_structure(&mut world, 51, 50, MaterialId::SAND);
+
+        // Check the air position
+        let positions = vec![IVec2::new(50, 50)];
+        StructuralIntegritySystem::process_checks(&mut world, positions);
+
+        // Sand should remain unchanged (not subject to structural checks)
+        let pixel = world.get_pixel(51, 50).unwrap();
+        assert_eq!(pixel.material_id, MaterialId::SAND);
+    }
+
+    #[test]
+    fn test_default_creates_empty_system() {
+        let system = StructuralIntegritySystem::default();
+        assert_eq!(system.check_queue.len(), 0);
+    }
+}

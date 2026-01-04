@@ -1,7 +1,5 @@
 //! Dockable panel system using egui_dock
 
-#[cfg(not(target_arch = "wasm32"))]
-use egui_dock::NodeIndex;
 use egui_dock::{DockArea, DockState, Style, TabViewer};
 
 /// Identifiers for dockable panels
@@ -14,6 +12,11 @@ pub enum DockTab {
     Crafting,
     #[cfg(not(target_arch = "wasm32"))]
     Logger,
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+        all(target_arch = "wasm32", feature = "multiplayer_wasm")
+    ))]
+    MultiplayerStats,
     #[cfg(not(target_arch = "wasm32"))]
     Parameters,
     #[cfg(feature = "profiling")]
@@ -30,6 +33,11 @@ impl std::fmt::Display for DockTab {
             DockTab::Crafting => write!(f, "Crafting"),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Logger => write!(f, "Log"),
+            #[cfg(any(
+                all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+                all(target_arch = "wasm32", feature = "multiplayer_wasm")
+            ))]
+            DockTab::MultiplayerStats => write!(f, "Multiplayer"),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Parameters => write!(f, "Parameters"),
             #[cfg(feature = "profiling")]
@@ -46,42 +54,31 @@ pub struct DockManager {
 impl DockManager {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
-        // Start with Stats at top - all panels stack vertically in the side panel
-        let mut dock_state = DockState::new(vec![DockTab::Stats]);
+        // All tabs present from start, grouped together - Logger is the active tab
+        let mut tabs = vec![DockTab::Logger, DockTab::Stats];
 
-        // Add Profiler below Stats (when profiling enabled)
+        #[cfg(any(feature = "multiplayer_native", feature = "multiplayer_wasm"))]
+        tabs.push(DockTab::MultiplayerStats);
+
         #[cfg(feature = "profiling")]
-        let [_stats, profiler_node] = dock_state.main_surface_mut().split_below(
-            NodeIndex::root(),
-            0.25,
-            vec![DockTab::Profiler],
-        );
+        tabs.push(DockTab::Profiler);
 
-        // Add Logger below Profiler (or below Stats if no profiling)
-        #[cfg(feature = "profiling")]
-        let [_profiler, logger_node] =
-            dock_state
-                .main_surface_mut()
-                .split_below(profiler_node, 0.5, vec![DockTab::Logger]);
-        #[cfg(not(feature = "profiling"))]
-        let [_stats, logger_node] = dock_state.main_surface_mut().split_below(
-            NodeIndex::root(),
-            0.33,
-            vec![DockTab::Logger],
-        );
+        tabs.push(DockTab::Parameters);
 
-        // Add Parameters at the bottom
-        dock_state
-            .main_surface_mut()
-            .split_below(logger_node, 0.5, vec![DockTab::Parameters]);
+        let dock_state = DockState::new(tabs);
 
         Self { dock_state }
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn new() -> Self {
-        // WASM: simpler layout - just Stats (profiler and logger not available)
-        let dock_state = DockState::new(vec![DockTab::Stats]);
+        // WASM: Stats tab present from start (but can be closed)
+        let mut tabs = vec![DockTab::Stats];
+
+        #[cfg(feature = "multiplayer_wasm")]
+        tabs.push(DockTab::MultiplayerStats);
+
+        let dock_state = DockState::new(tabs);
         Self { dock_state }
     }
 
@@ -147,6 +144,13 @@ pub struct DockContext<'a> {
     pub params: &'a mut crate::config::GameConfig,
     #[cfg(not(target_arch = "wasm32"))]
     pub params_changed: &'a mut bool,
+
+    // Multiplayer metrics (both native and WASM, when multiplayer feature enabled)
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+        all(target_arch = "wasm32", feature = "multiplayer_wasm")
+    ))]
+    pub multiplayer_metrics: Option<&'a crate::multiplayer::metrics::MultiplayerMetrics>,
 }
 
 /// Tab viewer implementation for dock
@@ -170,6 +174,11 @@ impl<'a> TabViewer for DockTabViewer<'a> {
             DockTab::Crafting => self.render_crafting(ui),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Logger => self.render_logger(ui),
+            #[cfg(any(
+                all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+                all(target_arch = "wasm32", feature = "multiplayer_wasm")
+            ))]
+            DockTab::MultiplayerStats => self.render_multiplayer_stats(ui),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Parameters => self.render_parameters(ui),
             #[cfg(feature = "profiling")]
@@ -424,6 +433,19 @@ impl<'a> DockTabViewer<'a> {
                 )
                 .changed();
         });
+    }
+
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "multiplayer_native"),
+        all(target_arch = "wasm32", feature = "multiplayer_wasm")
+    ))]
+    fn render_multiplayer_stats(&self, ui: &mut egui::Ui) {
+        if let Some(metrics) = self.ctx.multiplayer_metrics {
+            super::multiplayer_stats::render_multiplayer_stats(ui, metrics);
+        } else {
+            ui.label("Multiplayer not active");
+            ui.label("Connect to a SpacetimeDB server to view metrics");
+        }
     }
 
     #[cfg(feature = "profiling")]

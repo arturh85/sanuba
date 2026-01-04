@@ -8,10 +8,10 @@ use std::collections::HashMap;
 use glam::Vec2;
 use spacetimedb::{ReducerContext, Table};
 use sunaba_creature::{WorldAccess, WorldMutAccess};
-use sunaba_simulation::{MaterialType, Materials, Pixel, CHUNK_SIZE};
+use sunaba_simulation::{CHUNK_SIZE, MaterialId, MaterialType, Materials, Pixel};
 
 use crate::encoding::{decode_chunk_pixels, encode_chunk_pixels};
-use crate::{chunk_data, ChunkData};
+use crate::{ChunkData, chunk_data};
 
 /// Cached chunk data
 struct CachedChunk {
@@ -66,23 +66,24 @@ impl<'a> SpacetimeWorldAccess<'a> {
             .find(|c| c.x == chunk_x && c.y == chunk_y);
 
         if let Some(chunk) = chunk_opt
-            && let Ok(pixels) = decode_chunk_pixels(&chunk.pixel_data) {
-                cache.insert(
-                    (chunk_x, chunk_y),
-                    CachedChunk {
-                        pixels,
-                        dirty: false,
-                        db_id: chunk.id,
-                    },
-                );
-                return true;
-            }
+            && let Ok(pixels) = decode_chunk_pixels(&chunk.pixel_data)
+        {
+            cache.insert(
+                (chunk_x, chunk_y),
+                CachedChunk {
+                    pixels,
+                    dirty: false,
+                    db_id: chunk.id,
+                },
+            );
+            return true;
+        }
 
         // Create empty chunk if not found
         cache.insert(
             (chunk_x, chunk_y),
             CachedChunk {
-                pixels: vec![Pixel::new(0); CHUNK_SIZE * CHUNK_SIZE],
+                pixels: vec![Pixel::new(MaterialId::AIR); CHUNK_SIZE * CHUNK_SIZE],
                 dirty: false,
                 db_id: 0, // Will need to insert
             },
@@ -103,7 +104,11 @@ impl<'a> SpacetimeWorldAccess<'a> {
         let cache = self.chunk_cache.borrow();
         cache.get(&(chunk_x, chunk_y)).map(|chunk| {
             let idx = local_y * CHUNK_SIZE + local_x;
-            chunk.pixels.get(idx).copied().unwrap_or_else(|| Pixel::new(0))
+            chunk
+                .pixels
+                .get(idx)
+                .copied()
+                .unwrap_or_else(|| Pixel::new(0))
         })
     }
 
@@ -213,10 +218,9 @@ impl<'a> WorldAccess for SpacetimeWorldAccess<'a> {
 
         for dy in -r..=r {
             for dx in -r..=r {
-                if (dx * dx + dy * dy) as f32 <= r_squared
-                    && self.is_solid_at(cx + dx, cy + dy) {
-                        return true;
-                    }
+                if (dx * dx + dy * dy) as f32 <= r_squared && self.is_solid_at(cx + dx, cy + dy) {
+                    return true;
+                }
             }
         }
         false

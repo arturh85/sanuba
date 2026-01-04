@@ -3,24 +3,27 @@
 use glam::IVec2;
 use std::collections::HashMap;
 
-use super::generation::WorldGenerator;
-use super::persistence::{ChunkPersistence, WorldMetadata};
+use super::ca_update::CellularAutomataUpdater;
+use super::chemistry_system::ChemistrySystem;
+use super::chunk_manager::ChunkManager;
+use super::collision::CollisionDetector;
+use super::persistence_system::PersistenceSystem;
 use super::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
 use crate::entity::crafting::RecipeRegistry;
 use crate::entity::player::Player;
 use crate::entity::tools::ToolRegistry;
 use crate::simulation::{
     ChunkRenderData, FallingChunk, FallingChunkSystem, LightPropagation, MaterialId, MaterialType,
-    Materials, ReactionRegistry, RegenerationSystem, StateChangeSystem, StructuralIntegritySystem,
-    TemperatureSimulator, WorldCollisionQuery, add_heat_at_pixel, get_temperature_at_pixel,
+    Materials, ReactionRegistry, RegenerationSystem, StructuralIntegritySystem,
+    TemperatureSimulator, WorldCollisionQuery, get_temperature_at_pixel,
     mining::calculate_mining_time,
 };
 use crate::world::NoopStats;
 
 /// The game world, composed of chunks
 pub struct World {
-    /// Loaded chunks, keyed by chunk coordinates
-    pub chunks: HashMap<IVec2, Chunk>,
+    /// Chunk lifecycle manager (loading, unloading, active tracking)
+    chunk_manager: ChunkManager,
 
     /// Material definitions
     pub materials: Materials,
@@ -55,12 +58,6 @@ pub struct World {
     /// The player entity
     pub player: Player,
 
-    /// Which chunks are currently active (being simulated)
-    active_chunks: Vec<IVec2>,
-
-    /// Last player chunk position for dynamic chunk loading
-    last_load_chunk_pos: Option<IVec2>,
-
     /// Simulation time accumulator
     time_accumulator: f32,
 
@@ -73,23 +70,14 @@ pub struct World {
     /// Growth cycle timer (0-10 seconds, wraps) for tooltip progress display
     growth_timer: f32,
 
-    /// Chunk persistence manager (None for demo levels)
-    persistence: Option<ChunkPersistence>,
-
-    /// World generator for new chunks
-    generator: WorldGenerator,
-
-    /// Maximum number of chunks to keep loaded in memory
-    loaded_chunk_limit: usize,
-
-    /// Demo mode flag - prevents dynamic chunk loading
-    demo_mode: bool,
+    /// Persistence system (chunk loading, saving, world lifecycle)
+    persistence_system: PersistenceSystem,
 }
 
 impl World {
     pub fn new() -> Self {
         let mut world = Self {
-            chunks: HashMap::new(),
+            chunk_manager: ChunkManager::new(),
             materials: Materials::new(),
             temperature_sim: TemperatureSimulator::new(),
             reactions: ReactionRegistry::new(),
@@ -101,16 +89,11 @@ impl World {
             falling_chunks: FallingChunkSystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
-            active_chunks: Vec::new(),
-            last_load_chunk_pos: None,
             time_accumulator: 0.0,
             light_time_accumulator: 0.0,
             day_night_time: 600.0, // Start at noon (midpoint of 0-1200)
             growth_timer: 0.0,
-            persistence: None,
-            generator: WorldGenerator::new(42), // Default seed
-            loaded_chunk_limit: 3000,           // ~19MB max memory
-            demo_mode: false,
+            persistence_system: PersistenceSystem::new(42), // Default seed
         };
 
         // Don't pre-generate - let chunks generate on-demand as player explores
@@ -141,6 +124,11 @@ impl World {
         }
 
         world
+    }
+
+    /// Set the world generator (for terrain generation with custom seed)
+    pub fn set_generator(&mut self, seed: u64) {
+        self.persistence_system.set_seed(seed);
     }
 
     /// Generate a simple test world for development
@@ -212,14 +200,14 @@ impl World {
                 }
 
                 total_pixels += chunk_pixels;
-                self.chunks.insert(IVec2::new(cx, cy), chunk);
-                self.active_chunks.push(IVec2::new(cx, cy));
+                self.chunk_manager.chunks.insert(IVec2::new(cx, cy), chunk);
+                self.chunk_manager.active_chunks.push(IVec2::new(cx, cy));
             }
         }
 
         log::info!(
             "Generated test world: {} chunks, {} pixels",
-            self.chunks.len(),
+            self.chunk_manager.chunks.len(),
             total_pixels
         );
         log::info!(
@@ -232,135 +220,50 @@ impl World {
         log::info!("  Player starts at: {:?}", self.player.position);
     }
 
-    /// Player movement speed in pixels per second
-    const PLAYER_SPEED: f32 = 200.0;
-
-    /// Active chunk simulation radius (chunks from player)
-    const ACTIVE_CHUNK_RADIUS: i32 = 3; // 7×7 grid = 49 chunks
-
     /// Check if a rectangle collides with solid materials
     fn check_solid_collision(&self, x: f32, y: f32, width: f32, height: f32) -> bool {
-        use crate::simulation::MaterialType;
-
-        // Add collision tolerance - shrink hitbox slightly to prevent snagging on single pixels
-        const TOLERANCE: f32 = 0.5; // Pixels of wiggle room
-        let effective_width = width - TOLERANCE;
-        let effective_height = height - TOLERANCE;
-
-        // Check 8 points around hitbox
-        let check_points = [
-            (x - effective_width / 2.0, y - effective_height / 2.0), // Bottom-left
-            (x + effective_width / 2.0, y - effective_height / 2.0), // Bottom-right
-            (x - effective_width / 2.0, y + effective_height / 2.0), // Top-left
-            (x + effective_width / 2.0, y + effective_height / 2.0), // Top-right
-            (x, y - effective_height / 2.0),                         // Bottom-center
-            (x, y + effective_height / 2.0),                         // Top-center
-            (x - effective_width / 2.0, y),                          // Left-center
-            (x + effective_width / 2.0, y),                          // Right-center
-        ];
-
-        for (px, py) in check_points {
-            if let Some(pixel) = self.get_pixel(px as i32, py as i32)
-                && !pixel.is_empty()
-            {
-                let material = self.materials.get(pixel.material_id);
-                // Collide only with solid materials
-                if material.material_type == MaterialType::Solid {
-                    return true;
-                }
-            }
-        }
-        false
+        CollisionDetector::check_solid_collision(
+            &self.chunk_manager.chunks,
+            &self.materials,
+            x,
+            y,
+            width,
+            height,
+        )
     }
 
     /// Check if player is standing on ground
     fn is_player_grounded(&self) -> bool {
-        use crate::simulation::MaterialType;
-
-        // Check 3 points just below player's feet (more forgiving range)
-        let check_y = self.player.position.y - (crate::entity::player::Player::HEIGHT / 2.0) - 1.5;
-        let check_points = [
-            (
-                self.player.position.x - crate::entity::player::Player::WIDTH / 4.0,
-                check_y,
-            ), // Left
-            (self.player.position.x, check_y), // Center
-            (
-                self.player.position.x + crate::entity::player::Player::WIDTH / 4.0,
-                check_y,
-            ), // Right
-        ];
-
-        for (px, py) in check_points {
-            if let Some(pixel) = self.get_pixel(px as i32, py as i32)
-                && !pixel.is_empty()
-            {
-                let material = self.materials.get(pixel.material_id);
-                if material.material_type == MaterialType::Solid {
-                    return true;
-                }
-            }
-        }
-        false
+        CollisionDetector::is_rect_grounded(
+            &self.chunk_manager.chunks,
+            &self.materials,
+            self.player.position.x,
+            self.player.position.y,
+            crate::entity::player::Player::WIDTH,
+            crate::entity::player::Player::HEIGHT,
+        )
     }
 
     /// Check if a circle collides with solid materials
     /// Used for creature body part collision detection
     pub fn check_circle_collision(&self, x: f32, y: f32, radius: f32) -> bool {
-        use crate::simulation::MaterialType;
-
-        // Check center and 8 points around the perimeter
-        let check_points = [
-            (x, y),                                   // Center
-            (x + radius, y),                          // Right
-            (x - radius, y),                          // Left
-            (x, y + radius),                          // Top
-            (x, y - radius),                          // Bottom
-            (x + radius * 0.707, y + radius * 0.707), // Top-right
-            (x - radius * 0.707, y + radius * 0.707), // Top-left
-            (x + radius * 0.707, y - radius * 0.707), // Bottom-right
-            (x - radius * 0.707, y - radius * 0.707), // Bottom-left
-        ];
-
-        for (px, py) in check_points {
-            if let Some(pixel) = self.get_pixel(px as i32, py as i32)
-                && !pixel.is_empty()
-            {
-                let material = self.materials.get(pixel.material_id);
-                if material.material_type == MaterialType::Solid {
-                    return true;
-                }
-            }
-        }
-        false
+        CollisionDetector::check_circle_collision(
+            &self.chunk_manager.chunks,
+            &self.materials,
+            x,
+            y,
+            radius,
+        )
     }
 
     /// Check if any body part in a list is grounded (touching solid below)
     /// positions: Vec of (center, radius) for each body part
     pub fn is_creature_grounded(&self, positions: &[(glam::Vec2, f32)]) -> bool {
-        use crate::simulation::MaterialType;
-
-        for (center, radius) in positions {
-            // Check 3 points just below the body part
-            let check_y = center.y - radius - 1.0;
-            let check_points = [
-                (center.x - radius * 0.5, check_y),
-                (center.x, check_y),
-                (center.x + radius * 0.5, check_y),
-            ];
-
-            for (px, py) in check_points {
-                if let Some(pixel) = self.get_pixel(px as i32, py as i32)
-                    && !pixel.is_empty()
-                {
-                    let material = self.materials.get(pixel.material_id);
-                    if material.material_type == MaterialType::Solid {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        CollisionDetector::is_creature_grounded(
+            &self.chunk_manager.chunks,
+            &self.materials,
+            positions,
+        )
     }
 
     /// Get the first blocking pixel in a direction from a position
@@ -403,6 +306,12 @@ impl World {
 
         None
     }
+
+    /// Player movement speed in pixels per second
+    const PLAYER_SPEED: f32 = 200.0;
+
+    /// Active chunk simulation radius (chunks from player)
+    const ACTIVE_CHUNK_RADIUS: i32 = 3; // 7×7 grid = 49 chunks
 
     /// Update player position based on input with gravity and jump
     pub fn update_player(&mut self, input: &crate::entity::InputState, dt: f32) {
@@ -552,7 +461,7 @@ impl World {
         let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
 
         // 1. Remove distant chunks from active list
-        self.active_chunks.retain(|pos| {
+        self.chunk_manager.active_chunks.retain(|pos| {
             let dist_x = (pos.x - player_chunk_x).abs();
             let dist_y = (pos.y - player_chunk_y).abs();
             dist_x <= Self::ACTIVE_CHUNK_RADIUS && dist_y <= Self::ACTIVE_CHUNK_RADIUS
@@ -569,10 +478,12 @@ impl World {
                 let pos = IVec2::new(cx, cy);
 
                 // If chunk is loaded but not active, add it to active list
-                if self.chunks.contains_key(&pos) && !self.active_chunks.contains(&pos) {
-                    self.active_chunks.push(pos);
+                if self.chunk_manager.chunks.contains_key(&pos)
+                    && !self.chunk_manager.active_chunks.contains(&pos)
+                {
+                    self.chunk_manager.active_chunks.push(pos);
                     // Mark newly activated chunks for simulation so physics/chemistry runs
-                    if let Some(chunk) = self.chunks.get_mut(&pos) {
+                    if let Some(chunk) = self.chunk_manager.chunks.get_mut(&pos) {
                         chunk.set_simulation_active(true);
                     }
                 }
@@ -591,7 +502,7 @@ impl World {
     /// Spawn material at world coordinates with circular brush
     pub fn spawn_material(&mut self, world_x: i32, world_y: i32, material_id: u16) {
         let material_name = &self.materials.get(material_id).name;
-        let (chunk_pos, _, _) = Self::world_to_chunk_coords(world_x, world_y);
+        let (chunk_pos, _, _) = ChunkManager::world_to_chunk_coords(world_x, world_y);
 
         log::info!(
             "[SPAWN] Spawning {} at world ({}, {}) in chunk ({}, {})",
@@ -617,7 +528,7 @@ impl World {
         log::debug!("[SPAWN] Spawned {} pixels total", spawned);
 
         // Log chunk dirty status after spawning
-        if let Some(chunk) = self.chunks.get(&chunk_pos) {
+        if let Some(chunk) = self.chunk_manager.chunks.get(&chunk_pos) {
             log::debug!(
                 "[SPAWN] Chunk ({}, {}) dirty: {}, non-air pixels: {}",
                 chunk_pos.x,
@@ -640,9 +551,9 @@ impl World {
     /// Mine a single pixel and add it to player's inventory
     /// Returns true if successfully mined
     pub fn mine_pixel(&mut self, world_x: i32, world_y: i32) -> bool {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
 
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
             let pixel = chunk.get_pixel(local_x, local_y);
             let material_id = pixel.material_id;
 
@@ -929,7 +840,12 @@ impl World {
     }
 
     /// Update simulation
-    pub fn update<R: crate::world::WorldRng>(&mut self, dt: f32, stats: &mut dyn crate::world::SimStats, rng: &mut R) {
+    pub fn update<R: crate::world::WorldRng>(
+        &mut self,
+        dt: f32,
+        stats: &mut dyn crate::world::SimStats,
+        rng: &mut R,
+    ) {
         const FIXED_TIMESTEP: f32 = 1.0 / 60.0;
 
         // Update player (hunger, health, starvation damage)
@@ -965,7 +881,11 @@ impl World {
         }
     }
 
-    fn step_simulation<R: crate::world::WorldRng>(&mut self, stats: &mut dyn crate::world::SimStats, rng: &mut R) {
+    fn step_simulation<R: crate::world::WorldRng>(
+        &mut self,
+        stats: &mut dyn crate::world::SimStats,
+        rng: &mut R,
+    ) {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();
 
@@ -980,14 +900,14 @@ impl World {
             (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32),
         );
 
-        if self.last_load_chunk_pos != Some(current_chunk) {
-            self.load_nearby_chunks();
-            self.last_load_chunk_pos = Some(current_chunk);
+        if self.chunk_manager.last_load_chunk_pos != Some(current_chunk) {
+            self.persistence_system.load_nearby_chunks(&mut self.chunk_manager, self.player.position);
+            self.chunk_manager.last_load_chunk_pos = Some(current_chunk);
         }
 
         // 1. Clear update flags
-        for pos in &self.active_chunks {
-            if let Some(chunk) = self.chunks.get_mut(pos) {
+        for pos in &self.chunk_manager.active_chunks {
+            if let Some(chunk) = self.chunk_manager.chunks.get_mut(pos) {
                 chunk.clear_update_flags();
             }
         }
@@ -995,6 +915,7 @@ impl World {
         // 2. CA updates (movement) - only process chunks that need updating
         // A chunk needs updating if it or any of its 8 neighbors had changes last frame
         let chunks_to_update: Vec<IVec2> = self
+            .chunk_manager
             .active_chunks
             .iter()
             .copied()
@@ -1007,7 +928,7 @@ impl World {
         // Clear simulation_active for chunks we're about to update
         // It will be re-set by try_move_world() if any material actually moves
         for pos in &chunks_to_update {
-            if let Some(chunk) = self.chunks.get_mut(pos) {
+            if let Some(chunk) = self.chunk_manager.chunks.get_mut(pos) {
                 chunk.set_simulation_active(false);
             }
         }
@@ -1024,8 +945,10 @@ impl World {
         {
             #[cfg(feature = "profiling")]
             puffin::profile_scope!("temperature");
-            self.temperature_sim
-                .update(&mut self.chunks, &self.active_chunks);
+            self.temperature_sim.update(
+                &mut self.chunk_manager.chunks,
+                &self.chunk_manager.active_chunks,
+            );
         }
 
         // 4. Light propagation (15fps throttled) - active chunks only
@@ -1033,17 +956,17 @@ impl World {
         if self.light_time_accumulator >= LIGHT_TIMESTEP {
             let sky_light = self.calculate_sky_light();
             self.light_propagation.propagate_light(
-                &mut self.chunks,
+                &mut self.chunk_manager.chunks,
                 &self.materials,
                 sky_light,
-                &self.active_chunks,
+                &self.chunk_manager.active_chunks,
             );
             self.light_time_accumulator -= LIGHT_TIMESTEP;
         }
 
         // 5. State changes based on temperature
-        for i in 0..self.active_chunks.len() {
-            let pos = self.active_chunks[i];
+        for i in 0..self.chunk_manager.active_chunks.len() {
+            let pos = self.chunk_manager.active_chunks[i];
             self.check_chunk_state_changes(pos, stats);
         }
 
@@ -1068,8 +991,11 @@ impl World {
         self.falling_chunks = falling_chunks;
 
         // 9. Resource regeneration (fruit spawning)
-        self.regeneration_system
-            .update(&mut self.chunks, &self.active_chunks, 1.0 / 60.0);
+        self.regeneration_system.update(
+            &mut self.chunk_manager.chunks,
+            &self.chunk_manager.active_chunks,
+            1.0 / 60.0,
+        );
 
         // 10. Update creatures (sensing, planning, neural control)
         // Temporarily take creature_manager to avoid borrow checker issues
@@ -1115,10 +1041,10 @@ impl World {
     fn initialize_light(&mut self) {
         let sky_light = self.calculate_sky_light();
         self.light_propagation.propagate_light(
-            &mut self.chunks,
+            &mut self.chunk_manager.chunks,
             &self.materials,
             sky_light,
-            &self.active_chunks,
+            &self.chunk_manager.active_chunks,
         );
         log::info!("Initialized light propagation (sky_light={})", sky_light);
     }
@@ -1132,7 +1058,7 @@ impl World {
     /// Returns true if this chunk or any of its 8 neighbors have dirty_rect set or simulation_active
     fn chunk_needs_ca_update(&self, pos: IVec2) -> bool {
         // Check the chunk itself
-        if let Some(chunk) = self.chunks.get(&pos)
+        if let Some(chunk) = self.chunk_manager.chunks.get(&pos)
             && (chunk.dirty_rect.is_some() || chunk.is_simulation_active())
         {
             return true;
@@ -1145,7 +1071,7 @@ impl World {
                     continue;
                 }
                 let neighbor_pos = IVec2::new(pos.x + dx, pos.y + dy);
-                if let Some(neighbor) = self.chunks.get(&neighbor_pos)
+                if let Some(neighbor) = self.chunk_manager.chunks.get(&neighbor_pos)
                     && (neighbor.dirty_rect.is_some() || neighbor.is_simulation_active())
                 {
                     return true;
@@ -1156,7 +1082,12 @@ impl World {
         false
     }
 
-    fn update_chunk_ca<R: crate::world::WorldRng>(&mut self, chunk_pos: IVec2, stats: &mut dyn crate::world::SimStats, rng: &mut R) {
+    fn update_chunk_ca<R: crate::world::WorldRng>(
+        &mut self,
+        chunk_pos: IVec2,
+        stats: &mut dyn crate::world::SimStats,
+        rng: &mut R,
+    ) {
         // Update from bottom to top so falling works correctly
         for y in 0..CHUNK_SIZE {
             // Alternate direction each row for symmetry
@@ -1180,7 +1111,7 @@ impl World {
         stats: &mut dyn crate::world::SimStats,
         rng: &mut R,
     ) {
-        let chunk = match self.chunks.get(&chunk_pos) {
+        let chunk = match self.chunk_manager.chunks.get(&chunk_pos) {
             Some(c) => c,
             None => return,
         };
@@ -1209,16 +1140,40 @@ impl World {
         // Get material type for movement logic
         let material_type = self.materials.get(pixel.material_id).material_type;
 
-        // Normal CA movement
+        // Normal CA movement - delegate to CellularAutomataUpdater
         match material_type {
             MaterialType::Powder => {
-                self.update_powder(chunk_pos, x, y, stats, rng);
+                CellularAutomataUpdater::update_powder(
+                    &mut self.chunk_manager.chunks,
+                    chunk_pos,
+                    x,
+                    y,
+                    &self.materials,
+                    stats,
+                    rng,
+                );
             }
             MaterialType::Liquid => {
-                self.update_liquid(chunk_pos, x, y, stats, rng);
+                CellularAutomataUpdater::update_liquid(
+                    &mut self.chunk_manager.chunks,
+                    chunk_pos,
+                    x,
+                    y,
+                    &self.materials,
+                    stats,
+                    rng,
+                );
             }
             MaterialType::Gas => {
-                self.update_gas(chunk_pos, x, y, stats, rng);
+                CellularAutomataUpdater::update_gas(
+                    &mut self.chunk_manager.chunks,
+                    chunk_pos,
+                    x,
+                    y,
+                    &self.materials,
+                    stats,
+                    rng,
+                );
             }
             MaterialType::Solid => {
                 // Solids don't move
@@ -1229,239 +1184,11 @@ impl World {
         self.check_pixel_reactions(chunk_pos, x, y, stats, rng);
     }
 
-    fn update_powder<R: crate::world::WorldRng>(
-        &mut self,
-        chunk_pos: IVec2,
-        x: usize,
-        y: usize,
-        stats: &mut dyn crate::world::SimStats,
-        rng: &mut R,
-    ) {
-        // Convert to world coordinates
-        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-        // Try to fall down
-        if self.try_move_world(world_x, world_y, world_x, world_y - 1, stats) {
-            return;
-        }
-
-        // Try to fall diagonally (randomized for natural distribution)
-        let try_left_first = rng.gen_bool();
-
-        if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {}
-        } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {}
-        }
-    }
-
-    fn update_liquid<R: crate::world::WorldRng>(
-        &mut self,
-        chunk_pos: IVec2,
-        x: usize,
-        y: usize,
-        stats: &mut dyn crate::world::SimStats,
-        rng: &mut R,
-    ) {
-        // Convert to world coordinates
-        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-        // Try to fall down
-        if self.try_move_world(world_x, world_y, world_x, world_y - 1, stats) {
-            return;
-        }
-
-        // Try to fall diagonally (randomized for natural distribution)
-        let try_left_first = rng.gen_bool();
-
-        if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
-                return;
-            }
-        } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y - 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
-                return;
-            }
-        }
-
-        // Try to flow horizontally
-        if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {}
-        } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {}
-        }
-    }
-
-    fn update_gas<R: crate::world::WorldRng>(
-        &mut self,
-        chunk_pos: IVec2,
-        x: usize,
-        y: usize,
-        stats: &mut dyn crate::world::SimStats,
-        rng: &mut R,
-    ) {
-        // Convert to world coordinates
-        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-        // Gases rise (positive Y)
-        if self.try_move_world(world_x, world_y, world_x, world_y + 1, stats) {
-            return;
-        }
-
-        // Try to rise diagonally (randomized for natural distribution)
-        let try_left_first = rng.gen_bool();
-
-        if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1, stats) {
-                return;
-            }
-        } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y + 1, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1, stats) {
-                return;
-            }
-        }
-
-        // Disperse horizontally
-        if try_left_first {
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {}
-        } else {
-            if self.try_move_world(world_x, world_y, world_x + 1, world_y, stats) {
-                return;
-            }
-            if self.try_move_world(world_x, world_y, world_x - 1, world_y, stats) {}
-        }
-    }
-
-    /// Try to move a pixel, returns true if successful
-    #[allow(dead_code)]
-    fn try_move(
-        &mut self,
-        chunk_pos: IVec2,
-        from_x: usize,
-        from_y: usize,
-        to_x: usize,
-        to_y: usize,
-    ) -> bool {
-        // TODO: Handle cross-chunk movement
-        let chunk = match self.chunks.get(&chunk_pos) {
-            Some(c) => c,
-            None => return false,
-        };
-
-        let target = chunk.get_pixel(to_x, to_y);
-
-        // Can only move into empty space (for now)
-        // TODO: Handle density-based displacement (water sinks under oil, etc.)
-        if target.is_empty() {
-            let chunk = self.chunks.get_mut(&chunk_pos).unwrap();
-            chunk.swap_pixels(from_x, from_y, to_x, to_y);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Try to move a pixel using world coordinates (handles cross-chunk movement)
-    fn try_move_world(
-        &mut self,
-        from_world_x: i32,
-        from_world_y: i32,
-        to_world_x: i32,
-        to_world_y: i32,
-        stats: &mut dyn crate::world::SimStats,
-    ) -> bool {
-        // Convert to chunk coordinates
-        let (src_chunk_pos, src_x, src_y) = Self::world_to_chunk_coords(from_world_x, from_world_y);
-        let (dst_chunk_pos, dst_x, dst_y) = Self::world_to_chunk_coords(to_world_x, to_world_y);
-
-        // Phase 1: Read pixels (immutable borrows)
-        let src_pixel = match self.chunks.get(&src_chunk_pos) {
-            Some(c) => c.get_pixel(src_x, src_y),
-            None => return false, // Source chunk not loaded
-        };
-
-        let dst_pixel = match self.chunks.get(&dst_chunk_pos) {
-            Some(c) => c.get_pixel(dst_x, dst_y),
-            None => return false, // Destination chunk not loaded
-        };
-
-        // Can only move into empty space (for now)
-        // TODO: Handle density-based displacement (water sinks under oil, etc.)
-        if !dst_pixel.is_empty() {
-            return false;
-        }
-
-        // Phase 2: Write pixels (mutable borrows)
-        if src_chunk_pos == dst_chunk_pos {
-            // Same chunk - use swap for efficiency
-            if let Some(chunk) = self.chunks.get_mut(&src_chunk_pos) {
-                chunk.swap_pixels(src_x, src_y, dst_x, dst_y);
-                chunk.set_simulation_active(true);
-                stats.record_pixel_moved();
-                return true;
-            }
-        } else {
-            // Different chunks - sequential writes to avoid borrow checker issues
-            // First, clear source
-            if let Some(src_chunk) = self.chunks.get_mut(&src_chunk_pos) {
-                src_chunk.set_pixel(src_x, src_y, Pixel::AIR);
-                src_chunk.set_simulation_active(true);
-            } else {
-                return false;
-            }
-
-            // Then, set destination
-            if let Some(dst_chunk) = self.chunks.get_mut(&dst_chunk_pos) {
-                dst_chunk.set_pixel(dst_x, dst_y, src_pixel);
-                dst_chunk.set_simulation_active(true);
-                stats.record_pixel_moved();
-                return true;
-            } else {
-                // Rollback: restore source pixel
-                if let Some(src_chunk) = self.chunks.get_mut(&src_chunk_pos) {
-                    src_chunk.set_pixel(src_x, src_y, src_pixel);
-                }
-                return false;
-            }
-        }
-
-        false
-    }
-
     /// Get pixel at world coordinates
     pub fn get_pixel(&self, world_x: i32, world_y: i32) -> Option<Pixel> {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        self.chunks
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        self.chunk_manager
+            .chunks
             .get(&chunk_pos)
             .map(|c| c.get_pixel(local_x, local_y))
     }
@@ -1469,13 +1196,16 @@ impl World {
     /// Ensure chunks exist for a given pixel area (creates empty chunks if needed)
     /// Used by headless training to set up scenarios without full world generation
     pub fn ensure_chunks_for_area(&mut self, min_x: i32, min_y: i32, max_x: i32, max_y: i32) {
-        let (min_chunk, _, _) = Self::world_to_chunk_coords(min_x, min_y);
-        let (max_chunk, _, _) = Self::world_to_chunk_coords(max_x, max_y);
+        let (min_chunk, _, _) = ChunkManager::world_to_chunk_coords(min_x, min_y);
+        let (max_chunk, _, _) = ChunkManager::world_to_chunk_coords(max_x, max_y);
 
         for cy in min_chunk.y..=max_chunk.y {
             for cx in min_chunk.x..=max_chunk.x {
                 let pos = IVec2::new(cx, cy);
-                self.chunks.entry(pos).or_insert_with(|| Chunk::new(cx, cy));
+                self.chunk_manager
+                    .chunks
+                    .entry(pos)
+                    .or_insert_with(|| Chunk::new(cx, cy));
             }
         }
     }
@@ -1503,8 +1233,8 @@ impl World {
         };
 
         // Set the new pixel
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
             let old_material_id = chunk.get_material(local_x, local_y);
             chunk.set_pixel(local_x, local_y, pixel);
 
@@ -1541,8 +1271,8 @@ impl World {
 
     /// Get temperature at world coordinates
     pub fn get_temperature_at_pixel(&self, world_x: i32, world_y: i32) -> f32 {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        if let Some(chunk) = self.chunks.get(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunk_manager.chunks.get(&chunk_pos) {
             get_temperature_at_pixel(chunk, local_x, local_y)
         } else {
             20.0 // Default ambient temperature
@@ -1551,16 +1281,17 @@ impl World {
 
     /// Get light level at world coordinates (0-15)
     pub fn get_light_at(&self, world_x: i32, world_y: i32) -> Option<u8> {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        self.chunks
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        self.chunk_manager
+            .chunks
             .get(&chunk_pos)
             .map(|c| c.get_light(local_x, local_y))
     }
 
     /// Set light level at world coordinates (0-15)
     pub fn set_light_at(&mut self, world_x: i32, world_y: i32, level: u8) {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
             chunk.set_light(local_x, local_y, level);
         }
     }
@@ -1569,64 +1300,65 @@ impl World {
     pub fn get_pixel_material(&self, world_x: i32, world_y: i32) -> Option<u16> {
         self.get_pixel(world_x, world_y).map(|p| p.material_id)
     }
-
-    /// Convert world coordinates to chunk coordinates + local offset
-    fn world_to_chunk_coords(world_x: i32, world_y: i32) -> (IVec2, usize, usize) {
-        let chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);
-        let chunk_y = world_y.div_euclid(CHUNK_SIZE as i32);
-        let local_x = world_x.rem_euclid(CHUNK_SIZE as i32) as usize;
-        let local_y = world_y.rem_euclid(CHUNK_SIZE as i32) as usize;
-        (IVec2::new(chunk_x, chunk_y), local_x, local_y)
-    }
-
     /// Get iterator over active chunks
     pub fn active_chunks(&self) -> impl Iterator<Item = &Chunk> {
-        self.active_chunks
+        self.chunk_manager
+            .active_chunks
             .iter()
-            .filter_map(|pos| self.chunks.get(pos))
+            .filter_map(|pos| self.chunk_manager.chunks.get(pos))
     }
 
     /// Get positions of active chunks
     pub fn active_chunk_positions(&self) -> &[IVec2] {
-        &self.active_chunks
+        &self.chunk_manager.active_chunks
     }
 
     /// Get all loaded chunks
     pub fn chunks(&self) -> &HashMap<IVec2, Chunk> {
-        &self.chunks
+        &self.chunk_manager.chunks
+    }
+
+    /// Get all loaded chunks (mutable)
+    pub fn chunks_mut(&mut self) -> &mut HashMap<IVec2, Chunk> {
+        &mut self.chunk_manager.chunks
     }
 
     /// Check if chunk is loaded (for SpacetimeDB server)
     pub fn has_chunk(&self, pos: IVec2) -> bool {
-        self.chunks.contains_key(&pos)
+        self.chunk_manager.chunks.contains_key(&pos)
     }
 
     /// Insert pre-loaded chunk (for SpacetimeDB server)
     pub fn insert_chunk(&mut self, pos: IVec2, chunk: Chunk) {
-        self.chunks.insert(pos, chunk);
+        self.chunk_manager.chunks.insert(pos, chunk);
     }
 
     /// Generate a single chunk at position (for SpacetimeDB server)
     pub fn generate_chunk(&mut self, pos: IVec2) {
-        let chunk = self.generator.generate_chunk(pos.x, pos.y);
-        self.chunks.insert(pos, chunk);
+        let chunk = self.persistence_system.generator.generate_chunk(pos.x, pos.y);
+        self.chunk_manager.chunks.insert(pos, chunk);
     }
 
     /// Get chunk at position (for SpacetimeDB server)
     pub fn get_chunk(&self, x: i32, y: i32) -> Option<&Chunk> {
-        self.chunks.get(&IVec2::new(x, y))
+        self.chunk_manager.chunks.get(&IVec2::new(x, y))
     }
 
     /// Iterator over all chunks (for SpacetimeDB server)
     pub fn chunks_iter(&self) -> impl Iterator<Item = (&IVec2, &Chunk)> {
-        self.chunks.iter()
+        self.chunk_manager.chunks.iter()
     }
 
     /// Simulate a single chunk for settlement (for SpacetimeDB server)
     /// Called multiple times to settle a chunk before players arrive
-    pub fn update_chunk_settle<R: crate::world::WorldRng>(&mut self, chunk_x: i32, chunk_y: i32, rng: &mut R) {
+    pub fn update_chunk_settle<R: crate::world::WorldRng>(
+        &mut self,
+        chunk_x: i32,
+        chunk_y: i32,
+        rng: &mut R,
+    ) {
         let pos = IVec2::new(chunk_x, chunk_y);
-        if self.chunks.contains_key(&pos) {
+        if self.chunk_manager.chunks.contains_key(&pos) {
             // Simulate CA for this chunk only
             let mut no_op_stats = NoopStats;
             self.update_chunk_ca(pos, &mut no_op_stats, rng);
@@ -1686,16 +1418,16 @@ impl World {
 
     /// Set pixel without triggering structural checks (internal use)
     fn set_pixel_direct(&mut self, world_x: i32, world_y: i32, material_id: u16) {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
             chunk.set_material(local_x, local_y, material_id);
         }
     }
 
     /// Set pixel without triggering structural checks, returns success/failure
     fn set_pixel_direct_checked(&mut self, world_x: i32, world_y: i32, material_id: u16) -> bool {
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(world_x, world_y);
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
+        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
             chunk.set_material(local_x, local_y, material_id);
             true
         } else {
@@ -1730,13 +1462,14 @@ impl World {
 
             // Only place if target position is empty (air)
             if let Some(existing) = self.get_pixel(world_pos.x, world_pos.y)
-                && existing.is_empty() {
-                    if self.set_pixel_direct_checked(world_pos.x, world_pos.y, material_id) {
-                        placed += 1;
-                    } else {
-                        failed += 1;
-                    }
+                && existing.is_empty()
+            {
+                if self.set_pixel_direct_checked(world_pos.x, world_pos.y, material_id) {
+                    placed += 1;
+                } else {
+                    failed += 1;
                 }
+            }
         }
 
         if failed > 0 {
@@ -1752,255 +1485,34 @@ impl World {
 
     /// Clear all chunks from the world
     pub fn clear_all_chunks(&mut self) {
-        self.chunks.clear();
-        self.active_chunks.clear();
-        log::info!("Cleared all chunks");
+        self.persistence_system.clear_all_chunks(&mut self.chunk_manager);
     }
 
     /// Add a chunk to the world
     pub fn add_chunk(&mut self, chunk: Chunk) {
-        let pos = IVec2::new(chunk.x, chunk.y);
-        self.chunks.insert(pos, chunk);
-
-        // Add to active chunks if within range of player
-        let dist_x = (pos.x - (self.player.position.x as i32 / CHUNK_SIZE as i32)).abs();
-        let dist_y = (pos.y - (self.player.position.y as i32 / CHUNK_SIZE as i32)).abs();
-        if dist_x <= Self::ACTIVE_CHUNK_RADIUS
-            && dist_y <= Self::ACTIVE_CHUNK_RADIUS
-            && !self.active_chunks.contains(&pos)
-        {
-            self.active_chunks.push(pos);
-        }
+        self.persistence_system.add_chunk(&mut self.chunk_manager, chunk, self.player.position);
     }
 
     /// Initialize persistent world (load or generate)
     pub fn load_persistent_world(&mut self) {
-        // Reset demo mode when returning to persistent world
-        self.demo_mode = false;
-
-        // Clear any existing chunks (from test world generation)
-        self.clear_all_chunks();
-
-        let persistence =
-            ChunkPersistence::new("default").expect("Failed to create chunk persistence");
-
-        let metadata = persistence.load_metadata();
-
-        self.generator = WorldGenerator::new(metadata.seed);
-
-        // Restore player data if it exists, otherwise use spawn point
-        if let Some(saved_player) = metadata.player_data {
-            self.player = saved_player;
-            log::info!(
-                "Restored player data: inventory={}/{} slots, health={:.0}/{:.0}, hunger={:.0}/{:.0}",
-                self.player.inventory.used_slot_count(),
-                self.player.inventory.max_slots,
-                self.player.health.current,
-                self.player.health.max,
-                self.player.hunger.current,
-                self.player.hunger.max
-            );
-        } else {
-            // New world - set player at spawn point
-            self.player.position = glam::Vec2::new(metadata.spawn_point.0, metadata.spawn_point.1);
-            log::info!("New world - player spawned at {:?}", self.player.position);
-        }
-
-        self.persistence = Some(persistence);
-
-        // Load initial chunks around spawn
-        self.load_chunks_around_player();
-
+        let _ = self.persistence_system.load_persistent_world(&mut self.chunk_manager, &mut self.player);
         // Initialize light levels before first CA update
         self.initialize_light();
-
-        log::info!("Loaded persistent world (seed: {})", metadata.seed);
     }
 
     /// Disable persistence for demo levels
-    /// This prevents dynamic chunk loading from overwriting demo level chunks
     pub fn disable_persistence(&mut self) {
-        self.persistence = None;
-        self.demo_mode = true;
-        log::info!("Persistence disabled for demo mode");
-    }
-
-    /// Load chunks within active radius of player (17x17 = 289 chunks)
-    fn load_chunks_around_player(&mut self) {
-        let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
-        let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
-
-        for cy in (player_chunk_y - 8)..=(player_chunk_y + 8) {
-            for cx in (player_chunk_x - 8)..=(player_chunk_x + 8) {
-                self.load_or_generate_chunk(cx, cy);
-            }
-        }
-    }
-
-    /// Load nearby chunks dynamically as player moves (called when entering new chunk)
-    fn load_nearby_chunks(&mut self) {
-        // Don't auto-load chunks in demo mode - use only chunks the demo level created
-        if self.demo_mode {
-            return;
-        }
-
-        let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
-        let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
-
-        // Load chunks within 20-chunk radius (ensures chunks loaded beyond texture edge)
-        const LOAD_RADIUS: i32 = 20;
-
-        for cy in (player_chunk_y - LOAD_RADIUS)..=(player_chunk_y + LOAD_RADIUS) {
-            for cx in (player_chunk_x - LOAD_RADIUS)..=(player_chunk_x + LOAD_RADIUS) {
-                self.load_or_generate_chunk(cx, cy);
-            }
-        }
-    }
-
-    /// Load or generate a chunk at the given coordinates
-    fn load_or_generate_chunk(&mut self, chunk_x: i32, chunk_y: i32) {
-        let pos = IVec2::new(chunk_x, chunk_y);
-
-        if self.chunks.contains_key(&pos) {
-            log::trace!(
-                "[LOAD] Chunk ({}, {}) already loaded, skipping",
-                chunk_x,
-                chunk_y
-            );
-            return; // Already loaded
-        }
-
-        let chunk = if let Some(persistence) = &self.persistence {
-            log::debug!(
-                "[LOAD] Requesting chunk ({}, {}) from persistence",
-                chunk_x,
-                chunk_y
-            );
-            persistence.load_chunk(chunk_x, chunk_y, &self.generator)
-        } else {
-            // Demo mode: use generator without saving
-            log::debug!(
-                "[GEN] Demo mode: generating chunk ({}, {}) without persistence",
-                chunk_x,
-                chunk_y
-            );
-            self.generator.generate_chunk(chunk_x, chunk_y)
-        };
-
-        let non_air = chunk.count_non_air();
-        log::debug!(
-            "[LOAD] Adding chunk ({}, {}) to world - {} non-air pixels",
-            chunk_x,
-            chunk_y,
-            non_air
-        );
-
-        self.add_chunk(chunk);
-
-        // LRU eviction if too many chunks loaded
-        if self.chunks.len() > self.loaded_chunk_limit {
-            self.evict_distant_chunks();
-        }
-    }
-
-    /// Save and unload chunks far from player
-    fn evict_distant_chunks(&mut self) {
-        let player_chunk_x = (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32);
-        let player_chunk_y = (self.player.position.y as i32).div_euclid(CHUNK_SIZE as i32);
-
-        let mut to_evict = Vec::new();
-
-        for pos in self.chunks.keys() {
-            let dist_x = (pos.x - player_chunk_x).abs();
-            let dist_y = (pos.y - player_chunk_y).abs();
-
-            // Unload chunks >10 chunks away
-            if dist_x > 10 || dist_y > 10 {
-                to_evict.push(*pos);
-            }
-        }
-
-        for pos in to_evict {
-            if let Some(chunk) = self.chunks.remove(&pos)
-                && chunk.dirty
-                && let Some(persistence) = &self.persistence
-            {
-                if let Err(e) = persistence.save_chunk(&chunk) {
-                    log::error!("Failed to save chunk ({}, {}): {}", pos.x, pos.y, e);
-                } else {
-                    log::debug!("Saved and evicted chunk ({}, {})", pos.x, pos.y);
-                }
-            }
-        }
+        self.persistence_system.disable_persistence(&mut self.chunk_manager);
     }
 
     /// Save all dirty chunks (periodic auto-save)
     pub fn save_dirty_chunks(&mut self) {
-        if let Some(persistence) = &self.persistence {
-            let mut saved_count = 0;
-            let total_dirty = self.chunks.values().filter(|c| c.dirty).count();
-
-            if total_dirty > 0 {
-                log::debug!("[SAVE] Starting auto-save of {} dirty chunks", total_dirty);
-            }
-
-            for chunk in self.chunks.values_mut() {
-                if chunk.dirty {
-                    let non_air = chunk.count_non_air();
-                    log::debug!(
-                        "[SAVE] Saving dirty chunk ({}, {}) - {} non-air pixels",
-                        chunk.x,
-                        chunk.y,
-                        non_air
-                    );
-
-                    if let Err(e) = persistence.save_chunk(chunk) {
-                        log::error!(
-                            "[SAVE] Failed to save chunk ({}, {}): {}",
-                            chunk.x,
-                            chunk.y,
-                            e
-                        );
-                    } else {
-                        chunk.dirty = false;
-                        saved_count += 1;
-                    }
-                }
-            }
-
-            if saved_count > 0 {
-                log::info!("[SAVE] Auto-saved {} dirty chunks", saved_count);
-            }
-        }
+        self.persistence_system.save_dirty_chunks(&mut self.chunk_manager);
     }
 
     /// Save all chunks and metadata (manual save)
     pub fn save_all_dirty_chunks(&mut self) {
-        self.save_dirty_chunks();
-
-        // Also save metadata with player data
-        if let Some(persistence) = &self.persistence {
-            #[cfg(not(target_arch = "wasm32"))]
-            let last_played = chrono::Local::now().to_rfc3339();
-            #[cfg(target_arch = "wasm32")]
-            let last_played = "WASM Session".to_string();
-
-            let metadata = WorldMetadata {
-                version: 1,
-                seed: self.generator.seed,
-                spawn_point: (self.player.position.x, self.player.position.y),
-                created_at: String::new(), // Preserved from load
-                last_played,
-                play_time_seconds: 0,                   // TODO: track play time
-                player_data: Some(self.player.clone()), // Save player inventory, health, hunger
-            };
-
-            if let Err(e) = persistence.save_metadata(&metadata) {
-                log::error!("Failed to save world metadata: {}", e);
-            } else {
-                log::info!("Saved world metadata with player data");
-            }
-        }
+        self.persistence_system.save_all_dirty_chunks(&mut self.chunk_manager, &self.player);
     }
 
     /// Check all pixels in a chunk for state changes based on temperature
@@ -2009,28 +1521,12 @@ impl World {
         chunk_pos: IVec2,
         stats: &mut dyn crate::world::SimStats,
     ) {
-        let chunk = match self.chunks.get_mut(&chunk_pos) {
-            Some(c) => c,
-            None => return,
-        };
-
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                let pixel = chunk.get_pixel(x, y);
-                if pixel.is_empty() {
-                    continue;
-                }
-
-                let material = self.materials.get(pixel.material_id);
-                let temp = get_temperature_at_pixel(chunk, x, y);
-
-                let mut new_pixel = pixel;
-                if StateChangeSystem::check_state_change(&mut new_pixel, material, temp) {
-                    chunk.set_pixel(x, y, new_pixel);
-                    stats.record_state_change();
-                }
-            }
-        }
+        ChemistrySystem::check_chunk_state_changes(
+            &mut self.chunk_manager.chunks,
+            chunk_pos,
+            &self.materials,
+            stats,
+        );
     }
 
     /// Update fire pixel behavior
@@ -2042,86 +1538,44 @@ impl World {
         stats: &mut dyn crate::world::SimStats,
         rng: &mut R,
     ) {
-        // 1. Add heat to temperature field
-        if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
-            add_heat_at_pixel(chunk, x, y, 50.0); // Fire adds significant heat
-        }
-
-        // 2. Fire behaves like gas (rises)
-        self.update_gas(chunk_pos, x, y, stats, rng);
-
-        // 3. Fire has limited lifetime - random chance to become smoke
-        if rng.check_probability(0.02) {
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-            self.set_pixel(world_x, world_y, MaterialId::SMOKE);
-        }
+        ChemistrySystem::update_fire(
+            &mut self.chunk_manager.chunks,
+            chunk_pos,
+            x,
+            y,
+            &self.materials,
+            stats,
+            rng,
+        );
     }
 
     /// Check if a pixel should ignite based on temperature
     fn check_ignition(&mut self, chunk_pos: IVec2, x: usize, y: usize) {
-        let chunk = match self.chunks.get(&chunk_pos) {
-            Some(c) => c,
-            None => return,
-        };
-
-        let pixel = chunk.get_pixel(x, y);
-        let material = self.materials.get(pixel.material_id);
-
-        if !material.flammable {
-            return;
-        }
-
-        let temp = get_temperature_at_pixel(chunk, x, y);
-
-        if let Some(ignition_temp) = material.ignition_temp
-            && temp >= ignition_temp
-        {
-            // Mark pixel as burning
-            let chunk = self.chunks.get_mut(&chunk_pos).unwrap();
-            let mut new_pixel = pixel;
-            new_pixel.flags |= pixel_flags::BURNING;
-            chunk.set_pixel(x, y, new_pixel);
-
-            // Try to spawn fire in adjacent air cell
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-            for (dx, dy) in [(0, 1), (1, 0), (-1, 0), (0, -1)] {
-                if let Some(neighbor) = self.get_pixel(world_x + dx, world_y + dy)
-                    && neighbor.is_empty()
-                {
-                    self.set_pixel(world_x + dx, world_y + dy, MaterialId::FIRE);
-                    break;
-                }
-            }
-        }
+        ChemistrySystem::check_ignition(
+            &mut self.chunk_manager.chunks,
+            chunk_pos,
+            x,
+            y,
+            &self.materials,
+        );
     }
 
     /// Update burning material (gradual consumption)
-    fn update_burning_material<R: crate::world::WorldRng>(&mut self, chunk_pos: IVec2, x: usize, y: usize, rng: &mut R) {
-        let chunk = match self.chunks.get(&chunk_pos) {
-            Some(c) => c,
-            None => return,
-        };
-
-        let pixel = chunk.get_pixel(x, y);
-        let material = self.materials.get(pixel.material_id);
-
-        // Probability check - material burns gradually
-        if rng.check_probability(material.burn_rate) {
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-            // Transform to burns_to material (or air if not specified)
-            let new_material = material.burns_to.unwrap_or(MaterialId::AIR);
-            self.set_pixel(world_x, world_y, new_material);
-
-            // Add heat from burning
-            if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
-                add_heat_at_pixel(chunk, x, y, 20.0);
-            }
-        }
+    fn update_burning_material<R: crate::world::WorldRng>(
+        &mut self,
+        chunk_pos: IVec2,
+        x: usize,
+        y: usize,
+        rng: &mut R,
+    ) {
+        ChemistrySystem::update_burning_material(
+            &mut self.chunk_manager.chunks,
+            chunk_pos,
+            x,
+            y,
+            &self.materials,
+            rng,
+        );
     }
 
     /// Check for chemical reactions with neighboring pixels
@@ -2133,9 +1587,9 @@ impl World {
         stats: &mut dyn crate::world::SimStats,
         rng: &mut R,
     ) {
-        use crate::simulation::MaterialId;
-
-        let chunk = match self.chunks.get(&chunk_pos) {
+        // Need to avoid borrow checker issues by not capturing self in closures
+        // Instead, inline the logic here
+        let chunk = match self.chunk_manager.chunks.get(&chunk_pos) {
             Some(c) => c,
             None => return,
         };
@@ -2149,39 +1603,6 @@ impl World {
         let light_level = chunk.get_light(x, y);
         let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
         let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
-        // Debug logging for plant matter growth conditions
-        if pixel.material_id == MaterialId::PLANT_MATTER {
-            // Check if there's water nearby
-            let mut has_water = false;
-            for (dx, dy) in [(0, 1), (1, 0), (0, -1), (-1, 0)] {
-                if let Some(neighbor) = self.get_pixel(world_x + dx, world_y + dy)
-                    && neighbor.material_id == MaterialId::WATER
-                {
-                    has_water = true;
-                    break;
-                }
-            }
-
-            // Log growth check conditions (throttled - only once every 600 frames ≈ 10 seconds)
-            static mut LAST_LOG_FRAME: u32 = 0;
-            static mut FRAME_COUNT: u32 = 0;
-            unsafe {
-                FRAME_COUNT += 1;
-                if FRAME_COUNT - LAST_LOG_FRAME > 600 {
-                    log::debug!(
-                        "Plant growth check at ({}, {}): light={}, temp={:.1}°C, water={}, ready={}",
-                        world_x,
-                        world_y,
-                        light_level,
-                        temp,
-                        has_water,
-                        light_level >= 8 && (10.0..=40.0).contains(&temp) && has_water
-                    );
-                    LAST_LOG_FRAME = FRAME_COUNT;
-                }
-            }
-        }
 
         // Get pressure at this pixel
         let pressure = chunk.get_pressure_at(x, y);
@@ -2321,8 +1742,8 @@ impl sunaba_creature::WorldAccess for World {
 
     fn get_pressure_at(&self, x: i32, y: i32) -> f32 {
         // Get pressure from chunk's coarse grid
-        let (chunk_pos, local_x, local_y) = Self::world_to_chunk_coords(x, y);
-        if let Some(chunk) = self.chunks.get(&chunk_pos) {
+        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(x, y);
+        if let Some(chunk) = self.chunk_manager.chunks.get(&chunk_pos) {
             chunk.get_pressure_at(local_x, local_y)
         } else {
             1.0 // Default atmospheric pressure

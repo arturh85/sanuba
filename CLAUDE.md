@@ -92,6 +92,65 @@ impl<T: ?Sized + rand::Rng> WorldRng for T { ... }  // Blanket impl
 
 This supports `thread_rng()` (client), `ctx.rng()` (server), and `DeterministicRng` (genome→brain init).
 
+### Development Workflow for Schema Changes
+
+**CRITICAL:** When modifying the SpacetimeDB server schema, follow this checklist to prevent breaking clients.
+
+#### Schema Change Checklist
+
+When you modify `crates/sunaba-server/src/` (add/remove/modify tables in tables.rs or reducers in reducers/):
+
+1. **Build the server module:**
+   ```bash
+   just spacetime-build
+   ```
+
+2. **Regenerate client bindings (auto-generated, type-safe, gitignored):**
+   ```bash
+   just spacetime-generate-rust  # Native Rust client
+   just spacetime-generate-ts    # WASM TypeScript client
+   ```
+   - Updates `crates/sunaba/src/multiplayer/generated/` (Rust) - gitignored
+   - Updates `web/src/spacetime/` (TypeScript) - gitignored
+   - Both are fully auto-generated from server schema
+   - **Note:** Generated clients are gitignored and regenerated on every build
+
+3. **Run full test suite:**
+   ```bash
+   just test  # Includes both Rust and TypeScript verification
+   ```
+   - Verifies Rust client matches schema
+   - Verifies TypeScript client matches schema
+   - Runs `tsc --noEmit` to type-check TypeScript
+
+4. **Test locally with server:**
+   ```bash
+   just spacetime-start
+   just spacetime-publish-local
+   # Test both native and WASM builds
+   ```
+
+#### Quick Commands
+
+| Command | Purpose |
+|---------|---------|
+| `just spacetime-build` | Build WASM server module |
+| `just spacetime-generate-rust` | Regenerate Rust client from server |
+| `just spacetime-generate-ts` | Regenerate TypeScript client from server |
+| `just spacetime-verify-clients` | Verify Rust client matches server schema |
+| `just spacetime-verify-ts` | Verify TypeScript client is regenerated |
+| `just test` | Full validation (includes both client verifications) |
+
+#### Common Pitfalls
+
+❌ **DON'T:** Edit generated files (they're gitignored and auto-regenerated)
+❌ **DON'T:** Commit generated client code (`generated/` and `src/spacetime/` are gitignored)
+❌ **DON'T:** Forget to run `just spacetime-build` after modifying server schema
+✅ **DO:** Run `just test` after schema changes (auto-regenerates clients)
+✅ **DO:** Keep reducer signatures simple (avoid complex types)
+✅ **DO:** Test both native and WASM builds after schema changes
+✅ **DO:** Let generated clients handle all type safety automatically
+
 ## Workspace Structure
 
 sunaba is organized as a Cargo workspace with 5 crates:
@@ -298,9 +357,20 @@ crates/
 │
 └── sunaba-server/          # SpacetimeDB multiplayer server
     └── src/
-        ├── lib.rs                # Tables, reducers, tick handlers
-        ├── world_access.rs       # WorldAccess impl over SpacetimeDB
-        └── encoding.rs           # Bincode serialization helpers
+        ├── lib.rs                # Module declarations + re-exports
+        ├── tables.rs             # SpacetimeDB table definitions (8 tables)
+        ├── state.rs              # Global server state (SERVER_WORLD)
+        ├── reducers/
+        │   ├── mod.rs           # Reducer re-exports
+        │   ├── lifecycle.rs     # init, client connect/disconnect
+        │   ├── world_ticks.rs   # Scheduled simulation ticks (60fps, 30fps, 10fps)
+        │   ├── player_actions.rs # Player movement, placement, mining
+        │   ├── creatures.rs     # Creature spawning + feature extraction
+        │   ├── monitoring.rs    # Ping, metrics cleanup
+        │   └── testing.rs       # Debug/test reducers
+        ├── helpers.rs           # Chunk loading, sync, physics utilities
+        ├── world_access.rs      # WorldAccess impl over SpacetimeDB
+        └── encoding.rs          # Bincode serialization helpers
 ```
 
 ## Development Phases
@@ -340,39 +410,11 @@ F5             : Manual save
 H              : Help panel
 F1             : Debug stats
 F3             : Puffin profiler (requires --features profiling)
+M              : Multiplayer stats (requires multiplayer_native feature)
 T              : Temperature overlay
 ```
 
 When adding new controls, update the above list in addition to the controls help in web/index.html
-
-## Key Algorithms
-
-### CA Update Order (Noita-style)
-```
-For each frame:
-  Checkerboard pattern (4 passes) for parallel chunk updates
-
-Within each chunk (bottom to top):
-  For y from 0 to 63:
-    For x (alternating direction each row):
-      Update pixel based on material type
-      Check reactions with neighbors
-```
-
-### Structural Integrity
-```rust
-fn check_integrity(world, removed_pos) {
-    let region = flood_fill_solids(removed_pos, max_radius=64);
-
-    if !region.iter().any(|p| is_anchored(p)) {
-        if region.len() < 50 {
-            convert_to_particles(region);
-        } else {
-            convert_to_rigid_body(region);
-        }
-    }
-}
-```
 
 ## Notes for Claude
 
@@ -381,9 +423,11 @@ fn check_integrity(world, removed_pos) {
 3. **Data-driven materials**: Resist hardcoding material behaviors
 4. **Chunk boundaries**: Most bugs occur at chunk edges - test thoroughly
 5. **Rand compatibility**: Always use rand 0.8 stable APIs (`thread_rng()`, `gen_range()`, `r#gen()`). Import `Rng` trait. WorldRng abstraction handles SpacetimeDB `ctx.rng()` and client `thread_rng()`.
-6. **Data-driven creatures**: Behaviors should emerge from evolution, not code
-7. **Neural inference profiling**: Brain updates are hot path for many creatures
-8. **Deterministic evolution**: Seeded RNG for reproducible training runs
-9. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
-10. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
-11. **Multiplayer client**: Dual SDK approach - native uses Rust SDK (stub), WASM uses TypeScript SDK via `window.spacetimeClient`
+6. **SpacetimeDB schema changes**: ALWAYS run `just spacetime-generate-rust` AND `just spacetime-generate-ts` after modifying server schema. Both clients are auto-generated and type-safe. Run `just test` to validate both clients.
+7. **Data-driven creatures**: Behaviors should emerge from evolution, not code
+8. **Neural inference profiling**: Brain updates are hot path for many creatures
+9. **Deterministic evolution**: Seeded RNG for reproducible training runs
+10. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
+11. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
+12. **Multiplayer client sync**: Both Rust (native) and TypeScript (WASM) clients auto-generate from server schema. CI validates both via `just spacetime-verify-clients` and `just spacetime-verify-ts`.
+13. **Multiplayer metrics**: Server metrics are sampled at 6fps (every 10th tick) to reduce overhead. Metrics retention: 3600 samples (10 minutes). Ping sampled at 1 request/second. Access stats panel with M key (native builds with multiplayer_native feature).

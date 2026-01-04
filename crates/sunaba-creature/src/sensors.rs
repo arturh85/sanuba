@@ -4,6 +4,7 @@
 
 use glam::Vec2;
 use serde::{Deserialize, Serialize};
+use sunaba_simulation::MaterialId;
 
 /// Raycast vision result
 #[derive(Debug, Clone)]
@@ -294,18 +295,16 @@ pub fn detect_nearby_threats(
     let min_y = (position.y - radius).floor() as i32;
     let max_y = (position.y + radius).ceil() as i32;
 
-    // Dangerous material IDs (based on materials.rs)
-    const FIRE: u16 = 6;
-    const LAVA: u16 = 9;
-    const ACID: u16 = 11;
-
     for y in min_y..=max_y {
         for x in min_x..=max_x {
             if let Some(pixel) = world.get_pixel(x, y) {
                 let material_id = pixel.material_id;
 
                 // Check if material is dangerous
-                if material_id == FIRE || material_id == LAVA || material_id == ACID {
+                if material_id == MaterialId::FIRE
+                    || material_id == MaterialId::LAVA
+                    || material_id == MaterialId::ACID
+                {
                     let pixel_pos = Vec2::new(x as f32, y as f32);
                     let dist_sq = position.distance_squared(pixel_pos);
 
@@ -550,40 +549,4 @@ mod tests {
     // The following tests require World::new() which is in sunaba-core.
     // These tests are moved to sunaba-core as integration tests.
     // See sunaba-core/tests/creature_sensors_test.rs
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_raycast_vision_creates_correct_number() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_raycast_dda_air_returns_max_distance() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_detect_nearby_food_none_when_empty() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_detect_nearby_threats_none_when_safe() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_calculate_gradients_returns_normalized() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_sensory_input_gather_complete() {
-        // This test requires World::new() from sunaba-core
-    }
 }

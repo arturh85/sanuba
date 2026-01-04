@@ -8,6 +8,7 @@
 // Global state
 let spacetimeClient = null;
 let isConnectedFlag = false;
+let latestServerMetrics = null;
 
 /**
  * Connect to SpacetimeDB server
@@ -72,7 +73,8 @@ export async function subscribeWorld() {
             'SELECT * FROM world_config',
             'SELECT * FROM chunk_data',
             'SELECT * FROM player',
-            'SELECT * FROM creature_data'
+            'SELECT * FROM creature_data',
+            'SELECT * FROM server_metrics'
         ]);
 
         // Set up table update handlers
@@ -93,6 +95,23 @@ export async function subscribeWorld() {
             // console.log('[SpacetimeDB] Creature update:', row.id);
         });
 
+        spacetimeClient.on('server_metrics', (table, operation, row) => {
+            // Cache latest metrics (by tick number)
+            if (!latestServerMetrics || row.tick > latestServerMetrics.tick) {
+                latestServerMetrics = {
+                    tick: row.tick,
+                    timestamp_ms: row.timestamp_ms,
+                    world_tick_time_ms: row.world_tick_time_ms,
+                    creature_tick_time_ms: row.creature_tick_time_ms,
+                    active_chunks: row.active_chunks,
+                    dirty_chunks_synced: row.dirty_chunks_synced,
+                    online_players: row.online_players,
+                    creatures_alive: row.creatures_alive
+                };
+                // console.log('[SpacetimeDB] Metrics updated:', row.tick);
+            }
+        });
+
         console.log('[SpacetimeDB] Subscribed to world state');
 
     } catch (error) {
@@ -105,14 +124,16 @@ export async function subscribeWorld() {
  * Send player position update to server
  * @param {number} x - Player X position
  * @param {number} y - Player Y position
+ * @param {number} velX - Player X velocity
+ * @param {number} velY - Player Y velocity
  */
-export function updatePlayerPosition(x, y) {
+export function updatePlayerPosition(x, y, velX, velY) {
     if (!spacetimeClient) {
         throw new Error('Not connected to SpacetimeDB');
     }
 
     try {
-        spacetimeClient.call('update_player_position', x, y);
+        spacetimeClient.call('player_update_position', x, y, velX, velY);
     } catch (error) {
         console.error('[SpacetimeDB] Failed to update player position:', error);
         throw error;
@@ -131,7 +152,7 @@ export function placeMaterial(x, y, materialId) {
     }
 
     try {
-        spacetimeClient.call('place_material', x, y, materialId);
+        spacetimeClient.call('player_place_material', x, y, materialId);
     } catch (error) {
         console.error('[SpacetimeDB] Failed to place material:', error);
         throw error;
@@ -149,7 +170,7 @@ export function mineMaterial(x, y) {
     }
 
     try {
-        spacetimeClient.call('mine', x, y);
+        spacetimeClient.call('player_mine', x, y);
     } catch (error) {
         console.error('[SpacetimeDB] Failed to mine:', error);
         throw error;
@@ -162,4 +183,39 @@ export function mineMaterial(x, y) {
  */
 export function isConnected() {
     return isConnectedFlag && spacetimeClient !== null;
+}
+
+/**
+ * Send ping request to server for latency measurement
+ * @param {number} timestampMs - Client timestamp in milliseconds
+ * @returns {Promise<void>}
+ */
+export async function requestPing(timestampMs) {
+    if (!spacetimeClient) {
+        throw new Error('Not connected to SpacetimeDB');
+    }
+
+    try {
+        // Record send time for RTT calculation
+        const sentTime = Date.now();
+
+        // Call request_ping reducer (it echoes the timestamp)
+        await spacetimeClient.call('request_ping', timestampMs);
+
+        // Calculate round-trip time
+        const rtt = Date.now() - sentTime;
+        // console.log(`[SpacetimeDB] Ping RTT: ${rtt}ms`);
+
+    } catch (error) {
+        console.error('[SpacetimeDB] Ping failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get latest cached server metrics
+ * @returns {Object|null} Server metrics object or null if none available
+ */
+export function getLatestServerMetrics() {
+    return latestServerMetrics;
 }

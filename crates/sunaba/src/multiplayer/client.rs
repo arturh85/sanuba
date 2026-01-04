@@ -5,8 +5,13 @@ use std::sync::{Arc, Mutex};
 
 // Import generated SpacetimeDB client bindings
 use super::generated::{self, DbConnection};
+use generated::chunk_data_table::ChunkDataTableAccess;
+use generated::creature_data_table::CreatureDataTableAccess;
+use generated::player_table::PlayerTableAccess;
+use generated::request_ping_reducer::request_ping;
+use generated::server_metrics_table::ServerMetricsTableAccess;
 use generated::{player_mine, player_place_material, player_update_position};
-use spacetimedb_sdk::DbContext; // Trait for connection methods
+use spacetimedb_sdk::{DbContext, Table}; // Trait for connection and table methods
 
 /// SpacetimeDB client wrapper for native multiplayer integration
 pub struct MultiplayerClient {
@@ -73,23 +78,57 @@ impl MultiplayerClient {
 
         let conn_guard = conn.lock().unwrap();
 
-        // Subscribe to all relevant tables
-        let queries = vec![
-            "SELECT * FROM world_config",
-            "SELECT * FROM chunk_data",
-            "SELECT * FROM player",
-            "SELECT * FROM creature_data",
-        ];
-
-        let _subscription = conn_guard
+        // Subscribe to world config
+        let _config_sub = conn_guard
             .subscription_builder()
             .on_applied(|_ctx| {
-                log::debug!("World state subscription applied");
+                log::debug!("World config subscription applied");
             })
-            .on_error(|_ctx, err| {
-                log::error!("World state subscription error: {}", err);
+            .subscribe("SELECT * FROM world_config");
+
+        // Subscribe to chunk data with update callbacks
+        let _chunk_sub = conn_guard
+            .subscription_builder()
+            .on_applied(|ctx| {
+                log::info!(
+                    "Chunk data subscription applied - {} chunks received",
+                    ctx.db.chunk_data().iter().count()
+                );
             })
-            .subscribe(queries.join("; "));
+            .subscribe("SELECT * FROM chunk_data");
+
+        // Subscribe to players
+        let _player_sub = conn_guard
+            .subscription_builder()
+            .on_applied(|ctx| {
+                log::debug!(
+                    "Player subscription applied - {} players",
+                    ctx.db.player().iter().count()
+                );
+            })
+            .subscribe("SELECT * FROM player");
+
+        // Subscribe to creatures
+        let _creature_sub = conn_guard
+            .subscription_builder()
+            .on_applied(|ctx| {
+                log::debug!(
+                    "Creature subscription applied - {} creatures",
+                    ctx.db.creature_data().iter().count()
+                );
+            })
+            .subscribe("SELECT * FROM creature_data");
+
+        // Subscribe to server metrics
+        let _metrics_sub = conn_guard
+            .subscription_builder()
+            .on_applied(|ctx| {
+                log::debug!(
+                    "Server metrics subscription applied - {} samples",
+                    ctx.db.server_metrics().iter().count()
+                );
+            })
+            .subscribe("SELECT * FROM server_metrics");
 
         log::info!("Subscribed to world state successfully");
 
@@ -154,6 +193,49 @@ impl MultiplayerClient {
         Ok(())
     }
 
+    /// Sync chunks from server cache to local world
+    pub fn sync_chunks_to_world(
+        &self,
+        world: &mut sunaba_core::world::World,
+    ) -> anyhow::Result<usize> {
+        use glam::IVec2;
+
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not connected to server"))?;
+
+        let conn_guard = conn.lock().unwrap();
+
+        let mut synced_count = 0;
+
+        // Iterate all cached chunks from server
+        for chunk_row in conn_guard.db.chunk_data().iter() {
+            let pos = IVec2::new(chunk_row.x, chunk_row.y);
+
+            // Skip if already loaded
+            if world.has_chunk(pos) {
+                continue;
+            }
+
+            // Decode chunk data
+            let Ok(chunk) = crate::encoding::decode_chunk(&chunk_row.pixel_data) else {
+                log::warn!("Failed to decode chunk ({}, {})", chunk_row.x, chunk_row.y);
+                continue;
+            };
+
+            // Insert into world
+            world.insert_chunk(pos, chunk);
+            synced_count += 1;
+        }
+
+        if synced_count > 0 {
+            log::info!("Synced {} chunks from server", synced_count);
+        }
+
+        Ok(synced_count)
+    }
+
     /// Get chunk data from local cache (for rendering)
     pub fn get_chunk(&self, _x: i32, _y: i32) -> Option<Vec<u8>> {
         let _conn = self.connection.as_ref()?;
@@ -163,6 +245,36 @@ impl MultiplayerClient {
         // conn.lock().unwrap().db.chunk_data().filter_by_chunk_x_chunk_y(&x, &y).first().map(|chunk| chunk.data.clone())
 
         None
+    }
+
+    /// Send ping request to server for latency measurement
+    pub fn request_ping(&self, timestamp_ms: u64) -> anyhow::Result<()> {
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not connected to server"))?;
+
+        let conn_guard = conn.lock().unwrap();
+        conn_guard
+            .reducers
+            .request_ping(timestamp_ms)
+            .context("Failed to call request_ping reducer")?;
+
+        Ok(())
+    }
+
+    /// Get latest server metrics from subscribed table
+    pub fn get_latest_server_metrics(&self) -> Option<generated::ServerMetrics> {
+        let conn = self.connection.as_ref()?;
+        let conn_guard = conn.lock().unwrap();
+
+        // Get the most recent metric by tick number
+        conn_guard
+            .db
+            .server_metrics()
+            .iter()
+            .max_by_key(|m| m.tick)
+            .map(|m| m.clone())
     }
 
     /// Check if connected to server

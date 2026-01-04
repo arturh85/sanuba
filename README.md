@@ -65,6 +65,25 @@ just web
 
 Sunaba supports real-time multiplayer via [SpacetimeDB](https://spacetimedb.com/), a database-centric server framework.
 
+**Development Workflow:**
+
+After modifying the server schema (`crates/sunaba-server/src/lib.rs`):
+
+```bash
+# 1. Rebuild server
+just spacetime-build
+
+# 2. Regenerate clients (auto-generated, type-safe)
+just spacetime-generate-rust  # Native Rust client
+just spacetime-generate-ts    # WASM TypeScript client
+
+# 3. Verify everything matches
+just test  # Validates both Rust and TypeScript clients
+
+# 4. Test locally
+just spacetime-publish-local
+```
+
 **Quick Start:**
 
 ```bash
@@ -88,20 +107,15 @@ spacetime sql sunaba --server http://localhost:3000 "SELECT * FROM creature_data
 just spacetime-logs-tail
 ```
 
-**Client Architecture:**
+**Architecture:**
 
-Sunaba uses a dual-client approach to support both native and browser multiplayer:
+- **Native Client:** Auto-generated Rust SDK (gitignored, regenerated on build)
+- **WASM Client:** Auto-generated TypeScript SDK (gitignored, regenerated on build)
+- **Server:** WASM module with scheduled reducers (60fps world, 30fps creatures)
 
-- **Native Builds** (`--features multiplayer_native`): Use the Rust SpacetimeDB SDK for direct server connection
-  - Currently a structured stub pending full SDK integration
-  - Will provide direct, low-latency connection to SpacetimeDB
+**Safety:** Both clients are fully auto-generated and type-safe. Generated code is gitignored and regenerated on every build, ensuring clients always match the server schema. No manual maintenance required.
 
-- **WASM Builds** (`--features multiplayer_wasm`): Use TypeScript SDK via JavaScript bridge
-  - Browser-compatible multiplayer using `@clockworklabs/spacetimedb-sdk`
-  - JavaScript bridge exposes `window.spacetimeClient` to WASM via wasm-bindgen
-  - See `web/js/spacetime_bridge.js` for implementation
-
-**Server Architecture:**
+**Server Features:**
 
 The multiplayer server runs the same simulation code as the native game:
 - ✅ Full CA physics (falling sand, fire, reactions)

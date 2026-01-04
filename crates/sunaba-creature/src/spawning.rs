@@ -419,18 +419,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_update_creatures() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_creature_death_removal() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
     fn test_spawn_creature_with_hunger() {
         let mut manager = CreatureManager::new(10);
 

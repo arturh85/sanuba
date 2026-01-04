@@ -7,6 +7,7 @@ use super::{
     inventory::Inventory,
 };
 use crate::simulation::mining::MiningProgress;
+use sunaba_simulation::MaterialId;
 
 /// The player entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,11 +56,10 @@ impl Player {
         };
 
         // Give player some starting materials for testing
-        // Using material IDs from simulation/materials.rs
-        player.inventory.add_item(2, 1000); // Stone
-        player.inventory.add_item(3, 1000); // Sand
-        player.inventory.add_item(4, 1000); // Water
-        player.inventory.add_item(5, 1000); // Wood
+        player.inventory.add_item(MaterialId::SAND, 1000);
+        player.inventory.add_item(MaterialId::WATER, 1000);
+        player.inventory.add_item(MaterialId::WOOD, 1000);
+        player.inventory.add_item(MaterialId::FIRE, 1000);
 
         player
     }
