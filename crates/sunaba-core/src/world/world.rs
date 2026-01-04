@@ -9,16 +9,16 @@ use super::chunk_manager::ChunkManager;
 use super::collision::CollisionDetector;
 use super::debris_system::DebrisSystem;
 use super::light_system::LightSystem;
+use super::mining_system::MiningSystem;
 use super::persistence_system::PersistenceSystem;
 use super::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
 use crate::entity::crafting::RecipeRegistry;
 use crate::entity::player::Player;
 use crate::entity::tools::ToolRegistry;
 use crate::simulation::{
-    ChunkRenderData, FallingChunk, MaterialId, MaterialType,
-    Materials, ReactionRegistry, RegenerationSystem, StructuralIntegritySystem,
-    TemperatureSimulator, WorldCollisionQuery, get_temperature_at_pixel,
-    mining::calculate_mining_time,
+    ChunkRenderData, FallingChunk, MaterialId, MaterialType, Materials, ReactionRegistry,
+    RegenerationSystem, StructuralIntegritySystem, TemperatureSimulator, WorldCollisionQuery,
+    get_temperature_at_pixel,
 };
 use crate::world::NoopStats;
 
@@ -491,11 +491,9 @@ impl World {
         &self.tool_registry
     }
 
-    /// Brush radius for material spawning (1 = 3x3, 2 = 5x5)
-    const BRUSH_RADIUS: i32 = 1;
-
     /// Spawn material at world coordinates with circular brush
     pub fn spawn_material(&mut self, world_x: i32, world_y: i32, material_id: u16) {
+        const BRUSH_RADIUS: i32 = 1; // 1 = 3x3, 2 = 5x5
         let material_name = &self.materials.get(material_id).name;
         let (chunk_pos, _, _) = ChunkManager::world_to_chunk_coords(world_x, world_y);
 
@@ -509,10 +507,10 @@ impl World {
         );
 
         let mut spawned = 0;
-        for dy in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-            for dx in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
+        for dy in -BRUSH_RADIUS..=BRUSH_RADIUS {
+            for dx in -BRUSH_RADIUS..=BRUSH_RADIUS {
                 // Circular brush
-                if dx * dx + dy * dy <= Self::BRUSH_RADIUS * Self::BRUSH_RADIUS {
+                if dx * dx + dy * dy <= BRUSH_RADIUS * BRUSH_RADIUS {
                     let x = world_x + dx;
                     let y = world_y + dy;
                     self.set_pixel(x, y, material_id);
@@ -546,42 +544,13 @@ impl World {
     /// Mine a single pixel and add it to player's inventory
     /// Returns true if successfully mined
     pub fn mine_pixel(&mut self, world_x: i32, world_y: i32) -> bool {
-        let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
-
-        if let Some(chunk) = self.chunk_manager.chunks.get_mut(&chunk_pos) {
-            let pixel = chunk.get_pixel(local_x, local_y);
-            let material_id = pixel.material_id;
-
-            // Can't mine air or bedrock
-            if material_id == MaterialId::AIR || material_id == MaterialId::BEDROCK {
-                return false;
-            }
-
-            // Try to add to inventory
-            if self.player.mine_material(material_id) {
-                // Successfully added to inventory, remove the pixel
-                chunk.set_material(local_x, local_y, MaterialId::AIR);
-                chunk.dirty = true;
-
-                let material_name = &self.materials.get(material_id).name;
-                log::debug!(
-                    "[MINE] Mined {} at ({}, {})",
-                    material_name,
-                    world_x,
-                    world_y
-                );
-                true
-            } else {
-                log::debug!(
-                    "[MINE] Inventory full, can't mine at ({}, {})",
-                    world_x,
-                    world_y
-                );
-                false
-            }
-        } else {
-            false
-        }
+        MiningSystem::mine_pixel(
+            &mut self.player,
+            &mut self.chunk_manager,
+            world_x,
+            world_y,
+            &self.materials,
+        )
     }
 
     /// Place material from player's inventory at world coordinates with circular brush
@@ -592,246 +561,96 @@ impl World {
         world_y: i32,
         material_id: u16,
     ) -> u32 {
-        let material_name = self.materials.get(material_id).name.clone();
-        let mut placed = 0;
-
-        // Calculate how many pixels we want to place (circular brush)
-        let mut pixels_needed = 0;
-        for dy in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-            for dx in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-                if dx * dx + dy * dy <= Self::BRUSH_RADIUS * Self::BRUSH_RADIUS {
-                    let x = world_x + dx;
-                    let y = world_y + dy;
-                    // Only count if target pixel is air (can be replaced)
-                    if self
-                        .get_pixel(x, y)
-                        .map(|p| p.material_id == MaterialId::AIR)
-                        .unwrap_or(false)
-                    {
-                        pixels_needed += 1;
-                    }
-                }
-            }
-        }
-
-        if pixels_needed == 0 {
-            return 0;
-        }
-
-        // Check if player has enough material
-        if !self.player.inventory.has_item(material_id, pixels_needed) {
-            log::debug!(
-                "[PLACE] Not enough {} in inventory (need {}, have {})",
-                material_name,
-                pixels_needed,
-                self.player.inventory.count_item(material_id)
-            );
-            return 0;
-        }
-
-        // Consume from inventory first
-        let consumed = self
-            .player
-            .inventory
-            .remove_item(material_id, pixels_needed);
-
-        // Place the pixels with PLAYER_PLACED flag
-        for dy in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-            for dx in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-                if dx * dx + dy * dy <= Self::BRUSH_RADIUS * Self::BRUSH_RADIUS {
-                    let x = world_x + dx;
-                    let y = world_y + dy;
-                    if self
-                        .get_pixel(x, y)
-                        .map(|p| p.material_id == MaterialId::AIR)
-                        .unwrap_or(false)
-                    {
-                        let mut pixel = Pixel::new(material_id);
-                        pixel.flags |= pixel_flags::PLAYER_PLACED;
-                        self.set_pixel_full(x, y, pixel);
-                        placed += 1;
-                    }
-                }
-            }
-        }
-
-        log::debug!(
-            "[PLACE] Placed {} {} pixels at ({}, {}), consumed {} from inventory",
-            placed,
-            material_name,
+        let positions = MiningSystem::place_material_from_inventory(
+            &mut self.player,
+            &self.chunk_manager,
             world_x,
             world_y,
-            consumed
+            material_id,
+            &self.materials,
         );
 
-        placed
+        let count = positions.len() as u32;
+        for (x, y) in positions {
+            let mut pixel = Pixel::new(material_id);
+            pixel.flags |= pixel_flags::PLAYER_PLACED;
+            self.set_pixel_full(x, y, pixel);
+        }
+
+        count
     }
 
     /// Place material at world coordinates without consuming from inventory (debug mode)
     pub fn place_material_debug(&mut self, world_x: i32, world_y: i32, material_id: u16) -> u32 {
-        let mut placed = 0;
+        let positions =
+            MiningSystem::place_material_debug(&self.chunk_manager, world_x, world_y, material_id);
 
-        for dy in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-            for dx in -Self::BRUSH_RADIUS..=Self::BRUSH_RADIUS {
-                if dx * dx + dy * dy <= Self::BRUSH_RADIUS * Self::BRUSH_RADIUS {
-                    let x = world_x + dx;
-                    let y = world_y + dy;
-                    if self
-                        .get_pixel(x, y)
-                        .map(|p| p.material_id == MaterialId::AIR)
-                        .unwrap_or(false)
-                    {
-                        let mut pixel = Pixel::new(material_id);
-                        pixel.flags |= pixel_flags::PLAYER_PLACED;
-                        self.set_pixel_full(x, y, pixel);
-                        placed += 1;
-                    }
-                }
-            }
+        let count = positions.len() as u32;
+        for (x, y) in positions {
+            let mut pixel = Pixel::new(material_id);
+            pixel.flags |= pixel_flags::PLAYER_PLACED;
+            self.set_pixel_full(x, y, pixel);
         }
 
-        placed
+        count
     }
 
     /// Start mining a pixel (calculates required time based on material hardness and tool)
     pub fn start_mining(&mut self, world_x: i32, world_y: i32) {
-        // Get the pixel
-        let pixel = match self.get_pixel(world_x, world_y) {
-            Some(p) => p,
-            None => return, // Out of bounds
-        };
-
-        let material = self.materials.get(pixel.material_id);
-
-        // Can't mine air or materials without hardness (bedrock)
-        if material.hardness.is_none() {
-            return;
-        }
-
-        // Get equipped tool
-        let tool = self.player.get_equipped_tool(&self.tool_registry);
-
-        // Calculate mining time
-        let required_time = calculate_mining_time(1.0, material, tool);
-
-        // Start mining
-        self.player
-            .mining_progress
-            .start((world_x, world_y), required_time);
-
-        log::debug!(
-            "[MINING] Started mining {} at ({}, {}) - required time: {:.2}s (tool: {:?})",
-            material.name,
+        MiningSystem::start_mining(
+            &mut self.player,
+            &self.chunk_manager,
             world_x,
             world_y,
-            required_time,
-            tool.map(|t| t.name.as_str())
-        );
+            &self.materials,
+            &self.tool_registry,
+        )
     }
 
     /// Update mining progress (called each frame)
     /// Returns true if mining completed this frame
     pub fn update_mining(&mut self, delta_time: f32) -> bool {
-        if self.player.update_mining(delta_time) {
-            // Mining completed
-            if let Some((x, y)) = self.player.mining_progress.target_pixel {
-                self.complete_mining(x, y);
-                return true;
-            }
+        if let Some((x, y)) = MiningSystem::update_mining(&mut self.player, delta_time) {
+            self.complete_mining(x, y);
+            true
+        } else {
+            false
         }
-        false
     }
 
     /// Complete mining at the specified position
     fn complete_mining(&mut self, world_x: i32, world_y: i32) {
-        // Get the pixel
-        let pixel = match self.get_pixel(world_x, world_y) {
-            Some(p) => p,
-            None => {
-                log::warn!(
-                    "[MINING] Complete mining failed: pixel at ({}, {}) not found",
-                    world_x,
-                    world_y
-                );
-                return;
-            }
-        };
-
-        let material_id = pixel.material_id;
-        let material_name = self.materials.get(material_id).name.clone();
-
-        // Add to inventory
-        if self.player.mine_material(material_id) {
-            // Remove pixel
+        if MiningSystem::complete_mining(
+            &mut self.player,
+            &self.chunk_manager,
+            world_x,
+            world_y,
+            &self.materials,
+            &self.tool_registry,
+        )
+        .is_some()
+        {
+            // Successfully mined - remove the pixel
             self.set_pixel(world_x, world_y, MaterialId::AIR);
-
-            // Damage tool durability
-            if let Some(tool_id) = self.player.equipped_tool {
-                let broke = self.player.inventory.damage_tool(tool_id, 1);
-                if broke {
-                    let tool_name = self
-                        .tool_registry
-                        .get(tool_id)
-                        .map(|t| t.name.as_str())
-                        .unwrap_or("Unknown");
-                    log::info!("[MINING] {} broke!", tool_name);
-                    self.player.unequip_tool();
-                }
-            }
-
-            log::debug!(
-                "[MINING] Completed mining {} at ({}, {})",
-                material_name,
-                world_x,
-                world_y
-            );
-        } else {
-            log::warn!(
-                "[MINING] Failed to add {} to inventory (full?)",
-                material_name
-            );
         }
     }
 
     /// DEBUG: Instantly mine all materials in a circle around position
     /// Used for quick world exploration during testing
     pub fn debug_mine_circle(&mut self, center_x: i32, center_y: i32, radius: i32) {
-        // Iterate over square containing circle
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                // Check if point is inside circle (Euclidean distance)
-                if dx * dx + dy * dy <= radius * radius {
-                    let x = center_x + dx;
-                    let y = center_y + dy;
-
-                    // Get pixel material
-                    if let Some(pixel) = self.get_pixel(x, y) {
-                        let material_id = pixel.material_id;
-
-                        // Skip air and bedrock
-                        if material_id == MaterialId::AIR {
-                            continue;
-                        }
-
-                        let material = self.materials.get(material_id);
-                        if material.hardness.is_none() {
-                            continue; // Bedrock/unmineable materials
-                        }
-
-                        // Remove pixel and add to inventory
-                        self.player.mine_material(material_id);
-                        self.set_pixel(x, y, MaterialId::AIR);
-                    }
-                }
-            }
-        }
-
-        log::debug!(
-            "[DEBUG MINING] Mined circle at ({}, {}) with radius {}",
+        let positions = MiningSystem::debug_mine_circle(
+            &mut self.player,
+            &self.chunk_manager,
             center_x,
             center_y,
-            radius
+            radius,
+            &self.materials,
         );
+
+        // Remove pixels
+        for (x, y) in positions {
+            self.set_pixel(x, y, MaterialId::AIR);
+        }
     }
 
     /// Update simulation
@@ -889,7 +708,8 @@ impl World {
         );
 
         if self.chunk_manager.last_load_chunk_pos != Some(current_chunk) {
-            self.persistence_system.load_nearby_chunks(&mut self.chunk_manager, self.player.position);
+            self.persistence_system
+                .load_nearby_chunks(&mut self.chunk_manager, self.player.position);
             self.chunk_manager.last_load_chunk_pos = Some(current_chunk);
         }
 
@@ -1232,12 +1052,14 @@ impl World {
 
     /// Get light level at world coordinates (0-15)
     pub fn get_light_at(&self, world_x: i32, world_y: i32) -> Option<u8> {
-        self.light_system.get_light_at(&self.chunk_manager, world_x, world_y)
+        self.light_system
+            .get_light_at(&self.chunk_manager, world_x, world_y)
     }
 
     /// Set light level at world coordinates (0-15)
     pub fn set_light_at(&mut self, world_x: i32, world_y: i32, level: u8) {
-        self.light_system.set_light_at(&mut self.chunk_manager, world_x, world_y, level);
+        self.light_system
+            .set_light_at(&mut self.chunk_manager, world_x, world_y, level);
     }
 
     /// Get material ID at world coordinates
@@ -1279,7 +1101,10 @@ impl World {
 
     /// Generate a single chunk at position (for SpacetimeDB server)
     pub fn generate_chunk(&mut self, pos: IVec2) {
-        let chunk = self.persistence_system.generator.generate_chunk(pos.x, pos.y);
+        let chunk = self
+            .persistence_system
+            .generator
+            .generate_chunk(pos.x, pos.y);
         self.chunk_manager.chunks.insert(pos, chunk);
     }
 
@@ -1382,7 +1207,12 @@ impl World {
             if let Some(existing) = self.get_pixel(world_pos.x, world_pos.y)
                 && existing.is_empty()
             {
-                if DebrisSystem::set_pixel_direct_checked(&mut self.chunk_manager, world_pos.x, world_pos.y, material_id) {
+                if DebrisSystem::set_pixel_direct_checked(
+                    &mut self.chunk_manager,
+                    world_pos.x,
+                    world_pos.y,
+                    material_id,
+                ) {
                     placed += 1;
                 } else {
                     failed += 1;
@@ -1401,20 +1231,23 @@ impl World {
         }
     }
 
-
     /// Clear all chunks from the world
     pub fn clear_all_chunks(&mut self) {
-        self.persistence_system.clear_all_chunks(&mut self.chunk_manager);
+        self.persistence_system
+            .clear_all_chunks(&mut self.chunk_manager);
     }
 
     /// Add a chunk to the world
     pub fn add_chunk(&mut self, chunk: Chunk) {
-        self.persistence_system.add_chunk(&mut self.chunk_manager, chunk, self.player.position);
+        self.persistence_system
+            .add_chunk(&mut self.chunk_manager, chunk, self.player.position);
     }
 
     /// Initialize persistent world (load or generate)
     pub fn load_persistent_world(&mut self) {
-        let _ = self.persistence_system.load_persistent_world(&mut self.chunk_manager, &mut self.player);
+        let _ = self
+            .persistence_system
+            .load_persistent_world(&mut self.chunk_manager, &mut self.player);
         // Initialize light levels before first CA update
         let active_chunks = self.chunk_manager.active_chunks.clone();
         self.light_system.initialize_light(
@@ -1426,17 +1259,20 @@ impl World {
 
     /// Disable persistence for demo levels
     pub fn disable_persistence(&mut self) {
-        self.persistence_system.disable_persistence(&mut self.chunk_manager);
+        self.persistence_system
+            .disable_persistence(&mut self.chunk_manager);
     }
 
     /// Save all dirty chunks (periodic auto-save)
     pub fn save_dirty_chunks(&mut self) {
-        self.persistence_system.save_dirty_chunks(&mut self.chunk_manager);
+        self.persistence_system
+            .save_dirty_chunks(&mut self.chunk_manager);
     }
 
     /// Save all chunks and metadata (manual save)
     pub fn save_all_dirty_chunks(&mut self) {
-        self.persistence_system.save_all_dirty_chunks(&mut self.chunk_manager, &self.player);
+        self.persistence_system
+            .save_all_dirty_chunks(&mut self.chunk_manager, &self.player);
     }
 
     /// Check all pixels in a chunk for state changes based on temperature

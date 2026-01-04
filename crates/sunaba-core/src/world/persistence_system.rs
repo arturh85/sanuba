@@ -6,7 +6,7 @@ use glam::IVec2;
 use super::chunk_manager::ChunkManager;
 use super::generation::WorldGenerator;
 use super::persistence::{ChunkPersistence, WorldMetadata};
-use super::{Chunk, CHUNK_SIZE};
+use super::{CHUNK_SIZE, Chunk};
 use crate::entity::player::Player;
 
 /// Manages chunk persistence, loading, and eviction
@@ -140,11 +140,7 @@ impl PersistenceSystem {
     }
 
     /// Load nearby chunks dynamically as player moves (called when entering new chunk)
-    pub fn load_nearby_chunks(
-        &mut self,
-        chunk_manager: &mut ChunkManager,
-        player_pos: glam::Vec2,
-    ) {
+    pub fn load_nearby_chunks(&mut self, chunk_manager: &mut ChunkManager, player_pos: glam::Vec2) {
         // Don't auto-load chunks in ephemeral mode - use only chunks explicitly requested
         if chunk_manager.ephemeral_chunks {
             return;
@@ -254,11 +250,7 @@ impl PersistenceSystem {
     pub fn save_dirty_chunks(&mut self, chunk_manager: &mut ChunkManager) {
         if let Some(persistence) = &self.persistence {
             let mut saved_count = 0;
-            let total_dirty = chunk_manager
-                .chunks
-                .values()
-                .filter(|c| c.dirty)
-                .count();
+            let total_dirty = chunk_manager.chunks.values().filter(|c| c.dirty).count();
 
             if total_dirty > 0 {
                 log::debug!("[SAVE] Starting auto-save of {} dirty chunks", total_dirty);
@@ -311,7 +303,7 @@ impl PersistenceSystem {
                 spawn_point: (player.position.x, player.position.y),
                 created_at: String::new(), // Preserved from load
                 last_played,
-                play_time_seconds: 0,                   // TODO: track play time
+                play_time_seconds: 0,              // TODO: track play time
                 player_data: Some(player.clone()), // Save player inventory, health, hunger
             };
 

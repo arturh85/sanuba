@@ -3,10 +3,9 @@
 use glam::IVec2;
 use std::collections::HashMap;
 
-use super::{Chunk, CHUNK_SIZE, pixel_flags};
+use super::{CHUNK_SIZE, Chunk, pixel_flags};
 use crate::simulation::{
-    MaterialId, Materials, StateChangeSystem,
-    add_heat_at_pixel, get_temperature_at_pixel,
+    MaterialId, Materials, StateChangeSystem, add_heat_at_pixel, get_temperature_at_pixel,
 };
 use crate::world::{SimStats, WorldRng};
 
@@ -63,15 +62,7 @@ impl ChemistrySystem {
         }
 
         // 2. Fire behaves like gas (rises)
-        CellularAutomataUpdater::update_gas(
-            chunks,
-            chunk_pos,
-            x,
-            y,
-            materials,
-            stats,
-            rng,
-        );
+        CellularAutomataUpdater::update_gas(chunks, chunk_pos, x, y, materials, stats, rng);
 
         // 3. Fire has limited lifetime - random chance to become smoke
         if rng.check_probability(0.02) {
@@ -143,7 +134,11 @@ impl ChemistrySystem {
                     if neighbor_pixel.is_empty() {
                         // Set fire pixel
                         if let Some(target_chunk) = chunks.get_mut(&neighbor_chunk_pos) {
-                            target_chunk.set_pixel(local_x, local_y, super::Pixel::new(MaterialId::FIRE));
+                            target_chunk.set_pixel(
+                                local_x,
+                                local_y,
+                                super::Pixel::new(MaterialId::FIRE),
+                            );
                         }
                         break;
                     }
@@ -194,5 +189,4 @@ impl ChemistrySystem {
             }
         }
     }
-
 }

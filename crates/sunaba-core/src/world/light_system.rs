@@ -102,7 +102,12 @@ impl LightSystem {
     }
 
     /// Get light level at world coordinates (0-15)
-    pub fn get_light_at(&self, chunk_manager: &ChunkManager, world_x: i32, world_y: i32) -> Option<u8> {
+    pub fn get_light_at(
+        &self,
+        chunk_manager: &ChunkManager,
+        world_x: i32,
+        world_y: i32,
+    ) -> Option<u8> {
         let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
         chunk_manager
             .chunks
@@ -111,7 +116,13 @@ impl LightSystem {
     }
 
     /// Set light level at world coordinates (0-15)
-    pub fn set_light_at(&mut self, chunk_manager: &mut ChunkManager, world_x: i32, world_y: i32, level: u8) {
+    pub fn set_light_at(
+        &mut self,
+        chunk_manager: &mut ChunkManager,
+        world_x: i32,
+        world_y: i32,
+        level: u8,
+    ) {
         let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
         if let Some(chunk) = chunk_manager.chunks.get_mut(&chunk_pos) {
             chunk.set_light(local_x, local_y, level);

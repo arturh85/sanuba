@@ -21,11 +21,7 @@ impl DebrisSystem {
 
     /// Update falling chunks physics and return settled chunks
     /// Takes self mutably and a WorldCollisionQuery for collision detection
-    pub fn update<W: WorldCollisionQuery>(
-        &mut self,
-        dt: f32,
-        world: &W,
-    ) -> Vec<FallingChunk> {
+    pub fn update<W: WorldCollisionQuery>(&mut self, dt: f32, world: &W) -> Vec<FallingChunk> {
         self.falling_chunks.update(dt, world)
     }
 
