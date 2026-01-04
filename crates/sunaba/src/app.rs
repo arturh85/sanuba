@@ -315,6 +315,94 @@ impl App {
         }
     }
 
+    /// Connect to a multiplayer server
+    #[cfg(feature = "multiplayer")]
+    pub async fn connect_to_server(&mut self, server_url: String) -> anyhow::Result<()> {
+        let manager = self.multiplayer_manager.as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Multiplayer manager not initialized"))?;
+
+        // Check if already connected
+        if manager.state.is_connected() {
+            log::warn!("Already connected to server");
+            return Ok(());
+        }
+
+        log::info!("Connecting to server: {}", server_url);
+        manager.start_connecting(server_url.clone());
+
+        // Save singleplayer world before connecting
+        log::info!("Saving singleplayer world...");
+        self.world.save_all_dirty_chunks();
+        manager.set_singleplayer_saved(true);
+
+        // Attempt connection
+        match manager.client.connect(&server_url, "sunaba").await {
+            Ok(_) => {
+                log::info!("Connected successfully");
+
+                // Subscribe to world data
+                if let Err(e) = manager.client.subscribe_world().await {
+                    let error_msg = format!("Failed to subscribe to world: {}", e);
+                    log::error!("{}", error_msg);
+                    manager.mark_error(error_msg, server_url);
+                    return Err(anyhow::anyhow!("Subscription failed"));
+                }
+
+                // Disable persistence for multiplayer world (server is authoritative)
+                self.world.disable_persistence();
+
+                // Mark as connected
+                manager.mark_connected(server_url);
+
+                // Initialize metrics collector
+                self.ui_state.metrics_collector =
+                    Some(crate::multiplayer::metrics::MetricsCollector::new());
+
+                log::info!("Multiplayer connection established");
+                Ok(())
+            }
+            Err(e) => {
+                let error_msg = format!("Connection failed: {}", e);
+                log::error!("{}", error_msg);
+                manager.mark_error(error_msg.clone(), server_url);
+                Err(anyhow::anyhow!(error_msg))
+            }
+        }
+    }
+
+    /// Disconnect from multiplayer server and restore singleplayer world
+    #[cfg(feature = "multiplayer")]
+    pub async fn disconnect_from_server(&mut self) -> anyhow::Result<()> {
+        let manager = self.multiplayer_manager.as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Multiplayer manager not initialized"))?;
+
+        if manager.state.is_disconnected() {
+            log::warn!("Already disconnected");
+            return Ok(());
+        }
+
+        log::info!("Disconnecting from server...");
+
+        // Disconnect client
+        manager.client.disconnect().await?;
+
+        // Clear multiplayer world chunks
+        // Note: World has no clear_all method, but we'll reload singleplayer which replaces chunks
+        log::info!("Restoring singleplayer world...");
+
+        // Restore singleplayer world from disk
+        self.world.load_persistent_world();
+
+        // Mark as disconnected
+        manager.mark_disconnected();
+
+        // Clear metrics collector
+        self.ui_state.metrics_collector = None;
+
+        log::info!("Disconnected - singleplayer world restored");
+        Ok(())
+    }
+
     /// Select a hotbar slot and equip/unequip tools
     fn select_hotbar_slot(&mut self, slot: usize) {
         // Select the inventory slot
@@ -627,9 +715,24 @@ impl App {
             }
         }
 
-        // Update simulation with timing (disabled in multiplayer - server is authoritative)
-        #[cfg(not(feature = "multiplayer"))]
-        {
+        // Update simulation with timing (disabled when connected to multiplayer - server is authoritative)
+        // Run simulation if: (1) multiplayer disabled, OR (2) multiplayer enabled but disconnected
+        let should_simulate = {
+            #[cfg(feature = "multiplayer")]
+            {
+                // Only simulate if not connected
+                self.multiplayer_manager
+                    .as_ref()
+                    .map(|m| !m.state.is_connected())
+                    .unwrap_or(true)
+            }
+            #[cfg(not(feature = "multiplayer"))]
+            {
+                true
+            }
+        };
+
+        if should_simulate {
             #[cfg(feature = "profiling")]
             puffin::profile_scope!("simulation");
             self.ui_state.stats.begin_sim();

@@ -14,11 +14,23 @@ load:
 profile:
     cargo run -p sunaba --bin sunaba --release --features profiling
 
-# Run multiplayer client (connects to local SpacetimeDB server)
+# Run multiplayer client (connects to specified SpacetimeDB server)
 start-multiplayer server="http://localhost:3000":
     @echo "Starting multiplayer client (connecting to {{server}})..."
     @echo "Logs will appear in the game window - check the console there"
-    RUST_LOG=info cargo run -p sunaba --bin sunaba --release --features multiplayer_native
+    RUST_LOG=info cargo run -p sunaba --bin sunaba --release --features multiplayer_native -- --server {{server}}
+
+# Join local development server (localhost:3000)
+join-local:
+    just start-multiplayer http://localhost:3000
+
+# Join official server (sunaba.app42.blue)
+join-official:
+    just start-multiplayer https://sunaba.app42.blue
+
+# Join production server (IP)
+join-prod:
+    just start-multiplayer http://10.10.10.23:3000
 
 [unix]
 test: fmt clippy

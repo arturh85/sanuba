@@ -36,6 +36,11 @@ struct Args {
     /// Creature archetype: all (default), evolved, spider, snake, worm, flyer
     #[arg(long, default_value = "all")]
     archetype: String,
+
+    /// Server URL to connect to on startup (multiplayer mode)
+    #[arg(long)]
+    #[cfg(feature = "multiplayer")]
+    server: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -85,7 +90,15 @@ fn main() -> anyhow::Result<()> {
     }
 
     log::info!("Starting Sunaba");
-    pollster::block_on(run())
+
+    // Extract server URL for multiplayer if provided
+    #[cfg(feature = "multiplayer")]
+    let server_url = args.server;
+
+    #[cfg(not(feature = "multiplayer"))]
+    let server_url: Option<String> = None;
+
+    pollster::block_on(run(server_url))
 }
 
 #[cfg(feature = "headless")]
@@ -148,7 +161,18 @@ fn run_training(args: &Args) -> anyhow::Result<()> {
     env.run()
 }
 
-async fn run() -> anyhow::Result<()> {
-    let (app, event_loop) = App::new().await?;
+async fn run(server_url: Option<String>) -> anyhow::Result<()> {
+    let (mut app, event_loop) = App::new().await?;
+
+    // If server URL provided, connect to multiplayer server before starting game loop
+    #[cfg(feature = "multiplayer")]
+    if let Some(url) = server_url {
+        log::info!("Connecting to server: {}", url);
+        if let Err(e) = app.connect_to_server(url).await {
+            log::error!("Failed to connect to server: {}", e);
+            log::info!("Continuing in singleplayer mode");
+        }
+    }
+
     App::run(event_loop, app)
 }
