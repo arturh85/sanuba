@@ -135,19 +135,19 @@ spacetime-stop:
 
 # Publish to local SpacetimeDB instance
 spacetime-publish-local name="sunaba":
-    spacetime publish --skip-clippy -c local {{name}} crates/sunaba-server
+    cd crates/sunaba-server && spacetime publish {{name}} -s http://localhost:3000
 
 # Publish to SpacetimeDB cloud (requires auth)
 spacetime-publish-cloud name="sunaba":
-    spacetime publish --skip-clippy {{name}} crates/sunaba-server
+    cd crates/sunaba-server && spacetime publish {{name}}
 
 # View SpacetimeDB logs
 spacetime-logs name="sunaba":
-    spacetime logs -c local {{name}}
+    spacetime logs {{name}}
 
 # Follow SpacetimeDB logs (tail -f style)
 spacetime-logs-tail name="sunaba":
-    spacetime logs -c local {{name}} -f
+    spacetime logs {{name}} -f
 
 # Generate TypeScript client SDK
 spacetime-generate-ts name="sunaba" output="web/src/spacetime":
