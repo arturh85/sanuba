@@ -154,7 +154,7 @@ impl CppnGenome {
                     .unwrap();
 
                 let connection = CppnConnection {
-                    weight: (rand::random::<f32>() * 2.0 - 1.0) * 0.5, // [-0.5, 0.5]
+                    weight: 0.1, // Small deterministic weight for minimal network
                     enabled: true,
                     innovation_number: next_innovation,
                 };
@@ -303,6 +303,7 @@ impl CppnGenome {
 
     /// Mutate connection weights with given probability and perturbation power
     /// Returns number of weights mutated
+    #[cfg(feature = "evolution")]
     pub fn mutate_weights(&mut self, mutation_rate: f32, mutation_power: f32) -> usize {
         use rand::Rng;
         let mut rng = rand::rng();
@@ -332,6 +333,7 @@ impl CppnGenome {
 
     /// Add a new connection between two random unconnected nodes
     /// Returns true if a connection was added
+    #[cfg(feature = "evolution")]
     pub fn add_connection(&mut self) -> bool {
         use rand::Rng;
         use rand::prelude::IndexedRandom;
@@ -403,6 +405,7 @@ impl CppnGenome {
     /// Split an existing connection by adding a new node
     /// The old connection is disabled, and two new connections are created
     /// Returns true if a node was added
+    #[cfg(feature = "evolution")]
     pub fn add_node(&mut self) -> bool {
         use rand::Rng;
         use rand::prelude::IndexedRandom;
@@ -489,6 +492,7 @@ impl CppnGenome {
 
     /// Randomly enable or disable a connection
     /// Returns true if a connection was toggled
+    #[cfg(feature = "evolution")]
     pub fn toggle_connection(&mut self, disable_rate: f32) -> bool {
         use rand::Rng;
         use rand::prelude::IndexedRandom;
@@ -520,6 +524,7 @@ impl CppnGenome {
     }
 
     /// Apply all mutations with given probabilities
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, config: &MutationConfig) {
         use rand::Rng;
         let mut rng = rand::rng();
@@ -572,6 +577,7 @@ impl Default for MutationConfig {
 /// Crossover two CPPN genomes using NEAT-style gene alignment
 /// parent1_fitness and parent2_fitness determine which parent's genes are preferred
 /// Returns a new offspring genome
+#[cfg(feature = "evolution")]
 pub fn crossover_cppn(
     parent1: &CppnGenome,
     parent2: &CppnGenome,
@@ -716,6 +722,7 @@ pub fn crossover_cppn(
 
 /// Crossover two controller genomes
 /// Simply averages weights for matching dimensions
+#[cfg(feature = "evolution")]
 pub fn crossover_controller(
     parent1: &ControllerGenome,
     parent2: &ControllerGenome,
@@ -765,6 +772,7 @@ pub fn crossover_controller(
 }
 
 /// Crossover two creature genomes
+#[cfg(feature = "evolution")]
 pub fn crossover_genome(
     parent1: &CreatureGenome,
     parent2: &CreatureGenome,
@@ -853,7 +861,32 @@ pub struct ControllerGenome {
 }
 
 impl ControllerGenome {
+    /// Create minimal controller genome with small deterministic weights
+    pub fn minimal(hidden_dim: usize, message_passing_steps: usize) -> Self {
+        // Estimate sizes (will be adjusted when morphology is known)
+        let input_dim_estimate = 10; // Joint angles, velocities, contacts, etc.
+        let output_dim_estimate = 5; // Motor commands per joint
+
+        let message_weight_count = input_dim_estimate * hidden_dim;
+        let update_weight_count = hidden_dim * hidden_dim;
+        let output_weight_count = hidden_dim * output_dim_estimate;
+
+        // Use small constant weights for deterministic initialization
+        let message_weights = vec![0.1; message_weight_count];
+        let update_weights = vec![0.1; update_weight_count];
+        let output_weights = vec![0.1; output_weight_count];
+
+        Self {
+            message_weights,
+            update_weights,
+            output_weights,
+            message_passing_steps,
+            hidden_dim,
+        }
+    }
+
     /// Create random controller genome
+    #[cfg(feature = "evolution")]
     pub fn random(hidden_dim: usize, message_passing_steps: usize) -> Self {
         use rand::Rng;
         let mut rng = rand::rng();
@@ -893,6 +926,7 @@ impl ControllerGenome {
     }
 
     /// Mutate controller weights
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, mutation_rate: f32, mutation_power: f32) {
         use rand::Rng;
         let mut rng = rand::rng();
@@ -970,6 +1004,7 @@ pub struct CreatureGenome {
 impl CreatureGenome {
     /// Create test biped genome (for validation)
     /// Simple two-legged creature with central body
+    #[cfg(feature = "evolution")]
     pub fn test_biped() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(16, 2);
@@ -996,6 +1031,7 @@ impl CreatureGenome {
 
     /// Create test quadruped genome (for validation)
     /// Four-legged creature
+    #[cfg(feature = "evolution")]
     pub fn test_quadruped() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(24, 3);
@@ -1022,6 +1058,7 @@ impl CreatureGenome {
 
     /// Create test worm genome (for validation)
     /// Segmented creature with many body parts
+    #[cfg(feature = "evolution")]
     pub fn test_worm() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(8, 1);
@@ -1053,7 +1090,7 @@ impl CreatureGenome {
     pub fn archetype_spider() -> Self {
         let cppn = CppnGenome::minimal();
         // 8 legs = 8 motor outputs, larger hidden dim for coordination
-        let controller = ControllerGenome::random(32, 3);
+        let controller = ControllerGenome::minimal(32, 3);
         let traits = BehavioralTraits {
             aggression: 0.4,
             curiosity: 0.6,
@@ -1079,7 +1116,7 @@ impl CreatureGenome {
     pub fn archetype_snake() -> Self {
         let cppn = CppnGenome::minimal();
         // 5 joints between 6 segments, need coordination for wave propagation
-        let controller = ControllerGenome::random(24, 3);
+        let controller = ControllerGenome::minimal(24, 3);
         let traits = BehavioralTraits {
             aggression: 0.3,
             curiosity: 0.5,
@@ -1105,7 +1142,7 @@ impl CreatureGenome {
     pub fn archetype_worm() -> Self {
         let cppn = CppnGenome::minimal();
         // 3 joints between 4 segments, simple but flexible
-        let controller = ControllerGenome::random(12, 2);
+        let controller = ControllerGenome::minimal(12, 2);
         let traits = BehavioralTraits {
             aggression: 0.1,
             curiosity: 0.4,
@@ -1131,7 +1168,7 @@ impl CreatureGenome {
     pub fn archetype_flyer() -> Self {
         let cppn = CppnGenome::minimal();
         // 2 wings + 1 tail, need fast coordination for flight
-        let controller = ControllerGenome::random(20, 2);
+        let controller = ControllerGenome::minimal(20, 2);
         let traits = BehavioralTraits {
             aggression: 0.2,
             curiosity: 0.8, // Curious/exploratory
@@ -1154,6 +1191,7 @@ impl CreatureGenome {
     }
 
     /// Mutate the complete genome
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, cppn_config: &MutationConfig, controller_rate: f32) {
         use rand::Rng;
         let mut rng = rand::rng();

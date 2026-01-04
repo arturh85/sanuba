@@ -12,7 +12,9 @@ use glam::Vec2;
 
 pub mod behavior;
 pub mod creature;
+#[cfg(feature = "evolution")]
 pub mod critter;
+pub mod deterministic_rng;
 pub mod execution_state;
 pub mod genome;
 pub mod morphology;
@@ -27,6 +29,7 @@ pub mod world_interaction;
 
 // Re-export main types for convenience
 pub use creature::Creature;
+#[cfg(feature = "evolution")]
 pub use critter::{Critter, CritterManager, CritterState};
 pub use execution_state::{CreatureExecutionState, ExecutionInput, ExecutionState};
 pub use genome::{ControllerGenome, CreatureGenome};

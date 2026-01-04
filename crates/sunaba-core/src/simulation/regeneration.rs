@@ -2,11 +2,18 @@
 //!
 //! Handles periodic spawning of renewable resources like fruit from plant matter.
 
-use crate::simulation::MaterialId;
-use crate::world::{CHUNK_SIZE, Chunk, Pixel};
 use glam::IVec2;
-use rand::Rng;
 use std::collections::HashMap;
+
+#[cfg(feature = "regeneration")]
+use crate::simulation::MaterialId;
+#[cfg(feature = "regeneration")]
+use crate::world::{CHUNK_SIZE, Chunk, Pixel};
+#[cfg(feature = "regeneration")]
+use rand::Rng;
+
+#[cfg(not(feature = "regeneration"))]
+use crate::world::Chunk;
 
 /// Manages resource regeneration (fruit spawning, etc.)
 pub struct RegenerationSystem {
@@ -24,6 +31,7 @@ impl RegenerationSystem {
     /// Update regeneration system
     /// Throttled to run every 5 seconds
     /// Only processes active chunks
+    #[cfg(feature = "regeneration")]
     pub fn update(&mut self, chunks: &mut HashMap<IVec2, Chunk>, active_chunks: &[IVec2], dt: f32) {
         const REGENERATION_INTERVAL: f32 = 5.0; // Check every 5 seconds
 
@@ -43,7 +51,14 @@ impl RegenerationSystem {
         }
     }
 
+    /// Update regeneration system (disabled, no-op)
+    #[cfg(not(feature = "regeneration"))]
+    pub fn update(&mut self, _chunks: &mut HashMap<IVec2, Chunk>, _active_chunks: &[IVec2], _dt: f32) {
+        // No-op when regeneration feature is disabled
+    }
+
     /// Spawn fruit below plant matter pixels
+    #[cfg(feature = "regeneration")]
     fn spawn_fruit_in_chunk(&self, chunk: &mut Chunk) {
         const FRUIT_SPAWN_CHANCE: f32 = 0.05; // 5% chance per plant pixel per check
         let mut rng = rand::rng();

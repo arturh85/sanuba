@@ -473,11 +473,13 @@ pub fn spawn_creature(ctx: &ReducerContext, archetype: String, x: f32, y: f32) {
         _ => CreatureArchetype::Evolved,
     };
 
-    // Create genome based on archetype (use appropriate test genome)
+    // Create genome based on archetype
     let genome = match archetype_enum {
-        CreatureArchetype::Spider => CreatureGenome::test_quadruped(),
-        CreatureArchetype::Snake | CreatureArchetype::Worm => CreatureGenome::test_worm(),
-        CreatureArchetype::Flyer | CreatureArchetype::Evolved => CreatureGenome::test_biped(),
+        CreatureArchetype::Spider => CreatureGenome::archetype_spider(),
+        CreatureArchetype::Snake => CreatureGenome::archetype_snake(),
+        CreatureArchetype::Worm => CreatureGenome::archetype_worm(),
+        CreatureArchetype::Flyer => CreatureGenome::archetype_flyer(),
+        CreatureArchetype::Evolved => CreatureGenome::archetype_spider(), // Default to spider for evolved
     };
     let morph_config = MorphologyConfig::default();
     let morphology = archetype_enum.create_morphology(&genome, &morph_config);

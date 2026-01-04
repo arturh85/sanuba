@@ -5,8 +5,8 @@ edition.workspace = true
 
 [dependencies]
 sunaba-simulation = { path = "../sunaba-simulation" }
-sunaba-creature = { path = "../sunaba-creature" }
-ahash = "0.8"
+sunaba-creature = { path = "../sunaba-creature", default-features = false }
+ahash = { version = "0.8", default-features = false, features = ["compile-time-rng", "std"] }
 anyhow = "1.0"
 bincode-next = { version = "2.0", features = ["serde"] }
 bitflags = "2.4"
@@ -15,12 +15,18 @@ instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
 noise = "0.9"
 petgraph = "0.6"
-rand = "0.9"
-rand_xoshiro = "0.7"
 ron = "0.12"
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5"
 thiserror = "1.0"
+
+[dependencies.rand]
+version = "0.8"
+optional = true
+
+[dependencies.rand_xoshiro]
+version = "0.6"
+optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4"
@@ -28,4 +34,7 @@ lz4_flex = "0.11"
 puffin = { git = "https://github.com/blip-radar/puffin.git", branch = "egui-0.33", optional = true }
 
 [features]
+default = ["regeneration", "evolution"]
+regeneration = ["rand", "rand_xoshiro"]
+evolution = ["sunaba-creature/evolution"]
 profiling = ["puffin", "sunaba-creature/profiling"]

@@ -119,22 +119,25 @@ impl World {
         world.initialize_light();
 
         // Spawn 3 test creatures near spawn point with spacing
-        use crate::creature::genome::CreatureGenome;
+        #[cfg(feature = "evolution")]
+        {
+            use crate::creature::genome::CreatureGenome;
 
-        world
-            .creature_manager
-            .spawn_creature(CreatureGenome::test_biped(), glam::Vec2::new(-20.0, 100.0));
+            world
+                .creature_manager
+                .spawn_creature(CreatureGenome::test_biped(), glam::Vec2::new(-20.0, 100.0));
 
-        world.creature_manager.spawn_creature(
-            CreatureGenome::test_quadruped(),
-            glam::Vec2::new(0.0, 100.0),
-        );
+            world.creature_manager.spawn_creature(
+                CreatureGenome::test_quadruped(),
+                glam::Vec2::new(0.0, 100.0),
+            );
 
-        world
-            .creature_manager
-            .spawn_creature(CreatureGenome::test_worm(), glam::Vec2::new(20.0, 100.0));
+            world
+                .creature_manager
+                .spawn_creature(CreatureGenome::test_worm(), glam::Vec2::new(20.0, 100.0));
 
-        log::info!("Spawned 3 test creatures at startup");
+            log::info!("Spawned 3 test creatures at startup");
+        }
 
         world
     }
@@ -1240,8 +1243,8 @@ impl World {
             return;
         }
 
-        // Try to fall diagonally (randomized for symmetry)
-        let try_left_first = rand::random::<bool>();
+        // Try to fall diagonally (alternating by position for symmetry)
+        let try_left_first = (world_x + world_y) % 2 == 0;
 
         if try_left_first {
             if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
@@ -1272,8 +1275,8 @@ impl World {
             return;
         }
 
-        // Try to fall diagonally
-        let try_left_first = rand::random::<bool>();
+        // Try to fall diagonally (alternating by position for symmetry)
+        let try_left_first = (world_x + world_y) % 2 == 0;
 
         if try_left_first {
             if self.try_move_world(world_x, world_y, world_x - 1, world_y - 1, stats) {
@@ -1321,8 +1324,8 @@ impl World {
             return;
         }
 
-        // Try to rise diagonally
-        let try_left_first = rand::random::<bool>();
+        // Try to rise diagonally (alternating by position for symmetry)
+        let try_left_first = (world_x + world_y) % 2 == 0;
 
         if try_left_first {
             if self.try_move_world(world_x, world_y, world_x - 1, world_y + 1, stats) {
@@ -2004,10 +2007,13 @@ impl World {
         // 2. Fire behaves like gas (rises)
         self.update_gas(chunk_pos, x, y, stats);
 
-        // 3. Fire has limited lifetime - random chance to become smoke
-        if rand::random::<f32>() < 0.02 {
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+        // 3. Fire has limited lifetime - deterministic chance to become smoke
+        // Use position hash for pseudo-random but deterministic behavior
+        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+        let hash = ((world_x * 73856093) ^ (world_y * 19349663)) as u32;
+        let pseudo_rand = (hash % 100) as f32 / 100.0;
+        if pseudo_rand < 0.02 {
             self.set_pixel(world_x, world_y, MaterialId::SMOKE);
         }
     }
@@ -2062,11 +2068,12 @@ impl World {
         let pixel = chunk.get_pixel(x, y);
         let material = self.materials.get(pixel.material_id);
 
-        // Probability check - material burns gradually
-        if rand::random::<f32>() < material.burn_rate {
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
-
+        // Probability check - material burns gradually (deterministic)
+        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+        let hash = ((world_x * 73856093) ^ (world_y * 19349663)) as u32;
+        let pseudo_rand = (hash % 10000) as f32 / 10000.0;
+        if pseudo_rand < material.burn_rate {
             // Transform to burns_to material (or air if not specified)
             let new_material = material.burns_to.unwrap_or(MaterialId::AIR);
             self.set_pixel(world_x, world_y, new_material);
@@ -2176,8 +2183,10 @@ impl World {
                 pressure,
                 &neighbor_materials,
             ) {
-                // Probability check
-                if rand::random::<f32>() < reaction.probability {
+                // Probability check (deterministic)
+                let hash = ((world_x * 73856093) ^ (world_y * 19349663)) as u32;
+                let pseudo_rand = (hash % 10000) as f32 / 10000.0;
+                if pseudo_rand < reaction.probability {
                     // Apply reaction - get correct outputs based on material order
                     let (output_a, output_b) = self.reactions.get_outputs(
                         reaction,

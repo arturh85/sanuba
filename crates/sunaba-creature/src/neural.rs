@@ -111,9 +111,10 @@ impl SimpleNeuralController {
     }
 
     /// Create random controller for testing
+    #[cfg(feature = "evolution")]
     pub fn random(input_dim: usize, hidden_dim: usize, output_dim: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Calculate weight count: input->hidden + hidden->output
         let input_to_hidden = input_dim * hidden_dim;
@@ -202,8 +203,7 @@ impl DeepNeuralController {
     /// - hidden_dim=16 (biped) -> 48, 24
     /// - hidden_dim=24 (quadruped) -> 72, 36
     pub fn from_genome(genome: &ControllerGenome, input_dim: usize, output_dim: usize) -> Self {
-        use rand::Rng;
-        use rand::SeedableRng;
+        use crate::deterministic_rng::DeterministicRng;
 
         // Scale hidden layer sizes from genome's hidden_dim
         let scale = genome.hidden_dim as f32 / 16.0;
@@ -223,27 +223,26 @@ impl DeepNeuralController {
             .chain(genome.update_weights.iter())
             .chain(genome.output_weights.iter())
             .fold(0u64, |acc, &w| acc.wrapping_add((w * 1000.0) as i64 as u64));
-        let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(seed);
+        let mut rng = DeterministicRng::from_seed(seed);
 
         // Generate all weights randomly, seeded by genome
         // Xavier/Glorot initialization scaled by layer sizes
-        let weights: Vec<f32> = (0..expected_size)
-            .map(|i| {
-                // Determine which layer this weight belongs to for proper scaling
-                let in_h1 = input_dim * hidden1_dim;
-                let h1_h2 = hidden1_dim * hidden2_dim;
+        let mut weights = Vec::with_capacity(expected_size);
+        for i in 0..expected_size {
+            // Determine which layer this weight belongs to for proper scaling
+            let in_h1 = input_dim * hidden1_dim;
+            let h1_h2 = hidden1_dim * hidden2_dim;
 
-                let scale = if i < in_h1 {
-                    (2.0 / (input_dim + hidden1_dim) as f32).sqrt()
-                } else if i < in_h1 + h1_h2 {
-                    (2.0 / (hidden1_dim + hidden2_dim) as f32).sqrt()
-                } else {
-                    (2.0 / (hidden2_dim + output_dim) as f32).sqrt()
-                };
+            let scale = if i < in_h1 {
+                (2.0 / (input_dim + hidden1_dim) as f32).sqrt()
+            } else if i < in_h1 + h1_h2 {
+                (2.0 / (hidden1_dim + hidden2_dim) as f32).sqrt()
+            } else {
+                (2.0 / (hidden2_dim + output_dim) as f32).sqrt()
+            };
 
-                rng.random_range(-1.0..1.0) * scale
-            })
-            .collect();
+            weights.push(rng.gen_range_f32(-1.0, 1.0) * scale);
+        }
 
         Self {
             weights,
@@ -257,6 +256,7 @@ impl DeepNeuralController {
     }
 
     /// Create random controller for testing
+    #[cfg(feature = "evolution")]
     pub fn random(
         input_dim: usize,
         hidden1_dim: usize,
@@ -264,7 +264,7 @@ impl DeepNeuralController {
         output_dim: usize,
     ) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         let total_weights =
             input_dim * hidden1_dim + hidden1_dim * hidden2_dim + hidden2_dim * output_dim;

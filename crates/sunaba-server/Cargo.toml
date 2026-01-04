@@ -9,12 +9,12 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # SpacetimeDB
-spacetimedb = "1.0"
+spacetimedb = "1.11.1"
 
 # Sunaba crates (WASM-compatible)
 sunaba-simulation = { path = "../sunaba-simulation" }
-sunaba-creature = { path = "../sunaba-creature" }
-sunaba-core = { path = "../sunaba-core" }
+sunaba-creature = { path = "../sunaba-creature", default-features = false }
+sunaba-core = { path = "../sunaba-core", default-features = false }
 
 # Serialization
 bincode-next = { version = "2.0", features = ["serde"] }
