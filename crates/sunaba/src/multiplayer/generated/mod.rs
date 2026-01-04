@@ -20,6 +20,7 @@ pub mod creature_tick_timer_table;
 pub mod creature_tick_timer_type;
 pub mod player_mine_reducer;
 pub mod player_place_material_reducer;
+pub mod player_respawn_reducer;
 pub mod player_table;
 pub mod player_type;
 pub mod player_update_position_reducer;
@@ -60,6 +61,9 @@ pub use creature_tick_timer_type::CreatureTickTimer;
 pub use player_mine_reducer::{PlayerMineCallbackId, player_mine, set_flags_for_player_mine};
 pub use player_place_material_reducer::{
     PlayerPlaceMaterialCallbackId, player_place_material, set_flags_for_player_place_material,
+};
+pub use player_respawn_reducer::{
+    PlayerRespawnCallbackId, player_respawn, set_flags_for_player_respawn,
 };
 pub use player_table::*;
 pub use player_type::Player;
@@ -117,6 +121,7 @@ pub enum Reducer {
         world_y: i32,
         material_id: u16,
     },
+    PlayerRespawn,
     PlayerUpdatePosition {
         x: f32,
         y: f32,
@@ -157,6 +162,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreatureTick { .. } => "creature_tick",
             Reducer::PlayerMine { .. } => "player_mine",
             Reducer::PlayerPlaceMaterial { .. } => "player_place_material",
+            Reducer::PlayerRespawn => "player_respawn",
             Reducer::PlayerUpdatePosition { .. } => "player_update_position",
             Reducer::RebuildWorld => "rebuild_world",
             Reducer::RequestPing { .. } => "request_ping",
@@ -202,6 +208,10 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
             "player_place_material" => Ok(__sdk::parse_reducer_args::<
                 player_place_material_reducer::PlayerPlaceMaterialArgs,
             >("player_place_material", &value.args)?
+            .into()),
+            "player_respawn" => Ok(__sdk::parse_reducer_args::<
+                player_respawn_reducer::PlayerRespawnArgs,
+            >("player_respawn", &value.args)?
             .into()),
             "player_update_position" => Ok(__sdk::parse_reducer_args::<
                 player_update_position_reducer::PlayerUpdatePositionArgs,

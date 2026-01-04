@@ -65,7 +65,14 @@ pub fn load_or_create_chunk(
 
 /// Sync dirty chunks from World to database
 /// CRITICAL OPTIMIZATION: Only syncs chunks marked dirty by simulation
-pub fn sync_dirty_chunks_to_db(ctx: &ReducerContext, world: &sunaba_core::world::World, tick: u64) {
+/// Returns the number of chunks synced
+pub fn sync_dirty_chunks_to_db(
+    ctx: &ReducerContext,
+    world: &sunaba_core::world::World,
+    tick: u64,
+) -> u32 {
+    let mut synced_count = 0;
+
     for (pos, chunk) in world.chunks_iter() {
         // Skip clean chunks (optimization)
         if !chunk.is_dirty() {
@@ -100,7 +107,11 @@ pub fn sync_dirty_chunks_to_db(ctx: &ReducerContext, world: &sunaba_core::world:
                 last_modified_tick: tick,
             });
         }
+
+        synced_count += 1;
     }
+
+    synced_count
 }
 
 /// Get chunks at radius r from center (for settlement system)

@@ -3,6 +3,7 @@
 pub mod controls_help;
 pub mod crafting_ui;
 pub mod dock;
+pub mod game_over_panel;
 pub mod hud;
 pub mod inventory_ui;
 pub mod level_selector;
@@ -20,6 +21,7 @@ pub mod ui_state;
 pub use controls_help::ControlsHelpState;
 pub use crafting_ui::CraftingUI;
 pub use dock::{DockManager, DockTab};
+pub use game_over_panel::GameOverPanelState;
 pub use hud::Hud;
 pub use inventory_ui::InventoryPanel;
 pub use level_selector::LevelSelectorState;

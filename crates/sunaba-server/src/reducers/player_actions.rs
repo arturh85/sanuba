@@ -124,3 +124,37 @@ pub fn set_player_name(ctx: &ReducerContext, name: String) {
         ..player
     });
 }
+
+/// Respawn dead player at server-determined spawn point
+#[spacetimedb::reducer]
+pub fn player_respawn(ctx: &ReducerContext) {
+    let Some(player) = ctx.db.player().identity().find(ctx.sender) else {
+        log::error!("Player respawn failed: player not found");
+        return;
+    };
+
+    // Server-determined spawn point (can be customized based on world state)
+    let spawn_x = 0.0;
+    let spawn_y = 100.0;
+
+    // Get player name before update (to avoid borrow after move)
+    let player_name = player.name.clone();
+
+    // Update player state (reset position, health, hunger)
+    ctx.db.player().identity().update(Player {
+        x: spawn_x,
+        y: spawn_y,
+        vel_x: 0.0,
+        vel_y: 0.0,
+        health: 100.0,
+        hunger: 100.0,
+        ..player
+    });
+
+    log::info!(
+        "Player {} respawned at ({}, {})",
+        player_name.as_deref().unwrap_or("Unknown"),
+        spawn_x,
+        spawn_y
+    );
+}

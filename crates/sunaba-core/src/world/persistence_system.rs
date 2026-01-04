@@ -274,7 +274,12 @@ impl PersistenceSystem {
     }
 
     /// Save all chunks and metadata (manual save)
-    pub fn save_all_dirty_chunks(&mut self, chunk_manager: &mut ChunkManager, player: &Player) {
+    pub fn save_all_dirty_chunks(
+        &mut self,
+        chunk_manager: &mut ChunkManager,
+        player: &Player,
+        play_time_seconds: u64,
+    ) {
         self.save_dirty_chunks(chunk_manager);
 
         // Also save metadata with player data
@@ -290,7 +295,7 @@ impl PersistenceSystem {
                 spawn_point: (player.position.x, player.position.y),
                 created_at: String::new(), // Preserved from load
                 last_played,
-                play_time_seconds: 0,              // TODO: track play time
+                play_time_seconds, // Accumulated play time from World
                 player_data: Some(player.clone()), // Save player inventory, health, hunger
             };
 

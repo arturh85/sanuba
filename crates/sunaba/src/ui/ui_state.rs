@@ -52,6 +52,9 @@ pub struct UiState {
     /// Multiplayer panel state (connection UI)
     #[cfg(feature = "multiplayer")]
     pub multiplayer_panel: super::multiplayer_panel::MultiplayerPanelState,
+
+    /// Game over panel state (death screen)
+    pub game_over_panel: super::game_over_panel::GameOverPanelState,
 }
 
 impl UiState {
@@ -74,6 +77,7 @@ impl UiState {
             metrics_collector: None,
             #[cfg(feature = "multiplayer")]
             multiplayer_panel: super::multiplayer_panel::MultiplayerPanelState::new(),
+            game_over_panel: super::game_over_panel::GameOverPanelState::new(),
         }
     }
 
@@ -91,6 +95,7 @@ impl UiState {
             metrics_collector: None,
             #[cfg(feature = "multiplayer")]
             multiplayer_panel: super::multiplayer_panel::MultiplayerPanelState::new(),
+            game_over_panel: super::game_over_panel::GameOverPanelState::new(),
         }
     }
 
@@ -157,6 +162,7 @@ impl UiState {
         tool_registry: &crate::entity::tools::ToolRegistry,
         recipe_registry: &crate::entity::crafting::RecipeRegistry,
         config: &mut crate::config::GameConfig,
+        show_game_over: bool,
         #[cfg(feature = "multiplayer")] multiplayer_manager: Option<
             &crate::multiplayer::MultiplayerManager,
         >,
@@ -201,6 +207,11 @@ impl UiState {
         self.toasts.render(ctx);
         self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
         self.tooltip.render(ctx, cursor_screen_pos);
+
+        // Render game over screen (if player is dead)
+        if show_game_over {
+            self.game_over_panel.render(ctx);
+        }
     }
 
     /// Render all UI elements (WASM version)
@@ -218,6 +229,7 @@ impl UiState {
         player: &crate::entity::player::Player,
         tool_registry: &crate::entity::tools::ToolRegistry,
         recipe_registry: &crate::entity::crafting::RecipeRegistry,
+        show_game_over: bool,
         #[cfg(feature = "multiplayer")] multiplayer_manager: Option<
             &crate::multiplayer::MultiplayerManager,
         >,
@@ -260,6 +272,11 @@ impl UiState {
         self.toasts.render(ctx);
         self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
         self.tooltip.render(ctx, cursor_screen_pos);
+
+        // Render game over screen (if player is dead)
+        if show_game_over {
+            self.game_over_panel.render(ctx);
+        }
     }
 
     /// Render fullscreen loading overlay for multiplayer chunk loading

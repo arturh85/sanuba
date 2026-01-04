@@ -6,8 +6,11 @@ use std::sync::{Arc, Mutex};
 // Import generated SpacetimeDB client bindings
 use super::generated::{self, DbConnection};
 use generated::chunk_data_table::ChunkDataTableAccess;
+use generated::claim_admin_reducer::claim_admin;
 use generated::creature_data_table::CreatureDataTableAccess;
+use generated::player_respawn_reducer::player_respawn;
 use generated::player_table::PlayerTableAccess;
+use generated::rebuild_world_reducer::rebuild_world;
 use generated::request_ping_reducer::request_ping;
 use generated::server_metrics_table::ServerMetricsTableAccess;
 use generated::{player_mine, player_place_material, player_update_position};
@@ -21,6 +24,7 @@ use crate::multiplayer::oauth_native::{
 };
 
 /// SpacetimeDB client wrapper for native multiplayer integration
+#[derive(Clone)]
 pub struct MultiplayerClient {
     /// SpacetimeDB connection (wrapped in Arc<Mutex> for interior mutability)
     connection: Option<Arc<Mutex<DbConnection>>>,
@@ -182,7 +186,7 @@ impl MultiplayerClient {
     }
 
     /// Send player position update to server
-    pub fn update_player_position(&self, x: f32, y: f32) -> anyhow::Result<()> {
+    pub fn update_player_position(&self, x: f32, y: f32, vx: f32, vy: f32) -> anyhow::Result<()> {
         let conn = self
             .connection
             .as_ref()
@@ -191,7 +195,7 @@ impl MultiplayerClient {
         let conn_guard = conn.lock().unwrap();
         conn_guard
             .reducers
-            .player_update_position(x, y, 0.0, 0.0)
+            .player_update_position(x, y, vx, vy)
             .context("Failed to call player_update_position reducer")?;
 
         Ok(())
@@ -226,6 +230,55 @@ impl MultiplayerClient {
             .player_mine(x, y)
             .context("Failed to call player_mine reducer")?;
 
+        Ok(())
+    }
+
+    /// Claim admin status on the server (requires OAuth email)
+    pub async fn claim_admin(&self, email: String) -> anyhow::Result<()> {
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not connected to server"))?;
+
+        let conn_guard = conn.lock().unwrap();
+        conn_guard
+            .reducers
+            .claim_admin(email)
+            .context("Failed to call claim_admin reducer")?;
+
+        Ok(())
+    }
+
+    /// Request server to rebuild the world
+    pub async fn rebuild_world(&self) -> anyhow::Result<()> {
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not connected to server"))?;
+
+        let conn_guard = conn.lock().unwrap();
+        conn_guard
+            .reducers
+            .rebuild_world()
+            .context("Failed to call rebuild_world reducer")?;
+
+        Ok(())
+    }
+
+    /// Request player respawn from server
+    pub fn request_respawn(&self) -> anyhow::Result<()> {
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not connected to server"))?;
+
+        let conn_guard = conn.lock().unwrap();
+        conn_guard
+            .reducers
+            .player_respawn()
+            .context("Failed to call player_respawn reducer")?;
+
+        log::info!("Respawn request sent to server");
         Ok(())
     }
 
@@ -330,14 +383,18 @@ impl MultiplayerClient {
     }
 
     /// Get chunk data from local cache (for rendering)
-    pub fn get_chunk(&self, _x: i32, _y: i32) -> Option<Vec<u8>> {
-        let _conn = self.connection.as_ref()?;
+    pub fn get_chunk(&self, x: i32, y: i32) -> Option<Vec<u8>> {
+        let conn = self.connection.as_ref()?;
+        let conn_guard = conn.lock().unwrap();
 
         // Query chunk_data table from client cache
-        // TODO: Implement chunk lookup from generated table accessors
-        // conn.lock().unwrap().db.chunk_data().filter_by_chunk_x_chunk_y(&x, &y).first().map(|chunk| chunk.data.clone())
-
-        None
+        // Note: No filter_by method exists, iterate and find manually
+        conn_guard
+            .db
+            .chunk_data()
+            .iter()
+            .find(|chunk| chunk.x == x && chunk.y == y)
+            .map(|chunk| chunk.pixel_data.clone())
     }
 
     /// Send ping request to server for latency measurement

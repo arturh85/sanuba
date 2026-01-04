@@ -762,7 +762,11 @@ impl App {
             {
                 if let Some(manager) = self.multiplayer_manager.as_ref() {
                     let pos = self.world.player.position;
-                    if let Err(e) = manager.client.update_player_position(pos.x, pos.y) {
+                    let vel = self.world.player.velocity;
+                    if let Err(e) = manager
+                        .client
+                        .update_player_position(pos.x, pos.y, vel.x, vel.y)
+                    {
                         log::warn!("Failed to send player position to server: {}", e);
                     }
                 }
@@ -966,6 +970,7 @@ impl App {
                 self.world.tool_registry(),
                 &self.world.recipe_registry,
                 &mut self.config,
+                self.world.is_player_dead(),
                 #[cfg(feature = "multiplayer")]
                 self.multiplayer_manager.as_ref(),
             );
@@ -982,6 +987,7 @@ impl App {
                 &self.world.player,
                 self.world.tool_registry(),
                 &self.world.recipe_registry,
+                self.world.is_player_dead(),
                 #[cfg(feature = "multiplayer")]
                 self.multiplayer_manager.as_ref(),
             );
@@ -1120,24 +1126,21 @@ impl App {
                         }
 
                         // Native: blocking OAuth in background thread
-                        // TODO: Re-enable OAuth once we refactor to not require cloning the client
                         #[cfg(not(target_arch = "wasm32"))]
                         {
-                            log::warn!("OAuth login temporarily disabled - needs refactoring");
-                            self.ui_state.show_toast("OAuth temporarily disabled");
-                            // let client = mp_manager.client.clone();
-                            // std::thread::spawn(move || match client.oauth_login() {
-                            //     Ok(token) => {
-                            //         if let Err(e) = client.save_oauth_token(&token) {
-                            //             log::error!("Failed to save OAuth token: {}", e);
-                            //         } else {
-                            //             log::info!("OAuth login successful");
-                            //         }
-                            //     }
-                            //     Err(e) => log::error!("OAuth login failed: {}", e),
-                            // });
-                            // self.ui_state
-                            //     .show_toast("Opening browser for Google login...");
+                            let client = mp_manager.client.clone();
+                            std::thread::spawn(move || match client.oauth_login() {
+                                Ok(token) => {
+                                    if let Err(e) = client.save_oauth_token(&token) {
+                                        log::error!("Failed to save OAuth token: {}", e);
+                                    } else {
+                                        log::info!("OAuth login successful");
+                                    }
+                                }
+                                Err(e) => log::error!("OAuth login failed: {}", e),
+                            });
+                            self.ui_state
+                                .show_toast("Opening browser for Google login...");
                         }
                     }
                 }
@@ -1189,23 +1192,19 @@ impl App {
                                 }
 
                                 // Native: async claim_admin call via blocking
-                                // TODO: Re-enable claim_admin once we refactor to not require cloning
                                 #[cfg(not(target_arch = "wasm32"))]
                                 {
-                                    log::warn!(
-                                        "claim_admin temporarily disabled - needs refactoring"
-                                    );
-                                    // let client = mp_manager.client.clone();
-                                    // let email = email.clone();
-                                    // std::thread::spawn(move || {
-                                    //     if let Err(e) =
-                                    //         pollster::block_on(client.claim_admin(email))
-                                    //     {
-                                    //         log::error!("Failed to claim admin: {}", e);
-                                    //     } else {
-                                    //         log::info!("Admin claim request sent to server");
-                                    //     }
-                                    // });
+                                    let client = mp_manager.client.clone();
+                                    let email = email.clone();
+                                    std::thread::spawn(move || {
+                                        if let Err(e) =
+                                            pollster::block_on(client.claim_admin(email))
+                                        {
+                                            log::error!("Failed to claim admin: {}", e);
+                                        } else {
+                                            log::info!("Admin claim request sent to server");
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -1231,20 +1230,16 @@ impl App {
                             }
 
                             // Native: async rebuild_world call via blocking
-                            // TODO: Re-enable rebuild_world once we refactor to not require cloning
                             #[cfg(not(target_arch = "wasm32"))]
                             {
-                                log::warn!(
-                                    "rebuild_world temporarily disabled - needs refactoring"
-                                );
-                                // let client = mp_manager.client.clone();
-                                // std::thread::spawn(move || {
-                                //     if let Err(e) = pollster::block_on(client.rebuild_world()) {
-                                //         log::error!("Failed to rebuild world: {}", e);
-                                //     } else {
-                                //         log::info!("World rebuild requested");
-                                //     }
-                                // });
+                                let client = mp_manager.client.clone();
+                                std::thread::spawn(move || {
+                                    if let Err(e) = pollster::block_on(client.rebuild_world()) {
+                                        log::error!("Failed to rebuild world: {}", e);
+                                    } else {
+                                        log::info!("World rebuild requested");
+                                    }
+                                });
                             }
 
                             self.ui_state.show_toast("Rebuilding world...");
@@ -1257,11 +1252,37 @@ impl App {
                 // Reset action flags after processing
                 self.ui_state.multiplayer_panel.reset_flags();
             }
+
+            // Handle game over panel actions
+            if self.ui_state.game_over_panel.respawn_requested {
+                log::info!("Player requested respawn");
+
+                #[cfg(feature = "multiplayer")]
+                {
+                    if let Some(manager) = self.multiplayer_manager.as_ref() {
+                        // Multiplayer: request respawn from server
+                        if let Err(e) = manager.client.request_respawn() {
+                            log::error!("Failed to request respawn: {}", e);
+                        }
+                    } else {
+                        // Singleplayer: respawn locally
+                        self.world.respawn_player();
+                    }
+                }
+
+                #[cfg(not(feature = "multiplayer"))]
+                {
+                    // Singleplayer only: respawn locally
+                    self.world.respawn_player();
+                }
+
+                self.ui_state.game_over_panel.reset_flags();
+            }
         }
 
-        // TODO: Level selector actions now handled via dock
-        // The dock's LevelSelector tab currently just displays info
-        // Interactive level switching could be added later via dock callback system
+        // Future: Level selector in dock is currently read-only
+        // Interactive level switching could be added via dock callback system
+        // (would require architecture for dock -> app communication)
 
         // Handle egui output
         self.egui_state

@@ -41,6 +41,10 @@ extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "spacetimeClient"], js_name = "getLatestServerMetrics")]
     fn js_get_latest_server_metrics() -> JsValue;
 
+    /// Get chunk data from JavaScript cache
+    #[wasm_bindgen(js_namespace = ["window", "spacetimeClient"], js_name = "getChunk")]
+    fn js_get_chunk(x: i32, y: i32) -> JsValue;
+
     // OAuth bindings
     #[wasm_bindgen(js_namespace = ["window", "oauthClient"], js_name = "login", catch)]
     async fn js_oauth_login() -> Result<(), JsValue>;
@@ -60,6 +64,10 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = ["window", "spacetimeClient"], js_name = "rebuildWorld", catch)]
     async fn js_rebuild_world() -> Result<(), JsValue>;
+
+    // Player action bindings
+    #[wasm_bindgen(js_namespace = ["window", "spacetimeClient"], js_name = "requestRespawn", catch)]
+    async fn js_request_respawn() -> Result<(), JsValue>;
 }
 
 /// Server performance metrics (matches server schema)
@@ -206,13 +214,12 @@ impl MultiplayerClient {
     }
 
     /// Send player position update to server
-    pub fn update_player_position(&self, x: f32, y: f32) -> anyhow::Result<()> {
+    pub fn update_player_position(&self, x: f32, y: f32, vx: f32, vy: f32) -> anyhow::Result<()> {
         if !self.connected {
             anyhow::bail!("Not connected to server");
         }
 
-        // TODO: Pass actual velocity from player state instead of zeros
-        js_update_player_position(x, y, 0.0, 0.0)
+        js_update_player_position(x, y, vx, vy)
             .map_err(|e| anyhow::anyhow!("Failed to update player position: {:?}", e))?;
 
         Ok(())
@@ -244,9 +251,18 @@ impl MultiplayerClient {
     /// Get chunk data from local cache (for rendering)
     ///
     /// Note: Chunk data flows through subscription callbacks in JavaScript
-    pub fn get_chunk(&self, _x: i32, _y: i32) -> Option<Vec<u8>> {
-        // TODO: Implement chunk cache access via JavaScript
-        None
+    pub fn get_chunk(&self, x: i32, y: i32) -> Option<Vec<u8>> {
+        if !self.connected {
+            return None;
+        }
+
+        let result = js_get_chunk(x, y);
+        if result.is_null() {
+            return None;
+        }
+
+        // Convert JS Array to Vec<u8>
+        serde_wasm_bindgen::from_value(result).ok()
     }
 
     /// Send ping request to server for latency measurement
@@ -332,6 +348,21 @@ impl MultiplayerClient {
         js_rebuild_world()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to rebuild world: {:?}", e))?;
+        Ok(())
+    }
+
+    /// Request player respawn from server
+    pub fn request_respawn(&self) -> anyhow::Result<()> {
+        if !self.connected {
+            anyhow::bail!("Not connected to server");
+        }
+
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = js_request_respawn().await {
+                log::error!("Failed to request respawn: {:?}", e);
+            }
+        });
+
         Ok(())
     }
 }

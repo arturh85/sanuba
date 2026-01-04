@@ -9,6 +9,7 @@
 let spacetimeClient = null;
 let isConnectedFlag = false;
 let latestServerMetrics = null;
+let chunkCache = new Map(); // Key: "x,y", Value: Uint8Array chunk data
 
 /**
  * Connect to SpacetimeDB server
@@ -89,7 +90,15 @@ export async function subscribeWorld() {
 
         spacetimeClient.on('chunk_data', (table, operation, row) => {
             // console.log('[SpacetimeDB] Chunk data update:', row.x, row.y);
-            // TODO: Update local chunk cache for rendering
+            const key = `${row.x},${row.y}`;
+
+            if (operation === 'insert' || operation === 'update') {
+                // Cache chunk data for rendering
+                chunkCache.set(key, new Uint8Array(row.pixel_data));
+            } else if (operation === 'delete') {
+                // Remove from cache on delete
+                chunkCache.delete(key);
+            }
         });
 
         spacetimeClient.on('player', (table, operation, row) => {
@@ -261,4 +270,34 @@ export async function rebuildWorld() {
         console.error('[SpacetimeDB] Failed to rebuild world:', error);
         throw error;
     }
+}
+
+/**
+ * Request player respawn from server
+ * @returns {Promise<void>}
+ */
+export async function requestRespawn() {
+    if (!spacetimeClient) {
+        throw new Error('Not connected to SpacetimeDB');
+    }
+
+    try {
+        await spacetimeClient.call('player_respawn');
+        console.log('[SpacetimeDB] Respawn requested');
+    } catch (error) {
+        console.error('[SpacetimeDB] Failed to request respawn:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get chunk data from local cache for rendering
+ * @param {number} x - Chunk X coordinate
+ * @param {number} y - Chunk Y coordinate
+ * @returns {Array<number>|null} Chunk data as array of bytes, or null if not in cache
+ */
+export function getChunk(x, y) {
+    const key = `${x},${y}`;
+    const chunk = chunkCache.get(key);
+    return chunk ? Array.from(chunk) : null;
 }

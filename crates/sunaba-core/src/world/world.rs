@@ -68,6 +68,12 @@ pub struct World {
 
     /// Persistence system (chunk loading, saving, world lifecycle)
     persistence_system: PersistenceSystem,
+
+    /// Session start time (for play time tracking)
+    session_start: std::time::Instant,
+
+    /// Total play time in seconds (accumulated across sessions)
+    pub total_play_time_seconds: u64,
 }
 
 impl World {
@@ -87,6 +93,8 @@ impl World {
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
             persistence_system: PersistenceSystem::new(42), // Default seed
+            session_start: std::time::Instant::now(),
+            total_play_time_seconds: 0,
         };
 
         // Don't pre-generate - let chunks generate on-demand as player explores
@@ -324,6 +332,18 @@ impl World {
         );
     }
 
+    /// Check if player is dead
+    pub fn is_player_dead(&self) -> bool {
+        self.player.is_dead
+    }
+
+    /// Respawn player at spawn point
+    pub fn respawn_player(&mut self) {
+        let spawn_point = glam::Vec2::new(0.0, 100.0); // Default spawn
+        self.player.respawn(spawn_point);
+        log::info!("Player respawned at ({}, {})", spawn_point.x, spawn_point.y);
+    }
+
     /// Update active chunks: remove distant chunks and re-activate nearby loaded chunks
     fn update_active_chunks(&mut self) {
         ChunkStatus::update_active_chunks(
@@ -531,8 +551,9 @@ impl World {
 
         // Update player (hunger, health, starvation damage)
         if self.player.update(dt) {
-            log::warn!("Player died from starvation!");
-            // TODO: Handle player death (respawn, game over screen, etc.)
+            log::info!("Player died!");
+            // Player death is now handled in UI/app layer via is_dead flag
+            // Respawn will be triggered by player input (game over screen)
         }
 
         // Update light system (day/night cycle, growth timer)
@@ -1078,9 +1099,20 @@ impl World {
 
     /// Initialize persistent world (load or generate)
     pub fn load_persistent_world(&mut self) {
+        // Load world data (this also loads metadata with play_time_seconds)
         let _ = self
             .persistence_system
             .load_persistent_world(&mut self.chunk_manager, &mut self.player);
+
+        // Load play time from metadata
+        use crate::world::persistence::ChunkPersistence;
+        if let Ok(persistence) = ChunkPersistence::new("default") {
+            let metadata = persistence.load_metadata();
+            self.total_play_time_seconds = metadata.play_time_seconds;
+            self.session_start = std::time::Instant::now(); // Reset session start
+            log::info!("Loaded play time: {} seconds", self.total_play_time_seconds);
+        }
+
         // Initialize light levels before first CA update
         let active_chunks = self.chunk_manager.active_chunks.clone();
         self.light_system.initialize_light(
@@ -1104,8 +1136,15 @@ impl World {
 
     /// Save all chunks and metadata (manual save)
     pub fn save_all_dirty_chunks(&mut self) {
-        self.persistence_system
-            .save_all_dirty_chunks(&mut self.chunk_manager, &self.player);
+        // Calculate total play time (accumulated + current session)
+        let session_duration = self.session_start.elapsed().as_secs();
+        let total_play_time = self.total_play_time_seconds + session_duration;
+
+        self.persistence_system.save_all_dirty_chunks(
+            &mut self.chunk_manager,
+            &self.player,
+            total_play_time,
+        );
     }
 
     /// Check all pixels in a chunk for state changes based on temperature

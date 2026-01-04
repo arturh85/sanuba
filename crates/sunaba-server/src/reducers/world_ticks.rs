@@ -97,10 +97,23 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
     let delta_time = 0.016;
     let mut stats = NoOpStats;
     let mut rng = ctx.rng();
+
+    // Measure simulation time (for metrics)
+    let will_collect_metrics = new_tick_count % 10 == 0;
+    let sim_start = if will_collect_metrics {
+        Some(std::time::Instant::now())
+    } else {
+        None
+    };
+
     world.update(delta_time, &mut stats, &mut rng, true); // Server: skip creatures (not implemented server-side)
 
+    let world_tick_time_ms = sim_start
+        .map(|start| start.elapsed().as_secs_f32() * 1000.0)
+        .unwrap_or(0.0);
+
     // Sync ONLY dirty chunks to database
-    sync_dirty_chunks_to_db(ctx, world, config.tick_count);
+    let dirty_chunks_synced = sync_dirty_chunks_to_db(ctx, world, config.tick_count);
 
     // Update players (only if their chunk is loaded)
     for player in online_players {
@@ -140,10 +153,10 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
             id: 0,
             tick: new_tick_count,
             timestamp_ms: (new_tick_count * 16), // Approximate timestamp (16ms per tick)
-            world_tick_time_ms: 0.0,             // TODO: Add timing once SpacetimeDB supports it
-            creature_tick_time_ms: 0.0,          // TODO: Get from creature_tick
+            world_tick_time_ms,                  // Measured timing from world.update()
+            creature_tick_time_ms: 0.0, // Filled by creature_tick reducer (updates same tick)
             active_chunks,
-            dirty_chunks_synced: 0, // TODO: Track in sync_dirty_chunks_to_db
+            dirty_chunks_synced, // Tracked from sync_dirty_chunks_to_db()
             online_players: online_players_count,
             creatures_alive,
         });
@@ -165,6 +178,23 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
 #[spacetimedb::reducer]
 pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
     let delta_time = 0.033; // ~30fps
+
+    // Get current tick for metrics sampling
+    let current_tick = ctx
+        .db
+        .world_config()
+        .id()
+        .find(0)
+        .map(|c| c.tick_count)
+        .unwrap_or(0);
+
+    // Measure timing for sampled ticks
+    let will_collect_metrics = current_tick.is_multiple_of(10);
+    let tick_start = if will_collect_metrics {
+        Some(std::time::Instant::now())
+    } else {
+        None
+    };
 
     // Get all living creatures
     let creatures: Vec<CreatureData> = ctx.db.creature_data().iter().filter(|c| c.alive).collect();
@@ -258,6 +288,24 @@ pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
             alive,
             ..creature_row
         });
+    }
+
+    // Write timing to server metrics (sampled at same rate as world tick)
+    if let Some(start) = tick_start {
+        let creature_tick_time_ms = start.elapsed().as_secs_f32() * 1000.0;
+
+        // Update existing metrics row for this tick
+        if let Some(metrics) = ctx
+            .db
+            .server_metrics()
+            .iter()
+            .find(|m| m.tick == current_tick)
+        {
+            ctx.db.server_metrics().id().update(ServerMetrics {
+                creature_tick_time_ms,
+                ..metrics
+            });
+        }
     }
 
     // Schedule next tick (33ms = 30fps)
