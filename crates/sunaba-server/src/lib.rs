@@ -11,7 +11,10 @@
 mod encoding;
 mod world_access;
 
-use spacetimedb::{Identity, ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table};
+use std::sync::Mutex;
+use std::time::Duration;
+use once_cell::sync::Lazy;
 
 use glam::Vec2;
 use sunaba_creature::{
@@ -43,6 +46,12 @@ pub struct WorldConfig {
     pub simulation_paused: bool,
     /// Maximum creatures allowed
     pub max_creatures: u32,
+    /// Settlement radius (chunks from spawn to pre-simulate)
+    pub settlement_radius: i32,
+    /// Current settlement progress (chunks settled so far)
+    pub settlement_progress: i32,
+    /// Whether settlement is complete
+    pub settlement_complete: bool,
 }
 
 /// Chunk pixel data
@@ -134,6 +143,41 @@ pub struct CreatureData {
     pub alive: bool,
 }
 
+/// Timer table for world simulation ticks (60fps)
+#[spacetimedb::table(name = world_tick_timer, scheduled(world_tick))]
+pub struct WorldTickTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+/// Timer table for creature AI ticks (30fps)
+#[spacetimedb::table(name = creature_tick_timer, scheduled(creature_tick))]
+pub struct CreatureTickTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+/// Timer table for world settlement (10fps, low priority)
+#[spacetimedb::table(name = settle_tick_timer, scheduled(settle_world_tick))]
+pub struct SettleTickTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+// ============================================================================
+// Global Server State
+// ============================================================================
+
+/// Global server-side World instance (persists across reducer calls)
+static SERVER_WORLD: Lazy<Mutex<Option<sunaba_core::world::World>>> =
+    Lazy::new(|| Mutex::new(None));
+
 // ============================================================================
 // Lifecycle Reducers
 // ============================================================================
@@ -141,7 +185,7 @@ pub struct CreatureData {
 /// Initialize the server module
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
-    log::info!("Initializing Sunaba server module");
+    log::info!("Initializing Sunaba multiplayer server");
 
     // Create world config singleton
     ctx.db.world_config().insert(WorldConfig {
@@ -150,9 +194,30 @@ pub fn init(ctx: &ReducerContext) {
         tick_count: 0,
         simulation_paused: false,
         max_creatures: 50,
+        settlement_radius: 50,        // Settle 50 chunks from spawn
+        settlement_progress: 0,
+        settlement_complete: false,
     });
 
-    log::info!("Server initialized");
+    // Schedule world tick at 60fps (16ms)
+    ctx.db.world_tick_timer().insert(WorldTickTimer {
+        id: 0,
+        scheduled_at: Duration::from_millis(16).into(),
+    });
+
+    // Schedule creature tick at 30fps (33ms)
+    ctx.db.creature_tick_timer().insert(CreatureTickTimer {
+        id: 0,
+        scheduled_at: Duration::from_millis(33).into(),
+    });
+
+    // Schedule settlement tick at 10fps (100ms) - lower priority
+    ctx.db.settle_tick_timer().insert(SettleTickTimer {
+        id: 0,
+        scheduled_at: Duration::from_millis(100).into(),
+    });
+
+    log::info!("Scheduled reducers initialized");
 }
 
 /// Handle client connection
@@ -203,10 +268,9 @@ pub fn client_disconnected(ctx: &ReducerContext) {
 // Manual Tick Reducers (called by clients or scheduled externally)
 // ============================================================================
 
-/// World simulation tick - call this periodically for simulation
+/// World simulation tick - scheduled at 60fps
 #[spacetimedb::reducer]
-pub fn world_tick(ctx: &ReducerContext) {
-    // Get world config
+pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
     let Some(config) = ctx.db.world_config().id().find(0) else {
         log::error!("World config not found");
         return;
@@ -222,19 +286,53 @@ pub fn world_tick(ctx: &ReducerContext) {
         ..config
     });
 
-    // Get all online players
+    // Initialize or get World instance
+    let mut world_guard = SERVER_WORLD.lock().unwrap();
+    if world_guard.is_none() {
+        log::info!("Initializing server World with seed {}", config.seed);
+        let world = sunaba_core::world::World::new();
+        // TODO: Set seed
+        *world_guard = Some(world);
+    }
+
+    let Some(world) = world_guard.as_mut() else {
+        log::error!("Failed to get World");
+        return;
+    };
+
+    // Get online players
     let online_players: Vec<Player> = ctx.db.player().iter().filter(|p| p.online).collect();
 
-    // Update player physics
-    let delta_time = 0.016; // ~60fps
+    // Load 7x7 chunks around each player
+    for player in &online_players {
+        let chunk_x = (player.x as i32).div_euclid(64);
+        let chunk_y = (player.y as i32).div_euclid(64);
+
+        for dy in -3..=3 {
+            for dx in -3..=3 {
+                load_or_create_chunk(ctx, world, chunk_x + dx, chunk_y + dy);
+            }
+        }
+    }
+
+    // Run simulation (World::update uses dirty chunk optimization internally)
+    let delta_time = 0.016;
+    let mut stats = NoOpStats;
+    let mut rng = ctx.rng();
+    world.update(delta_time, &mut stats, &mut rng);
+
+    // Sync ONLY dirty chunks to database
+    sync_dirty_chunks_to_db(ctx, world, config.tick_count);
+
+    // Update players
     for player in online_players {
         update_player_physics(ctx, player, delta_time);
     }
 }
 
-/// Creature AI tick - call this periodically for creature updates
+/// Creature AI tick - scheduled at 30fps
 #[spacetimedb::reducer]
-pub fn creature_tick(ctx: &ReducerContext) {
+pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
     let delta_time = 0.033; // ~30fps
 
     // Get all living creatures
@@ -329,6 +427,72 @@ pub fn creature_tick(ctx: &ReducerContext) {
             alive,
             ..creature_row
         });
+    }
+}
+
+/// World settlement tick - scheduled at 10fps (low priority)
+/// Pre-simulates chunks in expanding rings from spawn to prevent falling sand during exploration
+#[spacetimedb::reducer]
+pub fn settle_world_tick(ctx: &ReducerContext, _arg: SettleTickTimer) {
+    let Some(config) = ctx.db.world_config().id().find(0) else {
+        return;
+    };
+
+    if config.settlement_complete {
+        return; // Already settled
+    }
+
+    let mut world_guard = SERVER_WORLD.lock().unwrap();
+    let Some(world) = world_guard.as_mut() else {
+        return;
+    };
+
+    // Settle chunks in expanding ring around spawn (0, 0)
+    let r = config.settlement_progress;
+    let chunks_to_settle = get_chunks_at_radius(0, 0, r);
+
+    for (chunk_x, chunk_y) in chunks_to_settle {
+        // Load chunk if not already loaded
+        load_or_create_chunk(ctx, world, chunk_x, chunk_y);
+
+        // Simulate chunk for 60 ticks (1 second worth of settling)
+        let mut rng = ctx.rng();
+        for _ in 0..60 {
+            world.update_chunk_settle(chunk_x, chunk_y, &mut rng);
+        }
+
+        // Save settled chunk to DB
+        if let Some(chunk) = world.get_chunk(chunk_x, chunk_y) {
+            let Ok(pixel_data) = encoding::encode_chunk(chunk) else {
+                continue;
+            };
+
+            ctx.db.chunk_data().insert(ChunkData {
+                id: 0,
+                x: chunk_x,
+                y: chunk_y,
+                pixel_data,
+                dirty: false, // Settled chunks start clean
+                last_modified_tick: 0,
+            });
+        }
+    }
+
+    // Update progress
+    let new_progress = r + 1;
+    let complete = new_progress > config.settlement_radius;
+
+    ctx.db.world_config().id().update(WorldConfig {
+        settlement_progress: new_progress,
+        settlement_complete: complete,
+        ..config
+    });
+
+    if complete {
+        log::info!(
+            "World settlement complete! Settled {} chunks from spawn",
+            config.settlement_radius
+        );
     }
 }
 
@@ -531,6 +695,122 @@ pub fn spawn_creature(ctx: &ReducerContext, archetype: String, x: f32, y: f32) {
 
 // ============================================================================
 // Helper Functions
+// ============================================================================
+
+// ============================================================================
+// Helper Functions for World Simulation
+// ============================================================================
+
+/// No-op stats implementation for server
+struct NoOpStats;
+impl sunaba_core::world::SimStats for NoOpStats {
+    fn record_pixel_moved(&mut self) {}
+    fn record_state_change(&mut self) {}
+    fn record_reaction(&mut self) {}
+}
+
+/// Load chunk from DB or generate new one
+fn load_or_create_chunk(
+    ctx: &ReducerContext,
+    world: &mut sunaba_core::world::World,
+    chunk_x: i32,
+    chunk_y: i32,
+) {
+    use glam::IVec2;
+    let pos = IVec2::new(chunk_x, chunk_y);
+
+    if world.has_chunk(pos) {
+        return;
+    }
+
+    // Try load from DB
+    if let Some(data) = ctx
+        .db
+        .chunk_data()
+        .iter()
+        .find(|c| c.x == chunk_x && c.y == chunk_y)
+    {
+        if let Ok(chunk) = encoding::decode_chunk(&data.pixel_data) {
+            world.insert_chunk(pos, chunk);
+            log::debug!("Loaded chunk ({}, {}) from DB", chunk_x, chunk_y);
+            return;
+        }
+    }
+
+    // Generate new
+    log::debug!("Generating chunk ({}, {})", chunk_x, chunk_y);
+    world.generate_chunk(pos);
+}
+
+/// Sync dirty chunks from World to database
+/// CRITICAL OPTIMIZATION: Only syncs chunks marked dirty by simulation
+fn sync_dirty_chunks_to_db(
+    ctx: &ReducerContext,
+    world: &sunaba_core::world::World,
+    tick: u64,
+) {
+    for (pos, chunk) in world.chunks_iter() {
+        // Skip clean chunks (optimization)
+        if !chunk.is_dirty() {
+            continue;
+        }
+
+        let Ok(pixel_data) = encoding::encode_chunk(chunk) else {
+            log::error!("Failed to encode chunk ({}, {})", pos.x, pos.y);
+            continue;
+        };
+
+        // Update or insert
+        if let Some(existing) = ctx
+            .db
+            .chunk_data()
+            .iter()
+            .find(|c| c.x == pos.x && c.y == pos.y)
+        {
+            ctx.db.chunk_data().id().update(ChunkData {
+                pixel_data,
+                dirty: true,
+                last_modified_tick: tick,
+                ..existing
+            });
+        } else {
+            ctx.db.chunk_data().insert(ChunkData {
+                id: 0,
+                x: pos.x,
+                y: pos.y,
+                pixel_data,
+                dirty: true,
+                last_modified_tick: tick,
+            });
+        }
+    }
+}
+
+/// Get chunks at radius r from center (for settlement system)
+fn get_chunks_at_radius(center_x: i32, center_y: i32, r: i32) -> Vec<(i32, i32)> {
+    let mut chunks = Vec::new();
+
+    if r == 0 {
+        return vec![(center_x, center_y)];
+    }
+
+    // Top and bottom edges
+    for x in -r..=r {
+        chunks.push((center_x + x, center_y - r));
+        chunks.push((center_x + x, center_y + r));
+    }
+
+    // Left and right edges (excluding corners to avoid duplicates)
+    for y in (-r + 1)..(r) {
+        chunks.push((center_x - r, center_y + y));
+        chunks.push((center_x + r, center_y + y));
+    }
+
+    chunks
+}
+
+// ============================================================================
+// Legacy Helper Functions
 // ============================================================================
 
 /// Find chunk at given chunk coordinates

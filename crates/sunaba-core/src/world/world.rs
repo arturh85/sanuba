@@ -15,6 +15,7 @@ use crate::simulation::{
     TemperatureSimulator, WorldCollisionQuery, add_heat_at_pixel, get_temperature_at_pixel,
     mining::calculate_mining_time,
 };
+use crate::world::NoopStats;
 
 /// The game world, composed of chunks
 pub struct World {
@@ -1593,6 +1594,43 @@ impl World {
     /// Get all loaded chunks
     pub fn chunks(&self) -> &HashMap<IVec2, Chunk> {
         &self.chunks
+    }
+
+    /// Check if chunk is loaded (for SpacetimeDB server)
+    pub fn has_chunk(&self, pos: IVec2) -> bool {
+        self.chunks.contains_key(&pos)
+    }
+
+    /// Insert pre-loaded chunk (for SpacetimeDB server)
+    pub fn insert_chunk(&mut self, pos: IVec2, chunk: Chunk) {
+        self.chunks.insert(pos, chunk);
+    }
+
+    /// Generate a single chunk at position (for SpacetimeDB server)
+    pub fn generate_chunk(&mut self, pos: IVec2) {
+        let chunk = self.generator.generate_chunk(pos.x, pos.y);
+        self.chunks.insert(pos, chunk);
+    }
+
+    /// Get chunk at position (for SpacetimeDB server)
+    pub fn get_chunk(&self, x: i32, y: i32) -> Option<&Chunk> {
+        self.chunks.get(&IVec2::new(x, y))
+    }
+
+    /// Iterator over all chunks (for SpacetimeDB server)
+    pub fn chunks_iter(&self) -> impl Iterator<Item = (&IVec2, &Chunk)> {
+        self.chunks.iter()
+    }
+
+    /// Simulate a single chunk for settlement (for SpacetimeDB server)
+    /// Called multiple times to settle a chunk before players arrive
+    pub fn update_chunk_settle<R: crate::world::WorldRng>(&mut self, chunk_x: i32, chunk_y: i32, rng: &mut R) {
+        let pos = IVec2::new(chunk_x, chunk_y);
+        if self.chunks.contains_key(&pos) {
+            // Simulate CA for this chunk only
+            let mut no_op_stats = NoopStats;
+            self.update_chunk_ca(pos, &mut no_op_stats, rng);
+        }
     }
 
     /// Get materials registry

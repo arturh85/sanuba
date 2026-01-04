@@ -3549,9 +3549,11 @@ dependencies = [
 name = "sunaba-server"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bincode-next",
  "glam",
  "log",
+ "once_cell",
  "serde",
  "spacetimedb",
  "sunaba-core",
