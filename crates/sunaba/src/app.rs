@@ -21,7 +21,9 @@ use crate::ui::UiState;
 use crate::world::World;
 
 #[cfg(feature = "multiplayer")]
-use crate::multiplayer::client::{DbContextTrait as _, PlayerTableAccessTrait as _, TableTrait as _};
+use crate::multiplayer::client::{
+    DbContextTrait as _, PlayerTableAccessTrait as _, TableTrait as _,
+};
 
 /// Game mode: persistent world or demo level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -557,6 +559,24 @@ impl App {
                     self.config.rendering.vignette_intensity,
                     self.config.rendering.bloom_intensity,
                 );
+                self.renderer.set_water_noise_params(
+                    self.config.rendering.water_noise_frequency,
+                    self.config.rendering.water_noise_speed,
+                    self.config.rendering.water_noise_amplitude,
+                );
+                self.renderer.set_lava_noise_params(
+                    self.config.rendering.lava_noise_frequency,
+                    self.config.rendering.lava_noise_speed,
+                    self.config.rendering.lava_noise_amplitude,
+                );
+
+                // Apply bloom settings
+                if self.config.rendering.bloom_enabled {
+                    self.renderer
+                        .enable_bloom(self.config.rendering.bloom_quality);
+                } else {
+                    self.renderer.disable_bloom();
+                }
 
                 log::debug!("Applied params changes from dock");
             }
@@ -984,7 +1004,14 @@ impl App {
             let camera_pos = self.renderer.camera_position();
             let camera_zoom = self.renderer.camera_zoom();
             let player_pos = self.world.player.position;
-            (remote_players, local_player_name, window_size, camera_pos, camera_zoom, player_pos)
+            (
+                remote_players,
+                local_player_name,
+                window_size,
+                camera_pos,
+                camera_zoom,
+                player_pos,
+            )
         };
 
         let full_output = self.egui_ctx.run(raw_input, |ctx| {
@@ -1052,7 +1079,14 @@ impl App {
             // Draw player nicknames overlay (multiplayer only)
             #[cfg(feature = "multiplayer")]
             {
-                let (remote_players, local_player_name, window_size, camera_pos, camera_zoom, player_pos) = &multiplayer_overlay_data;
+                let (
+                    remote_players,
+                    local_player_name,
+                    window_size,
+                    camera_pos,
+                    camera_zoom,
+                    player_pos,
+                ) = &multiplayer_overlay_data;
                 draw_player_nicknames_overlay(
                     ctx,
                     *window_size,
@@ -1144,9 +1178,19 @@ impl App {
                         self.ui_state.show_toast("Connected to server!");
 
                         // Set pre-entered nickname if provided
-                        if !self.ui_state.multiplayer_panel.nickname_input.trim().is_empty() {
-                            let nickname =
-                                self.ui_state.multiplayer_panel.nickname_input.trim().to_string();
+                        if !self
+                            .ui_state
+                            .multiplayer_panel
+                            .nickname_input
+                            .trim()
+                            .is_empty()
+                        {
+                            let nickname = self
+                                .ui_state
+                                .multiplayer_panel
+                                .nickname_input
+                                .trim()
+                                .to_string();
                             if let Some(ref manager) = self.multiplayer_manager {
                                 if let Err(e) = manager.client.set_nickname(nickname.clone()) {
                                     log::warn!("Failed to set pre-entered nickname: {}", e);
@@ -1230,7 +1274,11 @@ impl App {
 
                 // Handle nickname change request
                 #[cfg(feature = "multiplayer")]
-                if let Some(nickname) = self.ui_state.multiplayer_panel.set_nickname_requested.take()
+                if let Some(nickname) = self
+                    .ui_state
+                    .multiplayer_panel
+                    .set_nickname_requested
+                    .take()
                 {
                     if let Some(ref manager) = self.multiplayer_manager {
                         if let Err(e) = manager.client.set_nickname(nickname.clone()) {

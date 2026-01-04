@@ -14,3 +14,4 @@ config.ron
 crates/sunaba/src/multiplayer/generated/
 web/src/spacetime/
 /.mcp.json
+/.lsmcp/

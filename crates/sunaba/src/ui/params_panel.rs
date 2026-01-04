@@ -163,6 +163,92 @@ impl ParamsPanel {
                             .text("Bloom"),
                     )
                     .changed();
+
+                ui.separator();
+                ui.label("Water Animation:");
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.rendering.water_noise_frequency,
+                            0.01..=0.2,
+                        )
+                        .text("Frequency"),
+                    )
+                    .changed();
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(&mut self.config.rendering.water_noise_speed, 0.5..=5.0)
+                            .text("Speed"),
+                    )
+                    .changed();
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.rendering.water_noise_amplitude,
+                            0.0..=0.2,
+                        )
+                        .text("Amplitude"),
+                    )
+                    .changed();
+
+                ui.separator();
+                ui.label("Lava Animation:");
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.rendering.lava_noise_frequency,
+                            0.01..=0.15,
+                        )
+                        .text("Frequency"),
+                    )
+                    .changed();
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(&mut self.config.rendering.lava_noise_speed, 0.5..=3.0)
+                            .text("Speed"),
+                    )
+                    .changed();
+                self.changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.rendering.lava_noise_amplitude,
+                            0.0..=0.3,
+                        )
+                        .text("Amplitude"),
+                    )
+                    .changed();
+
+                ui.separator();
+                ui.label("Multi-Pass Bloom:");
+                self.changed |= ui
+                    .checkbox(&mut self.config.rendering.bloom_enabled, "Enable Bloom")
+                    .changed();
+                if self.config.rendering.bloom_enabled {
+                    self.changed |= ui
+                        .add(
+                            egui::Slider::new(&mut self.config.rendering.bloom_quality, 3..=5)
+                                .text("Quality")
+                                .custom_formatter(|n, _| {
+                                    match n as u32 {
+                                        3 => "Low (3 mips)",
+                                        4 => "Medium (4 mips)",
+                                        5 => "High (5 mips)",
+                                        _ => "Unknown",
+                                    }
+                                    .to_string()
+                                }),
+                        )
+                        .changed();
+                    self.changed |= ui
+                        .add(
+                            egui::Slider::new(
+                                &mut self.config.rendering.bloom_threshold,
+                                0.4..=0.8,
+                            )
+                            .text("Threshold"),
+                        )
+                        .changed();
+                }
             });
 
             ui.add_space(4.0);

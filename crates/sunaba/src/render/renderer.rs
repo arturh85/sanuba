@@ -77,6 +77,34 @@ struct PostProcessUniform {
     scanline_intensity: f32,
     vignette_intensity: f32,
     bloom_intensity: f32,
+    // Water noise animation parameters
+    water_noise_frequency: f32,
+    water_noise_speed: f32,
+    water_noise_amplitude: f32,
+    // Lava noise animation parameters
+    lava_noise_frequency: f32,
+    lava_noise_speed: f32,
+    lava_noise_amplitude: f32,
+}
+
+/// Bloom downsample uniform data
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct BloomDownsampleUniform {
+    threshold: f32,
+    is_first_pass: u32,
+    _padding1: f32,
+    _padding2: f32,
+}
+
+/// Bloom upsample uniform data
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct BloomUpsampleUniform {
+    filter_radius: f32,
+    _padding1: f32,
+    _padding2: f32,
+    _padding3: f32,
 }
 
 /// Timing breakdown for render phases (in milliseconds)
@@ -140,6 +168,25 @@ pub struct Renderer {
     post_process_buffer: wgpu::Buffer,
     post_process: PostProcessUniform,
 
+    // Bloom post-processing (multi-pass)
+    bloom_enabled: bool,
+    bloom_mip_count: u32,
+    bloom_mip_textures: Vec<wgpu::Texture>,
+    bloom_mip_views: Vec<wgpu::TextureView>,
+    bloom_sampler: wgpu::Sampler,
+    bloom_downsample_pipeline: wgpu::RenderPipeline,
+    bloom_upsample_pipeline: wgpu::RenderPipeline,
+    bloom_downsample_bind_groups: Vec<wgpu::BindGroup>,
+    bloom_upsample_bind_groups: Vec<wgpu::BindGroup>,
+    bloom_downsample_uniform_buffer: wgpu::Buffer,
+    bloom_upsample_uniform_buffer: wgpu::Buffer,
+    #[allow(dead_code)]
+    bloom_threshold: f32,
+    // Dummy texture for when bloom is disabled (texture must be kept alive for view)
+    #[allow(dead_code)]
+    dummy_bloom_texture: wgpu::Texture,
+    dummy_bloom_view: wgpu::TextureView,
+
     // Active chunks debug overlay
     show_active_chunks: bool,
 
@@ -161,6 +208,12 @@ pub struct Renderer {
 
     /// Player sprite for animated rendering
     player_sprite: PlayerSprite,
+
+    // Chunk-snapped positions for overlay updates
+    last_temp_overlay_chunk_x: i32,
+    last_temp_overlay_chunk_y: i32,
+    last_light_overlay_chunk_x: i32,
+    last_light_overlay_chunk_y: i32,
 }
 
 impl Renderer {
@@ -444,12 +497,97 @@ impl Renderer {
             scanline_intensity: 0.15, // Subtle scanlines
             vignette_intensity: 0.25, // Subtle vignette
             bloom_intensity: 0.3,     // Moderate bloom for fire/lava
+            // Water noise animation
+            water_noise_frequency: 0.08,
+            water_noise_speed: 2.0,
+            water_noise_amplitude: 0.06, // 15/255 normalized
+            // Lava noise animation
+            lava_noise_frequency: 0.05,
+            lava_noise_speed: 1.5,
+            lava_noise_amplitude: 0.12, // 30/255 normalized
         };
         let post_process_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("post_process_buffer"),
             contents: bytemuck::cast_slice(&[post_process]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
+        // Bloom uniform buffers
+        let bloom_downsample_uniform = BloomDownsampleUniform {
+            threshold: 0.6,
+            is_first_pass: 1,
+            _padding1: 0.0,
+            _padding2: 0.0,
+        };
+        let bloom_downsample_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("bloom_downsample_uniform_buffer"),
+                contents: bytemuck::cast_slice(&[bloom_downsample_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let bloom_upsample_uniform = BloomUpsampleUniform {
+            filter_radius: 1.0,
+            _padding1: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+        let bloom_upsample_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("bloom_upsample_uniform_buffer"),
+                contents: bytemuck::cast_slice(&[bloom_upsample_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        // Create bloom sampler (linear filtering for smooth bloom)
+        let bloom_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        // Create dummy 1x1 black texture for when bloom is disabled
+        let dummy_bloom_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("dummy_bloom_texture"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let dummy_bloom_view =
+            dummy_bloom_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Initialize dummy texture with black (0,0,0,0)
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &dummy_bloom_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &[0u8; 8], // 1 pixel * 8 bytes (Rgba16Float)
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(8),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
 
         // Debug overlay bind group layout (temperature and light)
         let overlay_bind_group_layout =
@@ -514,6 +652,24 @@ impl Renderer {
                         },
                         count: None,
                     },
+                    // Binding 6: Bloom texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    // Binding 7: Bloom sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 7,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
                 ],
             });
 
@@ -544,6 +700,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: post_process_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&dummy_bloom_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::Sampler(&bloom_sampler),
                 },
             ],
         });
@@ -606,6 +770,159 @@ impl Renderer {
             },
             multiview: None,
         });
+
+        // Load bloom shaders
+        let bloom_downsample_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("bloom_downsample_shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/bloom_downsample.wgsl").into(),
+            ),
+        });
+
+        let bloom_upsample_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("bloom_upsample_shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/bloom_upsample.wgsl").into(),
+            ),
+        });
+
+        // Bloom bind group layout (shared for both downsample and upsample)
+        let bloom_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("bloom_bind_group_layout"),
+                entries: &[
+                    // Binding 0: Input texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    // Binding 1: Sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    // Binding 2: Uniforms (different for downsample vs upsample)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        // Bloom downsample pipeline
+        let bloom_downsample_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("bloom_downsample_pipeline_layout"),
+                bind_group_layouts: &[&bloom_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let bloom_downsample_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("bloom_downsample_pipeline"),
+                layout: Some(&bloom_downsample_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &bloom_downsample_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &bloom_downsample_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                cache: None,
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
+
+        // Bloom upsample pipeline
+        let bloom_upsample_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("bloom_upsample_pipeline_layout"),
+                bind_group_layouts: &[&bloom_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let bloom_upsample_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("bloom_upsample_pipeline"),
+                layout: Some(&bloom_upsample_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &bloom_upsample_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &bloom_upsample_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::One,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                cache: None,
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
 
         // Vertex and index buffers
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -672,6 +989,21 @@ impl Renderer {
             overlay_type: 0, // 0 = no overlay
             post_process_buffer,
             post_process,
+            // Bloom (disabled by default, will be initialized when enabled)
+            bloom_enabled: false,
+            bloom_mip_count: 0,
+            bloom_mip_textures: Vec::new(),
+            bloom_mip_views: Vec::new(),
+            bloom_sampler,
+            bloom_downsample_pipeline,
+            bloom_upsample_pipeline,
+            bloom_downsample_bind_groups: Vec::new(),
+            bloom_upsample_bind_groups: Vec::new(),
+            bloom_downsample_uniform_buffer,
+            bloom_upsample_uniform_buffer,
+            bloom_threshold: 0.6,
+            dummy_bloom_texture,
+            dummy_bloom_view,
             show_active_chunks: false,
             texture_origin,
             texture_origin_buffer,
@@ -683,7 +1015,287 @@ impl Renderer {
                 "../../assets/sprites/player_sprite.png"
             ))
             .expect("Failed to load player sprite"),
+            last_temp_overlay_chunk_x: i32::MIN,
+            last_temp_overlay_chunk_y: i32::MIN,
+            last_light_overlay_chunk_x: i32::MIN,
+            last_light_overlay_chunk_y: i32::MIN,
         })
+    }
+
+    /// Initialize or reinitialize bloom resources (textures and bind groups)
+    fn init_bloom_resources(&mut self, source_width: u32, source_height: u32, mip_count: u32) {
+        // Clear existing resources
+        self.bloom_mip_textures.clear();
+        self.bloom_mip_views.clear();
+        self.bloom_downsample_bind_groups.clear();
+        self.bloom_upsample_bind_groups.clear();
+
+        // Create sampler for bloom
+        let bloom_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        // Create mip chain (each level is half the size of the previous)
+        for mip_level in 0..mip_count {
+            let mip_width = (source_width >> mip_level).max(1);
+            let mip_height = (source_height >> mip_level).max(1);
+
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(&format!("bloom_mip_{}", mip_level)),
+                size: wgpu::Extent3d {
+                    width: mip_width,
+                    height: mip_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba16Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            self.bloom_mip_textures.push(texture);
+            self.bloom_mip_views.push(view);
+        }
+
+        // Create downsample bind groups (source -> target mip)
+        // Mip 0 uses world texture as input, rest use previous mip
+        for mip_level in 0..mip_count {
+            let source_view = if mip_level == 0 {
+                &self.world_texture_view
+            } else {
+                &self.bloom_mip_views[(mip_level - 1) as usize]
+            };
+
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("bloom_downsample_bind_group_{}", mip_level)),
+                layout: &self.bloom_downsample_pipeline.get_bind_group_layout(0),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(source_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&bloom_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.bloom_downsample_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+
+            self.bloom_downsample_bind_groups.push(bind_group);
+        }
+
+        // Create upsample bind groups (smaller mip -> larger mip, with blending)
+        // Start from smallest mip, upsample back to mip 0
+        for mip_level in (0..mip_count).rev() {
+            let source_view = &self.bloom_mip_views[mip_level as usize];
+
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("bloom_upsample_bind_group_{}", mip_level)),
+                layout: &self.bloom_upsample_pipeline.get_bind_group_layout(0),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(source_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&bloom_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.bloom_upsample_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+
+            self.bloom_upsample_bind_groups.push(bind_group);
+        }
+
+        self.bloom_mip_count = mip_count;
+        self.bloom_enabled = true;
+        log::info!(
+            "Bloom initialized: {}x{} with {} mip levels",
+            source_width,
+            source_height,
+            mip_count
+        );
+
+        // Recreate overlay bind group with bloom texture (mip 0)
+        let overlay_bind_group_layout = self.render_pipeline.get_bind_group_layout(2);
+        self.overlay_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("overlay_bind_group"),
+            layout: &overlay_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.temp_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.temp_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&self.light_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.light_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.overlay_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.post_process_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&self.bloom_mip_views[0]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::Sampler(&self.bloom_sampler),
+                },
+            ],
+        });
+    }
+
+    /// Render bloom passes (downsample + upsample)
+    /// Returns the final bloom mip 0 view that should be composited with the main render
+    fn render_bloom_passes(&mut self, encoder: &mut wgpu::CommandEncoder) {
+        if !self.bloom_enabled || self.bloom_mip_count == 0 {
+            return;
+        }
+
+        // Downsample pass: Extract bright pixels and create mip chain
+        for mip_level in 0..self.bloom_mip_count {
+            let target_view = &self.bloom_mip_views[mip_level as usize];
+            let bind_group = &self.bloom_downsample_bind_groups[mip_level as usize];
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(&format!("bloom_downsample_pass_{}", mip_level)),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.bloom_downsample_pipeline);
+            render_pass.set_bind_group(0, bind_group, &[]);
+            render_pass.draw(0..3, 0..1); // Full-screen triangle
+        }
+
+        // Upsample pass: Blur and combine mips (from smallest back to largest)
+        for i in (1..self.bloom_mip_count).rev() {
+            let target_view = &self.bloom_mip_views[(i - 1) as usize];
+            let bind_group = &self.bloom_upsample_bind_groups[i as usize];
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(&format!("bloom_upsample_pass_{}", i)),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Keep existing content
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.bloom_upsample_pipeline);
+            render_pass.set_bind_group(0, bind_group, &[]);
+            render_pass.draw(0..3, 0..1); // Full-screen triangle
+        }
+    }
+
+    /// Enable bloom with specified quality (mip count: 3=Low, 4=Medium, 5=High)
+    pub fn enable_bloom(&mut self, quality_mip_count: u32) {
+        let mip_count = quality_mip_count.clamp(3, 5);
+        self.init_bloom_resources(
+            Self::WORLD_TEXTURE_SIZE,
+            Self::WORLD_TEXTURE_SIZE,
+            mip_count,
+        );
+    }
+
+    /// Disable bloom
+    pub fn disable_bloom(&mut self) {
+        self.bloom_enabled = false;
+        self.bloom_mip_textures.clear();
+        self.bloom_mip_views.clear();
+        self.bloom_downsample_bind_groups.clear();
+        self.bloom_upsample_bind_groups.clear();
+        self.bloom_mip_count = 0;
+
+        // Recreate overlay bind group with dummy bloom texture
+        let overlay_bind_group_layout = self.render_pipeline.get_bind_group_layout(2);
+        self.overlay_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("overlay_bind_group"),
+            layout: &overlay_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.temp_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.temp_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&self.light_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.light_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.overlay_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.post_process_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&self.dummy_bloom_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::Sampler(&self.bloom_sampler),
+                },
+            ],
+        });
     }
 
     /// Get render stats for debugging (dirty_chunks, rendered_total)
@@ -812,6 +1424,10 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("render_encoder"),
             });
+
+        // Render bloom passes (if enabled)
+        // TODO: Composite bloom result with world texture in final shader
+        self.render_bloom_passes(&mut encoder);
 
         // Time: egui preparation and rendering
         let t2 = Instant::now();
@@ -1111,8 +1727,7 @@ impl Renderer {
         // Draw sprite centered on player position
         for local_y in 0..self.player_sprite.display_height as i32 {
             for local_x in 0..self.player_sprite.display_width as i32 {
-                if let Some(mut pixel) = self.player_sprite.sample_pixel(local_x, local_y, flip_h)
-                {
+                if let Some(mut pixel) = self.player_sprite.sample_pixel(local_x, local_y, flip_h) {
                     // Apply subtle cyan tint to distinguish remote players
                     // Mix 90% original color + 10% cyan
                     pixel[0] = ((pixel[0] as u16 * 90 + 0 * 10) / 100) as u8; // R: reduce slightly
@@ -1381,35 +1996,6 @@ impl Renderer {
         }
     }
 
-    /// Animate water color with a subtle flowing effect
-    fn animate_water_color(&self, base: [u8; 4], world_x: i32, world_y: i32) -> [u8; 4] {
-        let time = self.post_process.time;
-        // Create a wave pattern that flows diagonally
-        let wave =
-            ((world_x as f32 * 0.15 + world_y as f32 * 0.1 + time * 2.5).sin() * 12.0) as i16;
-        [
-            (base[0] as i16 + wave).clamp(0, 255) as u8,
-            (base[1] as i16 + wave / 2).clamp(0, 255) as u8,
-            base[2], // Keep blue channel stable
-            base[3],
-        ]
-    }
-
-    /// Animate lava color with a pulsing glow effect
-    fn animate_lava_color(&self, base: [u8; 4], world_x: i32, world_y: i32) -> [u8; 4] {
-        let time = self.post_process.time;
-        // Pulsing glow with some spatial variation
-        let pulse =
-            ((time * 3.0 + world_x as f32 * 0.05 + world_y as f32 * 0.05).sin() * 0.5 + 0.5) * 25.0;
-        let secondary_pulse = ((time * 1.5 + world_x as f32 * 0.08).cos() * 0.5 + 0.5) * 15.0;
-        [
-            (base[0] as f32 + pulse).min(255.0) as u8,
-            (base[1] as f32 + secondary_pulse).min(255.0) as u8,
-            base[2],
-            base[3],
-        ]
-    }
-
     fn render_chunk_to_buffer(&mut self, chunk: &Chunk, world: &World) {
         // Calculate chunk position in texture using dynamic texture origin
         let world_x = chunk.x * CHUNK_SIZE as i32;
@@ -1466,14 +2052,8 @@ impl Renderer {
 
                 let base_color = world.materials.get_color(pixel.material_id);
 
-                // Apply animation for liquid materials
-                let color = if pixel.material_id == MaterialId::WATER {
-                    self.animate_water_color(base_color, world_x + x as i32, world_y + y as i32)
-                } else if pixel.material_id == MaterialId::LAVA {
-                    self.animate_lava_color(base_color, world_x + x as i32, world_y + y as i32)
-                } else {
-                    base_color
-                };
+                // Animation now handled in GPU shader for better performance
+                let color = base_color;
 
                 self.pixel_buffer[idx] = color[0];
                 self.pixel_buffer[idx + 1] = color[1];
@@ -1708,17 +2288,30 @@ impl Renderer {
         const TEMP_TEXTURE_SIZE: u32 = 40;
         const CELLS_PER_CHUNK: usize = 8; // 8x8 temperature grid per chunk
 
+        // Snap camera position to chunk boundaries
+        let camera_pos = glam::Vec2::new(self.camera.position[0], self.camera.position[1]);
+        let camera_chunk_x = (camera_pos.x / CHUNK_SIZE as f32).floor() as i32;
+        let camera_chunk_y = (camera_pos.y / CHUNK_SIZE as f32).floor() as i32;
+
+        // Only update if camera moved to a different chunk
+        if camera_chunk_x == self.last_temp_overlay_chunk_x
+            && camera_chunk_y == self.last_temp_overlay_chunk_y
+        {
+            return; // Skip update - no change
+        }
+
+        // Update tracking
+        self.last_temp_overlay_chunk_x = camera_chunk_x;
+        self.last_temp_overlay_chunk_y = camera_chunk_y;
+
         // Create temperature data buffer (40x40 = 5x5 chunks × 8x8 cells)
         let mut temp_data = vec![20.0f32; (TEMP_TEXTURE_SIZE * TEMP_TEXTURE_SIZE) as usize];
 
-        // Sample temperature from 5x5 chunks around player
-        let player_chunk_x = (world.player.position.x / CHUNK_SIZE as f32).floor() as i32;
-        let player_chunk_y = (world.player.position.y / CHUNK_SIZE as f32).floor() as i32;
-
+        // Sample temperature from 5x5 chunks around camera
         for cy in -2..=2 {
             for cx in -2..=2 {
-                let chunk_x = player_chunk_x + cx;
-                let chunk_y = player_chunk_y + cy;
+                let chunk_x = camera_chunk_x + cx;
+                let chunk_y = camera_chunk_y + cy;
 
                 // Get temperature data for this chunk
                 for cell_y in 0..CELLS_PER_CHUNK {
@@ -1860,22 +2453,67 @@ impl Renderer {
         )
     }
 
+    /// Set water noise animation parameters
+    pub fn set_water_noise_params(&mut self, frequency: f32, speed: f32, amplitude: f32) {
+        self.post_process.water_noise_frequency = frequency;
+        self.post_process.water_noise_speed = speed;
+        self.post_process.water_noise_amplitude = amplitude;
+    }
+
+    /// Get water noise animation parameters
+    pub fn get_water_noise_params(&self) -> (f32, f32, f32) {
+        (
+            self.post_process.water_noise_frequency,
+            self.post_process.water_noise_speed,
+            self.post_process.water_noise_amplitude,
+        )
+    }
+
+    /// Set lava noise animation parameters
+    pub fn set_lava_noise_params(&mut self, frequency: f32, speed: f32, amplitude: f32) {
+        self.post_process.lava_noise_frequency = frequency;
+        self.post_process.lava_noise_speed = speed;
+        self.post_process.lava_noise_amplitude = amplitude;
+    }
+
+    /// Get lava noise animation parameters
+    pub fn get_lava_noise_params(&self) -> (f32, f32, f32) {
+        (
+            self.post_process.lava_noise_frequency,
+            self.post_process.lava_noise_speed,
+            self.post_process.lava_noise_amplitude,
+        )
+    }
+
     /// Update light overlay texture with data from world
     pub fn update_light_overlay(&mut self, world: &World) {
         const LIGHT_TEXTURE_SIZE: u32 = 40;
         const SAMPLES_PER_CHUNK: usize = 8; // 8x8 downsampled light grid per chunk
 
+        // Snap camera position to chunk boundaries
+        let camera_pos = glam::Vec2::new(self.camera.position[0], self.camera.position[1]);
+        let camera_chunk_x = (camera_pos.x / CHUNK_SIZE as f32).floor() as i32;
+        let camera_chunk_y = (camera_pos.y / CHUNK_SIZE as f32).floor() as i32;
+
+        // Only update if camera moved to a different chunk
+        if camera_chunk_x == self.last_light_overlay_chunk_x
+            && camera_chunk_y == self.last_light_overlay_chunk_y
+        {
+            return; // Skip update - no change
+        }
+
+        // Update tracking
+        self.last_light_overlay_chunk_x = camera_chunk_x;
+        self.last_light_overlay_chunk_y = camera_chunk_y;
+
         // Create light data buffer (40x40 = 5x5 chunks × 8x8 samples)
         let mut light_data = vec![0.0f32; (LIGHT_TEXTURE_SIZE * LIGHT_TEXTURE_SIZE) as usize];
 
-        // Sample light from 5x5 chunks around player
-        let player_chunk_x = (world.player.position.x / CHUNK_SIZE as f32).floor() as i32;
-        let player_chunk_y = (world.player.position.y / CHUNK_SIZE as f32).floor() as i32;
-
+        // Sample light from 5x5 chunks around camera
         for cy in -2..=2 {
             for cx in -2..=2 {
-                let chunk_x = player_chunk_x + cx;
-                let chunk_y = player_chunk_y + cy;
+                let chunk_x = camera_chunk_x + cx;
+                let chunk_y = camera_chunk_y + cy;
 
                 // Get light data for this chunk (8x8 downsampled)
                 for sample_y in 0..SAMPLES_PER_CHUNK {

@@ -147,6 +147,7 @@ impl Default for DebugConfig {
 
 /// Rendering/post-processing settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RenderingConfig {
     /// Scanline effect intensity (0.0 = off, 0.5 = strong)
     pub scanline_intensity: f32,
@@ -154,6 +155,24 @@ pub struct RenderingConfig {
     pub vignette_intensity: f32,
     /// Bloom/glow intensity (0.0 = off, 1.0 = strong)
     pub bloom_intensity: f32,
+    /// Water noise frequency (spatial detail, 0.01-0.2)
+    pub water_noise_frequency: f32,
+    /// Water noise speed (animation speed, 0.5-5.0)
+    pub water_noise_speed: f32,
+    /// Water noise amplitude (color variation, 0.0-0.2)
+    pub water_noise_amplitude: f32,
+    /// Lava noise frequency (spatial detail, 0.01-0.15)
+    pub lava_noise_frequency: f32,
+    /// Lava noise speed (animation speed, 0.5-3.0)
+    pub lava_noise_speed: f32,
+    /// Lava noise amplitude (glow variation, 0.0-0.3)
+    pub lava_noise_amplitude: f32,
+    /// Enable multi-pass bloom
+    pub bloom_enabled: bool,
+    /// Bloom quality (3=Low, 4=Medium, 5=High mip levels)
+    pub bloom_quality: u32,
+    /// Bloom threshold (brightness threshold, 0.4-0.8)
+    pub bloom_threshold: f32,
 }
 
 impl Default for RenderingConfig {
@@ -162,6 +181,15 @@ impl Default for RenderingConfig {
             scanline_intensity: 0.15,
             vignette_intensity: 0.25,
             bloom_intensity: 0.3,
+            water_noise_frequency: 0.08,
+            water_noise_speed: 2.0,
+            water_noise_amplitude: 0.06,
+            lava_noise_frequency: 0.05,
+            lava_noise_speed: 1.5,
+            lava_noise_amplitude: 0.12,
+            bloom_enabled: false, // Disabled by default (can enable via UI)
+            bloom_quality: 4,     // Medium quality (4 mip levels)
+            bloom_threshold: 0.6,
         }
     }
 }
