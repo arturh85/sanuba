@@ -36,116 +36,61 @@ cargo fmt --all
 
 ## SpacetimeDB Multiplayer Architecture
 
-Sunaba supports real-time multiplayer via SpacetimeDB, a database-centric server framework that compiles Rust modules to WASM.
+Real-time multiplayer via [SpacetimeDB](https://spacetimedb.com/), a database-centric server framework compiling Rust to WASM.
 
-### Feature Flags
+**Quick Commands:**
+```bash
+just spacetime-build          # Build server WASM module
+just spacetime-start          # Start local server (localhost:3000)
+just spacetime-publish-local  # Publish module to local server
+just spacetime-logs-tail      # View server logs
+```
 
-The codebase uses feature flags to separate runtime code from evolution/training code:
+### Client Architecture (Dual SDK Approach)
 
-| Feature | Crate | Purpose | Includes |
-|---------|-------|---------|----------|
-| `evolution` | sunaba-creature | Mutation, crossover, archetype generation | Evolution code, test genomes |
-| `regeneration` | sunaba-core | Fruit spawning, resource regeneration | Regeneration system |
-| `profiling` | sunaba-core, sunaba-creature | Performance profiling | puffin integration |
+| Platform | SDK | Implementation | Status |
+|----------|-----|----------------|--------|
+| **Native** | Rust SDK | `crates/sunaba/src/multiplayer/client.rs` | Stub (pending) |
+| **WASM** | TypeScript SDK | `web/js/spacetime_bridge.js` → `window.spacetimeClient` | ✅ Ready |
 
-**Key Insight:** The SpacetimeDB server builds **without** `evolution` and `regeneration` features, eliminating the `rand` dependency. This allows WASM compilation without `getrandom`, as SpacetimeDB provides its own deterministic RNG via `ctx.rng()`.
+**Feature flags:** `multiplayer_native` (native) or `multiplayer_wasm` (WASM browser)
 
-### Random Number Generation
+### Server Architecture
 
-Three categories of randomness in Sunaba:
+**Feature Gating:** Server builds **without** `evolution` and `regeneration` features, eliminating most `rand` dependencies. SpacetimeDB provides deterministic RNG via `ctx.rng()`.
 
-1. **Server-side Simulation** (`ctx.rng()` in SpacetimeDB)
-   - CA updates: falling sand direction, fire decay, material burning, chemical reactions
-   - Uses SpacetimeDB's replicated deterministic RNG for server-client consistency
-   - Implemented via `WorldRng` trait
+**What runs server-side:**
+- ✅ CA simulation (falling sand, fire, reactions) using `ctx.rng()`
+- ✅ Creature AI (neural network inference only)
+- ✅ WorldRng trait abstraction (works with both `thread_rng()` and `ctx.rng()`)
+- ❌ Evolution/training (offline only)
+- ❌ Regeneration system (offline only)
 
-2. **Client-side Simulation** (`thread_rng()` in native game)
-   - Same CA logic as server, but uses `rand::rng()` for single-player
-   - Also uses `WorldRng` trait for consistency
+**Key tables:** `world_config`, `chunk_data`, `player`, `creature_data`, tick timers
 
-3. **Genome → Brain Initialization** (`DeterministicRng`)
-   - Seeded from genome weights for reproducibility
-   - Same genome always produces same neural network
-   - Works identically on server and client
-   - **Not random** - deterministic by design!
+### Rand Compatibility
 
-### WorldRng Trait
+**IMPORTANT:** Always use **rand 0.8** and **stable APIs** to avoid version conflicts:
 
-Abstraction that allows World simulation to work with any RNG:
+```rust
+use rand::{Rng, thread_rng};  // Always import Rng trait
 
+let mut rng = thread_rng();   // Not rand::rng() (nightly only)
+rng.gen_range(0..10);         // Not .random_range() (rand 0.9)
+rng.r#gen::<f32>();           // Use r#gen in Rust 2024 ('gen' is keyword)
+```
+
+**WorldRng abstraction** (in `sunaba-core/src/world/world.rs`) allows World to work with any RNG source:
 ```rust
 pub trait WorldRng {
     fn gen_bool(&mut self) -> bool;
     fn gen_f32(&mut self) -> f32;
     fn check_probability(&mut self, probability: f32) -> bool;
 }
-
-// Blanket impl for any rand::Rng (covers thread_rng AND ctx.rng)
-impl<T: ?Sized + rand::Rng> WorldRng for T { ... }
-
-// Usage in World methods
-pub fn update<R: WorldRng>(&mut self, dt: f32, stats: &mut dyn SimStats, rng: &mut R) {
-    self.step_simulation(stats, rng);
-}
+impl<T: ?Sized + rand::Rng> WorldRng for T { ... }  // Blanket impl
 ```
 
-### Server vs Client Code Separation
-
-| Component | Native Game | SpacetimeDB Server |
-|-----------|-------------|-------------------|
-| CA Simulation | ✅ Full | ✅ Full (active chunks) |
-| Creature AI | ✅ Full | ✅ Neural inference only |
-| Evolution/Training | ✅ Offline training | ❌ Feature-gated out |
-| Regeneration | ✅ Fruit spawning | ❌ Feature-gated out |
-| RNG Source | `rand::rng()` | `ctx.rng()` |
-| Physics | Kinematic | Kinematic |
-
-### Building for SpacetimeDB
-
-The server module (`sunaba-server`) is a SpacetimeDB reducer module:
-
-```bash
-# Build the WASM module
-just spacetime-build
-
-# Or manually
-spacetime build -p crates/sunaba-server
-
-# The module uses:
-# - No default features (no evolution, no regeneration)
-# - SpacetimeDB's rand 0.8 for RNG
-# - Same sunaba-creature/sunaba-core as native game
-```
-
-### Testing SpacetimeDB Locally
-
-```bash
-# Start local instance (http://localhost:3000)
-spacetime start
-
-# Build and publish module
-spacetime build -p crates/sunaba-server
-cd crates/sunaba-server && spacetime publish -s http://localhost:3000 sunaba-server
-
-# Test spawning a creature
-spacetime call sunaba-server spawn_creature --server http://localhost:3000 -- spider 0.0 100.0
-
-# Query database
-spacetime sql sunaba-server --server http://localhost:3000 "SELECT * FROM creature_data"
-
-# View logs
-spacetime logs -c local sunaba-server -f
-```
-
-### Server Tables (SpacetimeDB)
-
-Key tables in the multiplayer server:
-
-- `world_config` - Global settings (seed, tick_count, pause state)
-- `chunk_data` - Compressed pixel data for chunks
-- `player` - Player state (position, inventory, health, hunger)
-- `creature_data` - Server-side creatures (genome, morphology, physics state)
-- `world_tick_timer` / `creature_tick_timer` - Scheduled reducers
+This supports `thread_rng()` (client), `ctx.rng()` (server), and `DeterministicRng` (genome→brain init).
 
 ## Workspace Structure
 
@@ -435,11 +380,10 @@ fn check_integrity(world, removed_pos) {
 2. **Profile early**: The CA loop is the hot path, measure before optimizing
 3. **Data-driven materials**: Resist hardcoding material behaviors
 4. **Chunk boundaries**: Most bugs occur at chunk edges - test thoroughly
-5. **Determinism**: Use seeded RNG for reproducible behavior (important for debugging)
+5. **Rand compatibility**: Always use rand 0.8 stable APIs (`thread_rng()`, `gen_range()`, `r#gen()`). Import `Rng` trait. WorldRng abstraction handles SpacetimeDB `ctx.rng()` and client `thread_rng()`.
 6. **Data-driven creatures**: Behaviors should emerge from evolution, not code
 7. **Neural inference profiling**: Brain updates are hot path for many creatures
 8. **Deterministic evolution**: Seeded RNG for reproducible training runs
 9. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
 10. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
-11. **WASM-compatible physics**: Uses simple kinematic physics (no rapier2d) for SpacetimeDB compatibility
-12. **SpacetimeDB server**: Creature AI runs server-side with neural network inference in reducers
+11. **Multiplayer client**: Dual SDK approach - native uses Rust SDK (stub), WASM uses TypeScript SDK via `window.spacetimeClient`
