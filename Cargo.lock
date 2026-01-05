@@ -4430,6 +4430,7 @@ dependencies = [
  "sunaba-creature",
  "sunaba-simulation",
  "thiserror 1.0.69",
+ "web-time",
 ]
 
 [[package]]

@@ -3,6 +3,11 @@
 use glam::{IVec2, Vec2};
 use std::collections::HashMap;
 
+#[cfg(not(feature = "client"))]
+use std::time::Instant;
+#[cfg(feature = "client")]
+use web_time::Instant;
+
 use super::ca_update::CellularAutomataUpdater;
 use super::chemistry_system::ChemistrySystem;
 use super::chunk_manager::ChunkManager;
@@ -70,7 +75,7 @@ pub struct World {
     persistence_system: PersistenceSystem,
 
     /// Session start time (for play time tracking)
-    session_start: std::time::Instant,
+    session_start: Instant,
 
     /// Total play time in seconds (accumulated across sessions)
     pub total_play_time_seconds: u64,
@@ -93,7 +98,7 @@ impl World {
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
             persistence_system: PersistenceSystem::new(42), // Default seed
-            session_start: std::time::Instant::now(),
+            session_start: Instant::now(),
             total_play_time_seconds: 0,
         };
 
@@ -1109,7 +1114,7 @@ impl World {
         if let Ok(persistence) = ChunkPersistence::new("default") {
             let metadata = persistence.load_metadata();
             self.total_play_time_seconds = metadata.play_time_seconds;
-            self.session_start = std::time::Instant::now(); // Reset session start
+            self.session_start = Instant::now(); // Reset session start
             log::info!("Loaded play time: {} seconds", self.total_play_time_seconds);
         }
 
