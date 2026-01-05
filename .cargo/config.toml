@@ -6,18 +6,16 @@
 # To enable: export RUSTC_WRAPPER=sccache in your shell profile
 # Not enabled by default to avoid CI issues and conflicts with cargo-llvm-cov
 
-# Use faster linker (lld) on native targets - reduces link time by 50-70%
-# Also link Accelerate framework for BLAS support (ndarray requires cblas)
+# Link Accelerate framework on macOS for BLAS support (ndarray requires cblas)
+# Use faster linker (lld) on Linux - reduces link time by 50-70%
 [target.x86_64-apple-darwin]
 rustflags = [
-    "-C", "link-arg=-fuse-ld=lld",
     "-C", "link-arg=-framework",
     "-C", "link-arg=Accelerate"
 ]
 
 [target.aarch64-apple-darwin]
 rustflags = [
-    "-C", "link-arg=-fuse-ld=lld",
     "-C", "link-arg=-framework",
     "-C", "link-arg=Accelerate"
 ]
