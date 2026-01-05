@@ -31,7 +31,7 @@ mod tests {
 
     #[test]
     fn test_noop_stats_default() {
-        let _stats = NoopStats::default();
+        let _stats = NoopStats;
         // Should compile and not panic
     }
 
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn test_noop_stats_all_methods() {
-        let mut stats = NoopStats::default();
+        let mut stats = NoopStats;
 
         // Mix of all operations
         for _ in 0..100 {

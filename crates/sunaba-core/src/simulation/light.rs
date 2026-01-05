@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn test_light_constants() {
         assert_eq!(LIGHT_MAX, 15, "Max light should be 15");
-        assert!(LIGHT_FIRE <= LIGHT_MAX, "Fire light should not exceed max");
-        assert!(LIGHT_LAVA <= LIGHT_MAX, "Lava light should not exceed max");
+        const { assert!(LIGHT_FIRE <= LIGHT_MAX, "Fire light should not exceed max") };
+        const { assert!(LIGHT_LAVA <= LIGHT_MAX, "Lava light should not exceed max") };
     }
 }

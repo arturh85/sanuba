@@ -186,7 +186,7 @@ mod tests {
             &input,
             dt,
             200.0,
-            || true, // is_grounded
+            || true,            // is_grounded
             |_, _, _, _| false, // no collision
         );
 
@@ -219,25 +219,11 @@ mod tests {
         let dt = 0.05; // 50ms
 
         // First frame on ground
-        PlayerPhysicsSystem::update(
-            &mut player,
-            &input,
-            dt,
-            200.0,
-            || true,
-            |_, _, _, _| false,
-        );
+        PlayerPhysicsSystem::update(&mut player, &input, dt, 200.0, || true, |_, _, _, _| false);
         assert_eq!(player.coyote_time, Player::COYOTE_TIME);
 
         // Now in air, coyote time should decrease
-        PlayerPhysicsSystem::update(
-            &mut player,
-            &input,
-            dt,
-            200.0,
-            || false,
-            |_, _, _, _| false,
-        );
+        PlayerPhysicsSystem::update(&mut player, &input, dt, 200.0, || false, |_, _, _, _| false);
         assert!(player.coyote_time < Player::COYOTE_TIME);
         assert!(player.coyote_time > 0.0);
     }
@@ -249,14 +235,7 @@ mod tests {
         input.jump_pressed = true;
         let dt = 1.0 / 60.0;
 
-        PlayerPhysicsSystem::update(
-            &mut player,
-            &input,
-            dt,
-            200.0,
-            || false,
-            |_, _, _, _| false,
-        );
+        PlayerPhysicsSystem::update(&mut player, &input, dt, 200.0, || false, |_, _, _, _| false);
 
         // Jump buffer should be set when jump is pressed
         // (but used immediately if coyote time > 0, so we start in air)
@@ -356,14 +335,7 @@ mod tests {
         input.jump_pressed = true;
         let dt = 1.0 / 60.0;
 
-        PlayerPhysicsSystem::update(
-            &mut player,
-            &input,
-            dt,
-            200.0,
-            || true,
-            |_, _, _, _| false,
-        );
+        PlayerPhysicsSystem::update(&mut player, &input, dt, 200.0, || true, |_, _, _, _| false);
 
         // After jumping, coyote time should be consumed
         assert_eq!(player.coyote_time, 0.0);
@@ -442,14 +414,7 @@ mod tests {
         let input = make_test_input();
         let dt = 1.0 / 60.0;
 
-        PlayerPhysicsSystem::update(
-            &mut player,
-            &input,
-            dt,
-            200.0,
-            || false,
-            |_, _, _, _| false,
-        );
+        PlayerPhysicsSystem::update(&mut player, &input, dt, 200.0, || false, |_, _, _, _| false);
 
         // Velocity should be clamped to max fall speed
         assert!(player.velocity.y >= -Player::MAX_FALL_SPEED);

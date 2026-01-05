@@ -880,20 +880,44 @@ mod tests {
         let materials = Materials::new();
 
         // Test solid
-        assert_eq!(materials.get(MaterialId::STONE).material_type, MaterialType::Solid);
-        assert_eq!(materials.get(MaterialId::WOOD).material_type, MaterialType::Solid);
+        assert_eq!(
+            materials.get(MaterialId::STONE).material_type,
+            MaterialType::Solid
+        );
+        assert_eq!(
+            materials.get(MaterialId::WOOD).material_type,
+            MaterialType::Solid
+        );
 
         // Test powder
-        assert_eq!(materials.get(MaterialId::SAND).material_type, MaterialType::Powder);
-        assert_eq!(materials.get(MaterialId::ASH).material_type, MaterialType::Powder);
+        assert_eq!(
+            materials.get(MaterialId::SAND).material_type,
+            MaterialType::Powder
+        );
+        assert_eq!(
+            materials.get(MaterialId::ASH).material_type,
+            MaterialType::Powder
+        );
 
         // Test liquid
-        assert_eq!(materials.get(MaterialId::WATER).material_type, MaterialType::Liquid);
-        assert_eq!(materials.get(MaterialId::LAVA).material_type, MaterialType::Liquid);
+        assert_eq!(
+            materials.get(MaterialId::WATER).material_type,
+            MaterialType::Liquid
+        );
+        assert_eq!(
+            materials.get(MaterialId::LAVA).material_type,
+            MaterialType::Liquid
+        );
 
         // Test gas
-        assert_eq!(materials.get(MaterialId::AIR).material_type, MaterialType::Gas);
-        assert_eq!(materials.get(MaterialId::SMOKE).material_type, MaterialType::Gas);
+        assert_eq!(
+            materials.get(MaterialId::AIR).material_type,
+            MaterialType::Gas
+        );
+        assert_eq!(
+            materials.get(MaterialId::SMOKE).material_type,
+            MaterialType::Gas
+        );
     }
 
     #[test]
@@ -954,7 +978,9 @@ mod tests {
 
         // Gas < Liquid < Powder < Solid (generally)
         assert!(materials.get(MaterialId::AIR).density < materials.get(MaterialId::WATER).density);
-        assert!(materials.get(MaterialId::WATER).density < materials.get(MaterialId::STONE).density);
+        assert!(
+            materials.get(MaterialId::WATER).density < materials.get(MaterialId::STONE).density
+        );
 
         // Oil floats on water
         assert!(materials.get(MaterialId::OIL).density < materials.get(MaterialId::WATER).density);
