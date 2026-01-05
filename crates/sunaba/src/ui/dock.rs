@@ -1,7 +1,5 @@
 //! Dockable panel system using egui_dock
 
-#[cfg(not(target_arch = "wasm32"))]
-use egui_dock::NodeIndex;
 use egui_dock::{DockArea, DockState, Style, TabViewer};
 
 /// Identifiers for dockable panels
@@ -14,6 +12,8 @@ pub enum DockTab {
     Crafting,
     #[cfg(not(target_arch = "wasm32"))]
     Logger,
+    #[cfg(feature = "multiplayer")]
+    MultiplayerStats,
     #[cfg(not(target_arch = "wasm32"))]
     Parameters,
     #[cfg(feature = "profiling")]
@@ -30,6 +30,8 @@ impl std::fmt::Display for DockTab {
             DockTab::Crafting => write!(f, "Crafting"),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Logger => write!(f, "Log"),
+            #[cfg(feature = "multiplayer")]
+            DockTab::MultiplayerStats => write!(f, "Multiplayer"),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Parameters => write!(f, "Parameters"),
             #[cfg(feature = "profiling")]
@@ -46,42 +48,32 @@ pub struct DockManager {
 impl DockManager {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
-        // Start with Stats at top - all panels stack vertically in the side panel
-        let mut dock_state = DockState::new(vec![DockTab::Stats]);
+        // All tabs present from start, grouped together - Logger is the active tab
+        let mut tabs = vec![DockTab::Logger, DockTab::Stats];
 
-        // Add Profiler below Stats (when profiling enabled)
+        #[cfg(feature = "multiplayer")]
+        tabs.push(DockTab::MultiplayerStats);
+
         #[cfg(feature = "profiling")]
-        let [_stats, profiler_node] = dock_state.main_surface_mut().split_below(
-            NodeIndex::root(),
-            0.25,
-            vec![DockTab::Profiler],
-        );
+        tabs.push(DockTab::Profiler);
 
-        // Add Logger below Profiler (or below Stats if no profiling)
-        #[cfg(feature = "profiling")]
-        let [_profiler, logger_node] =
-            dock_state
-                .main_surface_mut()
-                .split_below(profiler_node, 0.5, vec![DockTab::Logger]);
-        #[cfg(not(feature = "profiling"))]
-        let [_stats, logger_node] = dock_state.main_surface_mut().split_below(
-            NodeIndex::root(),
-            0.33,
-            vec![DockTab::Logger],
-        );
+        tabs.push(DockTab::Parameters);
 
-        // Add Parameters at the bottom
-        dock_state
-            .main_surface_mut()
-            .split_below(logger_node, 0.5, vec![DockTab::Parameters]);
+        let dock_state = DockState::new(tabs);
 
         Self { dock_state }
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn new() -> Self {
-        // WASM: simpler layout - just Stats (profiler and logger not available)
-        let dock_state = DockState::new(vec![DockTab::Stats]);
+        // WASM: Stats tab present from start (but can be closed)
+        #[cfg_attr(not(feature = "multiplayer"), allow(unused_mut))]
+        let mut tabs = vec![DockTab::Stats];
+
+        #[cfg(feature = "multiplayer")]
+        tabs.push(DockTab::MultiplayerStats);
+
+        let dock_state = DockState::new(tabs);
         Self { dock_state }
     }
 
@@ -147,6 +139,16 @@ pub struct DockContext<'a> {
     pub params: &'a mut crate::config::GameConfig,
     #[cfg(not(target_arch = "wasm32"))]
     pub params_changed: &'a mut bool,
+
+    // Multiplayer metrics (both native and WASM, when multiplayer feature enabled)
+    #[cfg(feature = "multiplayer")]
+    pub multiplayer_metrics: Option<&'a crate::multiplayer::metrics::MultiplayerMetrics>,
+
+    // Multiplayer connection manager and panel state
+    #[cfg(feature = "multiplayer")]
+    pub multiplayer_manager: Option<&'a crate::multiplayer::MultiplayerManager>,
+    #[cfg(feature = "multiplayer")]
+    pub multiplayer_panel_state: &'a mut super::multiplayer_panel::MultiplayerPanelState,
 }
 
 /// Tab viewer implementation for dock
@@ -170,6 +172,8 @@ impl<'a> TabViewer for DockTabViewer<'a> {
             DockTab::Crafting => self.render_crafting(ui),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Logger => self.render_logger(ui),
+            #[cfg(feature = "multiplayer")]
+            DockTab::MultiplayerStats => self.render_multiplayer_stats(ui),
             #[cfg(not(target_arch = "wasm32"))]
             DockTab::Parameters => self.render_parameters(ui),
             #[cfg(feature = "profiling")]
@@ -409,6 +413,92 @@ impl<'a> DockTabViewer<'a> {
                 )
                 .changed();
 
+            ui.separator();
+            ui.label("Water Animation:");
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(
+                        &mut self.ctx.params.rendering.water_noise_frequency,
+                        0.01..=0.2,
+                    )
+                    .text("Frequency"),
+                )
+                .changed();
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(&mut self.ctx.params.rendering.water_noise_speed, 0.5..=5.0)
+                        .text("Speed"),
+                )
+                .changed();
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(
+                        &mut self.ctx.params.rendering.water_noise_amplitude,
+                        0.0..=0.2,
+                    )
+                    .text("Amplitude"),
+                )
+                .changed();
+
+            ui.separator();
+            ui.label("Lava Animation:");
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(
+                        &mut self.ctx.params.rendering.lava_noise_frequency,
+                        0.01..=0.15,
+                    )
+                    .text("Frequency"),
+                )
+                .changed();
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(&mut self.ctx.params.rendering.lava_noise_speed, 0.5..=3.0)
+                        .text("Speed"),
+                )
+                .changed();
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(
+                        &mut self.ctx.params.rendering.lava_noise_amplitude,
+                        0.0..=0.3,
+                    )
+                    .text("Amplitude"),
+                )
+                .changed();
+
+            ui.separator();
+            ui.label("Multi-Pass Bloom:");
+            *self.ctx.params_changed |= ui
+                .checkbox(&mut self.ctx.params.rendering.bloom_enabled, "Enable Bloom")
+                .changed();
+            if self.ctx.params.rendering.bloom_enabled {
+                *self.ctx.params_changed |= ui
+                    .add(
+                        egui::Slider::new(&mut self.ctx.params.rendering.bloom_quality, 3..=5)
+                            .text("Quality")
+                            .custom_formatter(|n, _| {
+                                match n as u32 {
+                                    3 => "Low (3 mips)",
+                                    4 => "Medium (4 mips)",
+                                    5 => "High (5 mips)",
+                                    _ => "Unknown",
+                                }
+                                .to_string()
+                            }),
+                    )
+                    .changed();
+                *self.ctx.params_changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.ctx.params.rendering.bloom_threshold,
+                            0.4..=0.8,
+                        )
+                        .text("Threshold"),
+                    )
+                    .changed();
+            }
+
             ui.add_space(8.0);
             ui.heading("Debug");
             *self.ctx.params_changed |= ui
@@ -423,7 +513,31 @@ impl<'a> DockTabViewer<'a> {
                     "Verbose Logging",
                 )
                 .changed();
+            *self.ctx.params_changed |= ui
+                .add(
+                    egui::Slider::new(&mut self.ctx.params.debug.brush_size, 1..=10)
+                        .text("Brush Size"),
+                )
+                .on_hover_text(
+                    "Circular brush radius for material placement (1 = single pixel, 10 = large circle)",
+                )
+                .changed();
         });
+    }
+
+    #[cfg(feature = "multiplayer")]
+    fn render_multiplayer_stats(&mut self, ui: &mut egui::Ui) {
+        if let Some(manager) = self.ctx.multiplayer_manager {
+            super::multiplayer_panel::render_multiplayer_panel(
+                ui,
+                manager,
+                self.ctx.multiplayer_panel_state,
+                self.ctx.multiplayer_metrics,
+            );
+        } else {
+            ui.label("Multiplayer not available");
+            ui.label("Rebuild with --features multiplayer_native to enable");
+        }
     }
 
     #[cfg(feature = "profiling")]

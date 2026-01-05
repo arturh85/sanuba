@@ -39,7 +39,16 @@ impl Default for WorldMetadata {
 
         Self {
             version: 1,
-            seed: rand::random(),
+            seed: {
+                #[cfg(feature = "regeneration")]
+                {
+                    rand::random()
+                }
+                #[cfg(not(feature = "regeneration"))]
+                {
+                    0
+                }
+            },
             spawn_point: (0.0, 100.0), // Start above ground
             created_at,
             last_played,

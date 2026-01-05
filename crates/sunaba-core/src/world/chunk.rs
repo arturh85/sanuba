@@ -176,6 +176,12 @@ impl Chunk {
         self.dirty_rect = None;
     }
 
+    /// Check if chunk is dirty (needs sync to database)
+    /// Used by SpacetimeDB server to only sync modified chunks
+    pub fn is_dirty(&self) -> bool {
+        self.dirty || self.dirty_rect.is_some() || self.simulation_active
+    }
+
     /// Clear all "updated this frame" flags from pixels
     pub fn clear_update_flags(&mut self) {
         for pixel in &mut self.pixels {

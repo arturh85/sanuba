@@ -13,6 +13,11 @@ A 2D falling-sand physics sandbox survival game featuring ML-evolved creatures w
 
 - **Emergent Physics**: Every pixel is simulated with material properties
 - **Chemistry System**: Materials react with each other (fire spreads, water evaporates, acid dissolves)
+- **Runtime-Switchable Multiplayer**: Real-time multiplayer via SpacetimeDB
+  - Start in singleplayer, connect/disconnect on-demand (press M key)
+  - World persistence: singleplayer world saved and restored
+  - Auto-reconnect with exponential backoff
+  - Server-side creature AI and physics with deterministic RNG
 - **ML-Evolved Creatures**: Pre-evolved populations with diverse morphologies and behaviors
   - Articulated bodies controlled by neural networks (CPPN-NEAT + MAP-Elites)
   - Emergent survival strategies: hunting, building, tool use, social behaviors
@@ -56,6 +61,85 @@ The game can run in browsers that support WebGPU (Chrome 113+, Edge 113+, Firefo
 ```bash
 just web
 ```
+
+### Multiplayer (SpacetimeDB)
+
+Sunaba supports **runtime-switchable multiplayer** via [SpacetimeDB](https://spacetimedb.com/). Start in singleplayer, connect to servers on-demand, switch back anytime.
+
+**Quick Join:**
+
+```bash
+# Start in singleplayer (default)
+just start
+
+# Connect to local dev server on startup
+just join-local
+
+# Connect to production server on startup
+just join-prod
+
+# Connect to custom server
+cargo run --features multiplayer_native -- --server https://your-server.com
+```
+
+**In-Game Connection:**
+- Press `M` key to open multiplayer panel
+- Select from predefined servers or enter custom URL
+- Click "Connect" to join, "Disconnect" to return to singleplayer
+- Your singleplayer world is saved before connecting and restored when you disconnect
+
+**Connection Flow:**
+- **Singleplayer → Multiplayer:** Saves your world, switches to server-authoritative mode
+- **Multiplayer → Singleplayer:** Restores your world from snapshot
+- **Auto-Reconnect:** Exponential backoff on connection loss (1s, 2s, 4s, 8s, max 30s)
+
+**Server Setup (for hosting):**
+
+```bash
+# Install SpacetimeDB CLI (first time only)
+curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh
+
+# Start local server
+just spacetime-start
+
+# Build and publish the server module
+just spacetime-build
+just spacetime-publish-local
+
+# View server logs
+just spacetime-logs-tail
+```
+
+**Development Workflow (schema changes):**
+
+After modifying `crates/sunaba-server/src/`:
+
+```bash
+just spacetime-build           # Rebuild server WASM
+just spacetime-generate-rust   # Regenerate Rust client
+just spacetime-generate-ts     # Regenerate TypeScript client
+just test                      # Validate both clients match server
+```
+
+**Architecture:**
+
+- **Native Client:** Auto-generated Rust SDK (gitignored, regenerated on build)
+- **WASM Client:** Auto-generated TypeScript SDK (gitignored, regenerated on build)
+- **Server:** WASM module with scheduled reducers (60fps world, 30fps creatures)
+
+**Safety:** Both clients are fully auto-generated and type-safe. Generated code is gitignored and regenerated on every build, ensuring clients always match the server schema. No manual maintenance required.
+
+**Server Features:**
+
+The multiplayer server runs the same simulation code as the native game:
+- ✅ Full CA physics (falling sand, fire, reactions)
+- ✅ Server-side creature AI (neural network inference)
+- ✅ Deterministic RNG via `ctx.rng()` for consistency
+- ❌ No evolution/training (feature-gated out for WASM)
+
+The server compiles **without** `evolution` and `regeneration` features, eliminating the `rand` dependency. SpacetimeDB provides its own deterministic RNG via `ctx.rng()`, ensuring server-client consistency.
+
+See [CLAUDE.md](CLAUDE.md#spacetimedb-multiplayer-architecture) for detailed multiplayer architecture.
 
 ### Tests
 
@@ -124,9 +208,10 @@ where complex behavior arises naturally from fundamental rules rather than scrip
 ### Foundation (Stable)
 The simulation core is complete and battle-tested:
 - Pixel physics: 32 materials with temperature, reactions, state changes
-- Structural integrity with rapier2d falling debris
+- Structural integrity with kinematic falling debris
 - Persistent world with procedural cave generation
 - Player systems: mining, crafting, inventory
+- **Multiplayer**: SpacetimeDB server module with server-side simulation and creature AI
 
 ### Creature Evolution (Active Research)
 Building the ML creature pipeline—currently exploring:

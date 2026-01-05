@@ -4,6 +4,7 @@
 
 use glam::Vec2;
 use serde::{Deserialize, Serialize};
+use sunaba_simulation::MaterialId;
 
 /// Raycast vision result
 #[derive(Debug, Clone)]
@@ -180,26 +181,30 @@ pub fn raycast_vision(
     hits
 }
 
-/// DDA (Digital Differential Analyzer) raycasting
+/// Bresenham raycasting - exact pixel traversal for creature sensors
 fn raycast_dda(
     world: &impl crate::WorldAccess,
     origin: Vec2,
     direction: Vec2,
     max_distance: f32,
 ) -> RaycastHit {
-    let mut current_pos = origin;
-    let step_size = 1.0; // Step one pixel at a time
+    use bresenham::Bresenham;
 
-    let mut distance = 0.0;
+    // Calculate start and end points for Bresenham (uses isize)
+    let from_i = (origin.x.round() as isize, origin.y.round() as isize);
+    let to = origin + direction * max_distance;
+    let to_i = (to.x.round() as isize, to.y.round() as isize);
 
-    while distance < max_distance {
-        // Step forward
-        current_pos += direction * step_size;
-        distance += step_size;
+    // Calculate max distance for normalization (in pixels)
+    let max_dist = ((to_i.0 - from_i.0).pow(2) + (to_i.1 - from_i.1).pow(2)) as f32;
+    let max_dist_sqrt = max_dist.sqrt().max(1.0); // Avoid division by zero
 
-        // Check pixel at current position
-        let pixel_x = current_pos.x.round() as i32;
-        let pixel_y = current_pos.y.round() as i32;
+    // Use Bresenham line algorithm for exact pixel traversal
+    let mut pixel_count = 0.0;
+    for (x, y) in Bresenham::new(from_i, to_i) {
+        pixel_count += 1.0;
+        let pixel_x = x as i32;
+        let pixel_y = y as i32;
 
         if let Some(pixel) = world.get_pixel(pixel_x, pixel_y) {
             let material_id = pixel.material_id;
@@ -208,11 +213,10 @@ fn raycast_dda(
             if material_id != 0 {
                 // Get additional information about the hit
                 let temperature = world.get_temperature_at_pixel(pixel_x, pixel_y);
-
                 let light_level = world.get_light_at(pixel_x, pixel_y).unwrap_or(0);
 
                 return RaycastHit {
-                    distance: distance / max_distance, // Normalize
+                    distance: (pixel_count / max_dist_sqrt).min(1.0), // Normalize to 0-1
                     material_id,
                     temperature,
                     light_level,
@@ -294,18 +298,16 @@ pub fn detect_nearby_threats(
     let min_y = (position.y - radius).floor() as i32;
     let max_y = (position.y + radius).ceil() as i32;
 
-    // Dangerous material IDs (based on materials.rs)
-    const FIRE: u16 = 6;
-    const LAVA: u16 = 9;
-    const ACID: u16 = 11;
-
     for y in min_y..=max_y {
         for x in min_x..=max_x {
             if let Some(pixel) = world.get_pixel(x, y) {
                 let material_id = pixel.material_id;
 
                 // Check if material is dangerous
-                if material_id == FIRE || material_id == LAVA || material_id == ACID {
+                if material_id == MaterialId::FIRE
+                    || material_id == MaterialId::LAVA
+                    || material_id == MaterialId::ACID
+                {
                     let pixel_pos = Vec2::new(x as f32, y as f32);
                     let dist_sq = position.distance_squared(pixel_pos);
 
@@ -550,40 +552,4 @@ mod tests {
     // The following tests require World::new() which is in sunaba-core.
     // These tests are moved to sunaba-core as integration tests.
     // See sunaba-core/tests/creature_sensors_test.rs
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_raycast_vision_creates_correct_number() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_raycast_dda_air_returns_max_distance() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_detect_nearby_food_none_when_empty() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_detect_nearby_threats_none_when_safe() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_calculate_gradients_returns_normalized() {
-        // This test requires World::new() from sunaba-core
-    }
-
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_sensory_input_gather_complete() {
-        // This test requires World::new() from sunaba-core
-    }
 }

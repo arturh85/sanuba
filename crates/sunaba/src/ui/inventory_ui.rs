@@ -167,7 +167,7 @@ impl InventoryPanel {
                     let color_bar = Rect::from_min_size(rect.min, Vec2::new(size, 8.0));
                     painter.rect_filled(color_bar, CornerRadius::same(2), tool_color);
 
-                    // Tool name (TODO: load from tool registry)
+                    // Tool name (hardcoded for now - registry not accessible from UI)
                     let name = match *tool_id {
                         1000 => "Wood Pick",
                         1001 => "Stone Pick",

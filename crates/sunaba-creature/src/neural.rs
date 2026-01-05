@@ -3,6 +3,7 @@
 //! Implements NerveNet-style GNN that adapts to variable morphologies.
 
 use glam::Vec2;
+use ndarray::{ArrayView1, ArrayView2};
 
 use super::genome::ControllerGenome;
 use super::morphology::CreatureMorphology;
@@ -111,9 +112,10 @@ impl SimpleNeuralController {
     }
 
     /// Create random controller for testing
+    #[cfg(feature = "evolution")]
     pub fn random(input_dim: usize, hidden_dim: usize, output_dim: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Calculate weight count: input->hidden + hidden->output
         let input_to_hidden = input_dim * hidden_dim;
@@ -122,7 +124,7 @@ impl SimpleNeuralController {
 
         // Initialize with Xavier/Glorot uniform distribution
         let weights: Vec<f32> = (0..total_weights)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -145,39 +147,36 @@ impl SimpleNeuralController {
 
     /// Forward pass: features -> motor commands
     /// Simple 2-layer network: input -> hidden (tanh) -> output (tanh)
+    /// Uses ndarray for BLAS-accelerated matrix operations
     pub fn forward(&self, input: &[f32]) -> Vec<f32> {
         assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
 
-        // Layer 1: input -> hidden
-        let input_to_hidden_weights = &self.weights[0..self.input_dim * self.hidden_dim];
-        let mut hidden = vec![0.0; self.hidden_dim];
+        // Convert input to Array1
+        let input_array = ArrayView1::from(input);
 
-        #[allow(clippy::needless_range_loop)]
-        for h in 0..self.hidden_dim {
-            let mut sum = 0.0;
-            for i in 0..self.input_dim {
-                let weight_idx = h * self.input_dim + i;
-                sum += input[i] * input_to_hidden_weights[weight_idx];
-            }
-            hidden[h] = sum.tanh(); // Activation
-        }
+        // Layer 1: input -> hidden
+        // Weight matrix is stored as [hidden_dim, input_dim] in row-major order
+        let w1_slice = &self.weights[0..self.input_dim * self.hidden_dim];
+        let w1 = ArrayView2::from_shape((self.hidden_dim, self.input_dim), w1_slice)
+            .expect("Failed to reshape input->hidden weights");
+
+        // Matrix-vector multiplication: hidden = W1 * input
+        let hidden_pre = w1.dot(&input_array);
+        // Apply tanh activation
+        let hidden = hidden_pre.mapv(|x| x.tanh());
 
         // Layer 2: hidden -> output
         let hidden_to_output_start = self.input_dim * self.hidden_dim;
-        let hidden_to_output_weights = &self.weights[hidden_to_output_start..];
-        let mut output = vec![0.0; self.output_dim];
+        let w2_slice = &self.weights[hidden_to_output_start..];
+        let w2 = ArrayView2::from_shape((self.output_dim, self.hidden_dim), w2_slice)
+            .expect("Failed to reshape hidden->output weights");
 
-        #[allow(clippy::needless_range_loop)]
-        for o in 0..self.output_dim {
-            let mut sum = 0.0;
-            for h in 0..self.hidden_dim {
-                let weight_idx = o * self.hidden_dim + h;
-                sum += hidden[h] * hidden_to_output_weights[weight_idx];
-            }
-            output[o] = sum.tanh(); // Activation
-        }
+        // Matrix-vector multiplication: output = W2 * hidden
+        let output_pre = w2.dot(&hidden);
+        // Apply tanh activation
+        let output = output_pre.mapv(|x| x.tanh());
 
-        output
+        output.to_vec()
     }
 }
 
@@ -202,8 +201,7 @@ impl DeepNeuralController {
     /// - hidden_dim=16 (biped) -> 48, 24
     /// - hidden_dim=24 (quadruped) -> 72, 36
     pub fn from_genome(genome: &ControllerGenome, input_dim: usize, output_dim: usize) -> Self {
-        use rand::Rng;
-        use rand::SeedableRng;
+        use crate::deterministic_rng::DeterministicRng;
 
         // Scale hidden layer sizes from genome's hidden_dim
         let scale = genome.hidden_dim as f32 / 16.0;
@@ -223,27 +221,26 @@ impl DeepNeuralController {
             .chain(genome.update_weights.iter())
             .chain(genome.output_weights.iter())
             .fold(0u64, |acc, &w| acc.wrapping_add((w * 1000.0) as i64 as u64));
-        let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(seed);
+        let mut rng = DeterministicRng::from_seed(seed);
 
         // Generate all weights randomly, seeded by genome
         // Xavier/Glorot initialization scaled by layer sizes
-        let weights: Vec<f32> = (0..expected_size)
-            .map(|i| {
-                // Determine which layer this weight belongs to for proper scaling
-                let in_h1 = input_dim * hidden1_dim;
-                let h1_h2 = hidden1_dim * hidden2_dim;
+        let mut weights = Vec::with_capacity(expected_size);
+        for i in 0..expected_size {
+            // Determine which layer this weight belongs to for proper scaling
+            let in_h1 = input_dim * hidden1_dim;
+            let h1_h2 = hidden1_dim * hidden2_dim;
 
-                let scale = if i < in_h1 {
-                    (2.0 / (input_dim + hidden1_dim) as f32).sqrt()
-                } else if i < in_h1 + h1_h2 {
-                    (2.0 / (hidden1_dim + hidden2_dim) as f32).sqrt()
-                } else {
-                    (2.0 / (hidden2_dim + output_dim) as f32).sqrt()
-                };
+            let scale = if i < in_h1 {
+                (2.0 / (input_dim + hidden1_dim) as f32).sqrt()
+            } else if i < in_h1 + h1_h2 {
+                (2.0 / (hidden1_dim + hidden2_dim) as f32).sqrt()
+            } else {
+                (2.0 / (hidden2_dim + output_dim) as f32).sqrt()
+            };
 
-                rng.random_range(-1.0..1.0) * scale
-            })
-            .collect();
+            weights.push(rng.gen_range_f32(-1.0, 1.0) * scale);
+        }
 
         Self {
             weights,
@@ -257,6 +254,7 @@ impl DeepNeuralController {
     }
 
     /// Create random controller for testing
+    #[cfg(feature = "evolution")]
     pub fn random(
         input_dim: usize,
         hidden1_dim: usize,
@@ -264,14 +262,14 @@ impl DeepNeuralController {
         output_dim: usize,
     ) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         let total_weights =
             input_dim * hidden1_dim + hidden1_dim * hidden2_dim + hidden2_dim * output_dim;
 
         // Xavier/Glorot initialization
         let weights: Vec<f32> = (0..total_weights)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -302,80 +300,72 @@ impl DeepNeuralController {
 
     /// Forward pass with two hidden layers and optional recurrence
     /// input -> hidden1 (tanh) -> hidden2 (tanh) -> output (tanh)
+    /// Uses ndarray for BLAS-accelerated matrix operations
     pub fn forward(&mut self, input: &[f32]) -> Vec<f32> {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();
 
         assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
 
+        // Convert input to Array1
+        let input_array = ArrayView1::from(input);
+
         let mut offset = 0;
 
         // Layer 1: input -> hidden1
         let w1_end = self.input_dim * self.hidden1_dim;
-        let w1 = &self.weights[offset..w1_end];
+        let w1_slice = &self.weights[offset..w1_end];
+        let w1 = ArrayView2::from_shape((self.hidden1_dim, self.input_dim), w1_slice)
+            .expect("Failed to reshape input->hidden1 weights");
         offset = w1_end;
 
-        let mut hidden1 = vec![0.0; self.hidden1_dim];
-        #[allow(clippy::needless_range_loop)]
-        for h in 0..self.hidden1_dim {
-            let mut sum = 0.0;
-            for i in 0..self.input_dim {
-                sum += input[i] * w1[h * self.input_dim + i];
-            }
-            hidden1[h] = sum.tanh();
-        }
+        // Matrix-vector multiplication: hidden1 = W1 * input
+        let hidden1_pre = w1.dot(&input_array);
+        let hidden1 = hidden1_pre.mapv(|x| x.tanh());
 
         // Layer 2: hidden1 -> hidden2
         let w2_end = offset + self.hidden1_dim * self.hidden2_dim;
-        let w2 = &self.weights[offset..w2_end];
+        let w2_slice = &self.weights[offset..w2_end];
+        let w2 = ArrayView2::from_shape((self.hidden2_dim, self.hidden1_dim), w2_slice)
+            .expect("Failed to reshape hidden1->hidden2 weights");
         offset = w2_end;
 
-        let mut hidden2 = vec![0.0; self.hidden2_dim];
-        #[allow(clippy::needless_range_loop)]
-        for h in 0..self.hidden2_dim {
-            let mut sum = 0.0;
-            for i in 0..self.hidden1_dim {
-                sum += hidden1[i] * w2[h * self.hidden1_dim + i];
-            }
-            hidden2[h] = sum.tanh();
-        }
+        // Matrix-vector multiplication: hidden2 = W2 * hidden1
+        let hidden2_pre = w2.dot(&hidden1);
+        let mut hidden2 = hidden2_pre.mapv(|x| x.tanh());
 
         // Simple recurrence: blend with previous hidden state
         if let Some(ref prev) = self.prev_hidden {
             let blend = self.recurrence_factor;
-            for h in 0..self.hidden2_dim.min(prev.len()) {
-                hidden2[h] = (1.0 - blend) * hidden2[h] + blend * prev[h];
+            let prev_array = ArrayView1::from(prev);
+            let min_dim = self.hidden2_dim.min(prev.len());
+
+            // Blend current hidden2 with previous hidden state
+            for h in 0..min_dim {
+                hidden2[h] = (1.0 - blend) * hidden2[h] + blend * prev_array[h];
             }
         }
-        self.prev_hidden = Some(hidden2.clone());
+        self.prev_hidden = Some(hidden2.to_vec());
 
         // Layer 3: hidden2 -> output
-        let w3 = &self.weights[offset..];
-        let mut output = vec![0.0; self.output_dim];
+        let w3_slice = &self.weights[offset..];
+        let w3 = ArrayView2::from_shape((self.output_dim, self.hidden2_dim), w3_slice)
+            .expect("Failed to reshape hidden2->output weights");
 
-        #[allow(clippy::needless_range_loop)]
-        for o in 0..self.output_dim {
-            let mut sum = 0.0;
-            for h in 0..self.hidden2_dim {
-                let idx = o * self.hidden2_dim + h;
-                if idx < w3.len() {
-                    sum += hidden2[h] * w3[idx];
-                }
-            }
-            output[o] = sum.tanh();
-        }
+        // Matrix-vector multiplication: output = W3 * hidden2
+        let output_pre = w3.dot(&hidden2);
+        let output = output_pre.mapv(|x| x.tanh());
 
-        output
+        output.to_vec()
     }
 }
 
-/// Extract features from physics state
-/// Extracts actual physics data from rapier2d bodies for neural control
-pub fn extract_body_part_features(
+/// Extract features from simple physics state
+/// Uses CreaturePhysicsState for position-based physics without rapier2d
+pub fn extract_body_part_features_simple(
     morphology: &CreatureMorphology,
-    physics_world: &crate::physics::PhysicsWorld,
+    physics_state: &super::simple_physics::CreaturePhysicsState,
     sensory_input: &super::sensors::SensoryInput,
-    physics_handles: Option<&[rapier2d::prelude::RigidBodyHandle]>,
     world: &impl crate::WorldAccess,
 ) -> Vec<BodyPartFeatures> {
     let num_parts = morphology.body_parts.len();
@@ -387,73 +377,38 @@ pub fn extract_body_part_features(
         None => (0.0, 0.0, 1.0), // No food detected - zero direction, max distance
     };
 
-    // Get body part positions and orientations from physics
-    let body_data: Vec<(Vec2, f32, Vec2)> = if let Some(handles) = physics_handles {
-        handles
-            .iter()
-            .filter_map(|&handle| {
-                physics_world.rigid_body_set().get(handle).map(|rb| {
-                    let pos = rb.translation();
-                    let rotation = rb.rotation().angle();
-                    let linvel = rb.linvel();
-                    (
-                        Vec2::new(pos.x, pos.y),
-                        rotation,
-                        Vec2::new(linvel.x, linvel.y),
-                    )
-                })
-            })
-            .collect()
-    } else {
-        // No physics handles - return placeholder data
-        morphology
-            .body_parts
-            .iter()
-            .map(|part| (part.local_position, 0.0, Vec2::ZERO))
-            .collect()
-    };
-
     // Get root orientation for relative calculations
-    let _root_pos = body_data.first().map(|(p, _, _)| *p).unwrap_or(Vec2::ZERO);
-    let root_orientation = body_data.first().map(|(_, r, _)| *r).unwrap_or(0.0);
-
-    // Build joint angle map (parent_index -> child angles relative to parent)
-    let mut joint_angles: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-    let mut prev_angles: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-
-    for joint in &morphology.joints {
-        if let (Some((_, parent_rot, _)), Some((_, child_rot, _))) = (
-            body_data.get(joint.parent_index),
-            body_data.get(joint.child_index),
-        ) {
-            // Joint angle is the relative rotation between parent and child
-            let angle = child_rot - parent_rot;
-            // Normalize to [-PI, PI]
-            let normalized = (angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
-                - std::f32::consts::PI;
-            joint_angles.insert(joint.child_index, normalized);
-        }
-    }
+    let root_orientation = physics_state.part_rotations.first().copied().unwrap_or(0.0);
 
     for (i, _part) in morphology.body_parts.iter().enumerate() {
-        // Get this body part's data
-        let (position, orientation, velocity) =
-            body_data
-                .get(i)
-                .copied()
-                .unwrap_or((Vec2::ZERO, 0.0, Vec2::ZERO));
+        // Get this body part's data from physics_state
+        let position = physics_state
+            .part_positions
+            .get(i)
+            .copied()
+            .unwrap_or(Vec2::ZERO);
+        let orientation = physics_state.part_rotations.get(i).copied().unwrap_or(0.0);
 
-        // Joint angle (relative to parent, or 0 if root)
-        let joint_angle = joint_angles.get(&i).copied().unwrap_or(0.0);
-
-        // Joint angular velocity (approximate from angle change)
-        // For now, use 0 since we need previous frame data
-        // This will be improved when we track previous angles
-        let joint_angular_velocity = prev_angles
-            .get(&i)
-            .map(|prev| (joint_angle - prev) * 60.0) // Assuming 60fps
+        // Joint angle (from motor angles if this is a motorized part)
+        let joint_angle = physics_state
+            .motor_part_indices
+            .iter()
+            .position(|&idx| idx == i)
+            .and_then(|motor_idx| physics_state.motor_angles.get(motor_idx).copied())
             .unwrap_or(0.0);
-        prev_angles.insert(i, joint_angle);
+
+        // Joint angular velocity
+        let joint_angular_velocity = physics_state
+            .motor_part_indices
+            .iter()
+            .position(|&idx| idx == i)
+            .and_then(|motor_idx| {
+                physics_state
+                    .motor_angular_velocities
+                    .get(motor_idx)
+                    .copied()
+            })
+            .unwrap_or(0.0);
 
         // Ground contact: raycast downward from body part
         let ground_contact = check_ground_contact(world, position, &morphology.body_parts[i]);
@@ -470,6 +425,9 @@ pub fn extract_body_part_features(
 
         // Normalize orientation relative to root
         let relative_orientation = orientation - root_orientation;
+
+        // Velocity is not tracked in simple physics - use zero
+        let velocity = Vec2::ZERO;
 
         features.push(BodyPartFeatures {
             joint_angle,
@@ -627,34 +585,9 @@ mod tests {
         assert_eq!(graph.edges.len(), 4);
     }
 
-    #[test]
-    #[ignore] // Requires concrete World implementation from sunaba-core
-    fn test_extract_body_part_features() {
-        use crate::morphology::CreatureMorphology;
-        use crate::physics::PhysicsWorld;
-        use crate::sensors::SensorConfig;
-        // Tests need concrete World implementation - World::new() is in sunaba-core
-
-        let morphology = CreatureMorphology::test_biped();
-        let physics_world = PhysicsWorld::new();
-        // Note: World::new() is in sunaba-core, not available here
-        let config = SensorConfig::default();
-
-        // This test requires a concrete World implementation
-        // let world = World::new();
-        // let sensory_input = SensoryInput::gather(&world, Vec2::new(100.0, 100.0), &config);
-        // let features = extract_body_part_features(&morphology, &physics_world, &sensory_input, None, &world);
-
-        // Should have features for each body part
-        // assert_eq!(features.len(), morphology.body_parts.len());
-
-        // Each feature should have raycast data
-        // for feature in &features {
-        //     assert_eq!(feature.raycast_distances.len(), config.num_raycasts);
-        //     assert_eq!(feature.contact_materials.len(), 5);
-        // }
-        let _ = (morphology, physics_world, config);
-    }
+    // The following tests require World::new() which is in sunaba-core.
+    // These tests are moved to sunaba-core as integration tests.
+    // See sunaba-core/tests/creature_neural_test.rs
 
     #[test]
     fn test_neural_controller_deterministic() {

@@ -43,11 +43,12 @@ impl MaterialId {
     pub const IRON_INGOT: u16 = 26;
     pub const BRONZE_INGOT: u16 = 27;
     pub const STEEL_INGOT: u16 = 28;
+    pub const GOLD_INGOT: u16 = 29;
 
     // Special materials
-    pub const GUNPOWDER: u16 = 29;
-    pub const POISON_GAS: u16 = 30;
-    pub const FERTILIZER: u16 = 31;
+    pub const GUNPOWDER: u16 = 30;
+    pub const POISON_GAS: u16 = 31;
+    pub const FERTILIZER: u16 = 32;
 }
 
 /// How a material behaves physically
@@ -570,7 +571,7 @@ impl Materials {
             hardness: Some(4),
             structural: true,
             melting_point: Some(1064.0),
-            melts_to: Some(MaterialId::COPPER_INGOT), // FIXME: Should be gold_ingot
+            melts_to: Some(MaterialId::GOLD_INGOT), // Fixed: was COPPER_INGOT
             hardness_multiplier: 1.5,
             conducts_electricity: true,
             tags: vec![MaterialTag::Ore, MaterialTag::Mineral],
@@ -649,6 +650,25 @@ impl Materials {
             heat_conductivity: 0.75,
             structural_strength: Some(200.0),
             hardness_multiplier: 3.5, // Very hard to mine
+            tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
+            ..Default::default()
+        });
+
+        // Gold Ingot - smelted gold
+        self.register(MaterialDef {
+            id: MaterialId::GOLD_INGOT,
+            name: "gold_ingot".to_string(),
+            material_type: MaterialType::Solid,
+            color: [255, 215, 0, 255], // Bright gold
+            density: 19.3,             // Gold is very dense
+            hardness: Some(5),         // Softer than iron/steel
+            structural: true,
+            melting_point: Some(1064.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.7,
+            conducts_electricity: true,
+            structural_strength: Some(80.0), // Softer metal
+            hardness_multiplier: 1.0,        // Easy to mine (soft metal)
             tags: vec![MaterialTag::Metallic, MaterialTag::Refined],
             ..Default::default()
         });

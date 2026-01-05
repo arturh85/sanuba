@@ -1,7 +1,7 @@
 use crate::simulation::MaterialId;
 use crate::world::biome::{BiomeRegistry, BiomeType, select_biome};
 use crate::world::chunk::{CHUNK_SIZE, Chunk};
-use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
+use fastnoise_lite::{FastNoiseLite, FractalType, NoiseType};
 
 // World dimension constants
 pub const SURFACE_Y: i32 = 0; // Sea level baseline
@@ -22,74 +22,94 @@ pub struct WorldGenerator {
     biome_registry: BiomeRegistry,
 
     // Large-scale (biome selection) - very low frequency
-    temperature_noise: Fbm<Perlin>, // 2 octaves, freq=0.0003
-    moisture_noise: Fbm<Perlin>,    // 2 octaves, freq=0.0003
+    temperature_noise: FastNoiseLite, // 2 octaves, freq=0.0003
+    moisture_noise: FastNoiseLite,    // 2 octaves, freq=0.0003
 
     // Medium-scale (terrain features) - low frequency
-    terrain_height_noise: Fbm<Perlin>, // 4 octaves, freq=0.001
+    terrain_height_noise: FastNoiseLite, // 4 octaves, freq=0.001
 
     // Small-scale (cave details) - medium frequency
-    cave_noise_large: Fbm<Perlin>, // 3 octaves, freq=0.01 (big caverns)
-    cave_noise_small: Fbm<Perlin>, // 4 octaves, freq=0.02 (tunnels)
+    cave_noise_large: FastNoiseLite, // 3 octaves, freq=0.005 (big caverns)
+    cave_noise_small: FastNoiseLite, // 4 octaves, freq=0.008 (tunnels)
 
     // Per-ore noise layers
-    coal_noise: Perlin,
-    iron_noise: Perlin,
-    copper_noise: Perlin,
-    gold_noise: Perlin,
+    coal_noise: FastNoiseLite,
+    iron_noise: FastNoiseLite,
+    copper_noise: FastNoiseLite,
+    gold_noise: FastNoiseLite,
 
     // Vegetation placement
-    tree_noise: Perlin,
-    plant_noise: Perlin,
+    tree_noise: FastNoiseLite,
+    plant_noise: FastNoiseLite,
 }
 
 impl WorldGenerator {
     pub fn new(seed: u64) -> Self {
         // Large-scale biome selection noise (very low frequency for large regions)
-        let temperature_noise = Fbm::<Perlin>::new(seed as u32)
-            .set_octaves(2)
-            .set_frequency(0.0003) // Very large biome regions (~3000 pixel wavelength)
-            .set_lacunarity(2.0)
-            .set_persistence(0.5);
+        let mut temperature_noise = FastNoiseLite::with_seed(seed as i32);
+        temperature_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+        temperature_noise.set_frequency(Some(0.0003)); // Very large biome regions (~3000 pixel wavelength)
+        temperature_noise.set_fractal_type(Some(FractalType::FBm));
+        temperature_noise.set_fractal_octaves(Some(2));
+        temperature_noise.set_fractal_lacunarity(Some(2.0));
+        temperature_noise.set_fractal_gain(Some(0.5)); // persistence
 
-        let moisture_noise = Fbm::<Perlin>::new((seed + 1) as u32)
-            .set_octaves(2)
-            .set_frequency(0.0003)
-            .set_lacunarity(2.0)
-            .set_persistence(0.5);
+        let mut moisture_noise = FastNoiseLite::with_seed((seed + 1) as i32);
+        moisture_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+        moisture_noise.set_frequency(Some(0.0003));
+        moisture_noise.set_fractal_type(Some(FractalType::FBm));
+        moisture_noise.set_fractal_octaves(Some(2));
+        moisture_noise.set_fractal_lacunarity(Some(2.0));
+        moisture_noise.set_fractal_gain(Some(0.5));
 
         // Medium-scale terrain height variation (hills and valleys)
-        let terrain_height_noise = Fbm::<Perlin>::new((seed + 2) as u32)
-            .set_octaves(4)
-            .set_frequency(0.001) // ~1000 pixel wavelength for rolling hills
-            .set_lacunarity(2.0)
-            .set_persistence(0.5);
+        let mut terrain_height_noise = FastNoiseLite::with_seed((seed + 2) as i32);
+        terrain_height_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+        terrain_height_noise.set_frequency(Some(0.001)); // ~1000 pixel wavelength for rolling hills
+        terrain_height_noise.set_fractal_type(Some(FractalType::FBm));
+        terrain_height_noise.set_fractal_octaves(Some(4));
+        terrain_height_noise.set_fractal_lacunarity(Some(2.0));
+        terrain_height_noise.set_fractal_gain(Some(0.5));
 
         // Large cave systems (big caverns) - reduced frequency for Noita-like scale
         // Target: 60-80px tall caverns (5-6x player height of 12px)
-        let cave_noise_large = Fbm::<Perlin>::new((seed + 3) as u32)
-            .set_octaves(3)
-            .set_frequency(0.005) // ~200 pixel wavelength (was 0.01)
-            .set_lacunarity(2.0)
-            .set_persistence(0.5);
+        let mut cave_noise_large = FastNoiseLite::with_seed((seed + 3) as i32);
+        cave_noise_large.set_noise_type(Some(NoiseType::OpenSimplex2));
+        cave_noise_large.set_frequency(Some(0.005)); // ~200 pixel wavelength
+        cave_noise_large.set_fractal_type(Some(FractalType::FBm));
+        cave_noise_large.set_fractal_octaves(Some(3));
+        cave_noise_large.set_fractal_lacunarity(Some(2.0));
+        cave_noise_large.set_fractal_gain(Some(0.5));
 
         // Small cave tunnels - reduced frequency for wider passages
         // Target: 36-48px wide tunnels (3-4x player height)
-        let cave_noise_small = Fbm::<Perlin>::new((seed + 4) as u32)
-            .set_octaves(4)
-            .set_frequency(0.008) // ~125 pixel wavelength (was 0.02)
-            .set_lacunarity(2.0)
-            .set_persistence(0.5);
+        let mut cave_noise_small = FastNoiseLite::with_seed((seed + 4) as i32);
+        cave_noise_small.set_noise_type(Some(NoiseType::OpenSimplex2));
+        cave_noise_small.set_frequency(Some(0.008)); // ~125 pixel wavelength
+        cave_noise_small.set_fractal_type(Some(FractalType::FBm));
+        cave_noise_small.set_fractal_octaves(Some(4));
+        cave_noise_small.set_fractal_lacunarity(Some(2.0));
+        cave_noise_small.set_fractal_gain(Some(0.5));
 
         // Ore placement noise (different seeds for variety)
-        let coal_noise = Perlin::new((seed + 5) as u32);
-        let iron_noise = Perlin::new((seed + 6) as u32);
-        let copper_noise = Perlin::new((seed + 7) as u32);
-        let gold_noise = Perlin::new((seed + 8) as u32);
+        let mut coal_noise = FastNoiseLite::with_seed((seed + 5) as i32);
+        coal_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+
+        let mut iron_noise = FastNoiseLite::with_seed((seed + 6) as i32);
+        iron_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+
+        let mut copper_noise = FastNoiseLite::with_seed((seed + 7) as i32);
+        copper_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+
+        let mut gold_noise = FastNoiseLite::with_seed((seed + 8) as i32);
+        gold_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
 
         // Vegetation placement
-        let tree_noise = Perlin::new((seed + 9) as u32);
-        let plant_noise = Perlin::new((seed + 10) as u32);
+        let mut tree_noise = FastNoiseLite::with_seed((seed + 9) as i32);
+        tree_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+
+        let mut plant_noise = FastNoiseLite::with_seed((seed + 10) as i32);
+        plant_noise.set_noise_type(Some(NoiseType::OpenSimplex2));
 
         Self {
             seed,
@@ -126,8 +146,8 @@ impl WorldGenerator {
             }
         }
 
-        // Fresh chunks start as not dirty
-        chunk.dirty = false;
+        // Mark fresh chunks as dirty so they get synced to database in multiplayer
+        chunk.dirty = true;
         chunk
     }
 
@@ -135,7 +155,8 @@ impl WorldGenerator {
     /// Background is decorative (no physics) - shows cave walls behind open spaces
     fn get_background_at(&self, world_x: i32, world_y: i32, foreground: u16) -> u16 {
         // Above ground: no background (sky)
-        let terrain_height_value = self.terrain_height_noise.get([world_x as f64, 0.0]);
+        let terrain_height_value =
+            self.terrain_height_noise.get_noise_2d(world_x as f32, 0.0) as f64;
         let height_variation = (terrain_height_value * 100.0) as i32;
         let terrain_y = SURFACE_Y + height_variation;
 
@@ -146,10 +167,10 @@ impl WorldGenerator {
         // Underground: if foreground is air (cave), show stone background
         if foreground == MaterialId::AIR {
             // Use offset noise to create variation in background
-            let bg_noise = self.cave_noise_large.get([
-                world_x as f64 + 1000.0, // Offset to get different pattern
-                world_y as f64 + 1000.0,
-            ]);
+            let bg_noise = self.cave_noise_large.get_noise_2d(
+                world_x as f32 + 1000.0, // Offset to get different pattern
+                world_y as f32 + 1000.0,
+            ) as f64;
 
             // Vary the background material for visual interest
             if bg_noise > 0.3 {
@@ -174,13 +195,15 @@ impl WorldGenerator {
         }
 
         // Step 1: Sample biome noise to determine biome type
-        let temperature = self.temperature_noise.get([world_x as f64, 0.0]);
-        let moisture = self.moisture_noise.get([world_x as f64, 0.0]);
+        let temperature = self.temperature_noise.get_noise_2d(world_x as f32, 0.0) as f64;
+        let moisture = self.moisture_noise.get_noise_2d(world_x as f32, 0.0) as f64;
+
         let biome_type = select_biome(temperature, moisture);
         let biome = self.biome_registry.get(biome_type);
 
         // Step 2: Calculate terrain height using biome parameters
-        let terrain_height_value = self.terrain_height_noise.get([world_x as f64, 0.0]);
+        let terrain_height_value =
+            self.terrain_height_noise.get_noise_2d(world_x as f32, 0.0) as f64;
         // Apply biome-specific height variance and offset
         let height_variation = (terrain_height_value * 100.0 * biome.height_variance as f64) as i32;
         let terrain_y = SURFACE_Y + biome.height_offset + height_variation;
@@ -210,13 +233,13 @@ impl WorldGenerator {
         let depth = terrain_y - world_y;
         if depth == 0 || depth == 1 {
             // Plant placement
-            let plant_value = self.plant_noise.get([world_x as f64 * 0.05, 0.0]);
+            let plant_value = self.plant_noise.get_noise_2d(world_x as f32 * 0.05, 0.0) as f64;
             if plant_value > (1.0 - biome.plant_density as f64) {
                 return MaterialId::PLANT_MATTER;
             }
 
             // Tree placement (will be expanded in Phase 2.5)
-            let tree_value = self.tree_noise.get([world_x as f64 * 0.03, 0.0]);
+            let tree_value = self.tree_noise.get_noise_2d(world_x as f32 * 0.03, 0.0) as f64;
             if tree_value > (1.0 - biome.tree_density as f64) {
                 // Simple tree: just wood for now
                 if depth == 0 && world_y < SKY_HEIGHT {
@@ -228,8 +251,12 @@ impl WorldGenerator {
         // Step 5: Underground caves (apply biome cave density multiplier)
         // Thresholds lowered to create larger, more open caves like Noita
         if world_y < terrain_y - 10 {
-            let cave_large = self.cave_noise_large.get([world_x as f64, world_y as f64]);
-            let cave_small = self.cave_noise_small.get([world_x as f64, world_y as f64]);
+            let cave_large = self
+                .cave_noise_large
+                .get_noise_2d(world_x as f32, world_y as f32) as f64;
+            let cave_small = self
+                .cave_noise_small
+                .get_noise_2d(world_x as f32, world_y as f32) as f64;
 
             // Apply biome cave density - lower thresholds = more cave space
             // Original: 0.3/0.4, now 0.15/0.25 for larger openings
@@ -251,13 +278,14 @@ impl WorldGenerator {
         }
 
         // Step 7: Ore generation with biome multipliers
-        const NOISE_SCALE: f64 = 0.08;
+        const NOISE_SCALE: f32 = 0.08;
 
         // Coal: shallow underground (y=-50 to y=-500)
         if world_y > SHALLOW_UNDERGROUND && world_y < SURFACE_Y - 50 {
             let coal_value = self
                 .coal_noise
-                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+                .get_noise_2d(world_x as f32 * NOISE_SCALE, world_y as f32 * NOISE_SCALE)
+                as f64;
             let threshold = 0.75 / biome.get_ore_multiplier(MaterialId::COAL_ORE) as f64;
             if coal_value > threshold {
                 return MaterialId::COAL_ORE;
@@ -268,7 +296,8 @@ impl WorldGenerator {
         if world_y > -1000 && world_y < -200 {
             let copper_value = self
                 .copper_noise
-                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+                .get_noise_2d(world_x as f32 * NOISE_SCALE, world_y as f32 * NOISE_SCALE)
+                as f64;
             let threshold = 0.77 / biome.get_ore_multiplier(MaterialId::COPPER_ORE) as f64;
             if copper_value > threshold {
                 return MaterialId::COPPER_ORE;
@@ -279,7 +308,8 @@ impl WorldGenerator {
         if world_y > -2000 && world_y < -500 {
             let iron_value = self
                 .iron_noise
-                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+                .get_noise_2d(world_x as f32 * NOISE_SCALE, world_y as f32 * NOISE_SCALE)
+                as f64;
             let threshold = 0.76 / biome.get_ore_multiplier(MaterialId::IRON_ORE) as f64;
             if iron_value > threshold {
                 return MaterialId::IRON_ORE;
@@ -290,7 +320,8 @@ impl WorldGenerator {
         if world_y > -3000 && world_y < -1500 {
             let gold_value = self
                 .gold_noise
-                .get([world_x as f64 * NOISE_SCALE, world_y as f64 * NOISE_SCALE]);
+                .get_noise_2d(world_x as f32 * NOISE_SCALE, world_y as f32 * NOISE_SCALE)
+                as f64;
             let threshold = 0.80 / biome.get_ore_multiplier(MaterialId::GOLD_ORE) as f64;
             if gold_value > threshold {
                 return MaterialId::GOLD_ORE;
@@ -301,7 +332,8 @@ impl WorldGenerator {
         if world_y < CAVERN_LAYER {
             let lava_value = self
                 .cave_noise_large
-                .get([world_x as f64 * 0.05, world_y as f64 * 0.05]);
+                .get_noise_2d(world_x as f32 * 0.05, world_y as f32 * 0.05)
+                as f64;
             if lava_value > 0.6 {
                 return MaterialId::LAVA;
             }

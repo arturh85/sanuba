@@ -185,7 +185,7 @@ impl ReactionRegistry {
             energy_released: 8.0,
         });
 
-        // Gold Ore + Fire → Copper Ingot + Smoke (FIXME: should be gold_ingot)
+        // Gold Ore + Fire → Gold Ingot + Smoke
         self.register(Reaction {
             name: "smelt_gold".to_string(),
             input_a: MaterialId::GOLD_ORE,
@@ -196,7 +196,7 @@ impl ReactionRegistry {
             requires_light: None,
             min_pressure: None,
             catalyst: None,
-            output_a: MaterialId::COPPER_INGOT, // FIXME: placeholder
+            output_a: MaterialId::GOLD_INGOT, // Fixed: was COPPER_INGOT
             output_b: MaterialId::SMOKE,
             probability: 0.05,
             energy_released: 5.0,

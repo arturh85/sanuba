@@ -15,11 +15,18 @@ pub mod ui;
 #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
 pub mod headless;
 
+// Multiplayer module (native: Rust SDK, WASM: TypeScript SDK via JS)
+#[cfg(feature = "multiplayer")]
+pub mod multiplayer;
+
+// Encoding module for chunk synchronization (multiplayer only)
+#[cfg(feature = "multiplayer")]
+pub mod encoding;
+
 // Re-export core modules for convenience
 pub use sunaba_core::creature;
 pub use sunaba_core::entity;
 pub use sunaba_core::levels;
-pub use sunaba_core::physics;
 pub use sunaba_core::simulation;
 pub use sunaba_core::world;
 

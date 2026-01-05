@@ -126,14 +126,14 @@ impl Critter {
         }
 
         // Process current state
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         match &mut self.state {
             CritterState::Idle { timer } => {
                 *timer -= dt;
                 if *timer <= 0.0 {
                     // Pick a random wander target
-                    let angle = rng.random::<f32>() * std::f32::consts::TAU;
-                    let dist = rng.random_range(20.0..50.0);
+                    let angle = rng.r#gen::<f32>() * std::f32::consts::TAU;
+                    let dist = rng.gen_range(20.0..50.0);
                     let target = (
                         (self.position.x + angle.cos() * dist).clamp(0.0, world_bounds.0),
                         self.ground_level + self.radius,
@@ -155,7 +155,7 @@ impl Critter {
                 } else {
                     // Reached target, go idle
                     self.state = CritterState::Idle {
-                        timer: rng.random_range(1.0..3.0),
+                        timer: rng.gen_range(1.0..3.0),
                     };
                 }
             }
@@ -167,7 +167,7 @@ impl Critter {
                 if dist_to_threat > self.threat_radius * 1.5 {
                     // Safe, go idle
                     self.state = CritterState::Idle {
-                        timer: rng.random_range(0.5..1.5),
+                        timer: rng.gen_range(0.5..1.5),
                     };
                 } else if away.length() > 0.1 {
                     let dir = away.normalize();

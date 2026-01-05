@@ -31,6 +31,10 @@ pub struct GameConfig {
 
     #[serde(default)]
     pub rendering: RenderingConfig,
+
+    #[serde(default)]
+    #[cfg(feature = "multiplayer")]
+    pub multiplayer: MultiplayerConfig,
 }
 
 /// Camera/zoom settings
@@ -127,6 +131,8 @@ pub struct DebugConfig {
     pub debug_placement: bool,
     /// Enable verbose logging
     pub verbose_logging: bool,
+    /// Brush radius for material placement (1-10)
+    pub brush_size: u32,
 }
 
 impl Default for DebugConfig {
@@ -134,12 +140,14 @@ impl Default for DebugConfig {
         Self {
             debug_placement: true,
             verbose_logging: false,
+            brush_size: 1,
         }
     }
 }
 
 /// Rendering/post-processing settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RenderingConfig {
     /// Scanline effect intensity (0.0 = off, 0.5 = strong)
     pub scanline_intensity: f32,
@@ -147,6 +155,24 @@ pub struct RenderingConfig {
     pub vignette_intensity: f32,
     /// Bloom/glow intensity (0.0 = off, 1.0 = strong)
     pub bloom_intensity: f32,
+    /// Water noise frequency (spatial detail, 0.01-0.2)
+    pub water_noise_frequency: f32,
+    /// Water noise speed (animation speed, 0.5-5.0)
+    pub water_noise_speed: f32,
+    /// Water noise amplitude (color variation, 0.0-0.2)
+    pub water_noise_amplitude: f32,
+    /// Lava noise frequency (spatial detail, 0.01-0.15)
+    pub lava_noise_frequency: f32,
+    /// Lava noise speed (animation speed, 0.5-3.0)
+    pub lava_noise_speed: f32,
+    /// Lava noise amplitude (glow variation, 0.0-0.3)
+    pub lava_noise_amplitude: f32,
+    /// Enable multi-pass bloom
+    pub bloom_enabled: bool,
+    /// Bloom quality (3=Low, 4=Medium, 5=High mip levels)
+    pub bloom_quality: u32,
+    /// Bloom threshold (brightness threshold, 0.4-0.8)
+    pub bloom_threshold: f32,
 }
 
 impl Default for RenderingConfig {
@@ -155,6 +181,15 @@ impl Default for RenderingConfig {
             scanline_intensity: 0.15,
             vignette_intensity: 0.25,
             bloom_intensity: 0.3,
+            water_noise_frequency: 0.08,
+            water_noise_speed: 2.0,
+            water_noise_amplitude: 0.06,
+            lava_noise_frequency: 0.05,
+            lava_noise_speed: 1.5,
+            lava_noise_amplitude: 0.12,
+            bloom_enabled: false, // Disabled by default (can enable via UI)
+            bloom_quality: 4,     // Medium quality (4 mip levels)
+            bloom_threshold: 0.6,
         }
     }
 }
@@ -182,6 +217,7 @@ impl GameConfig {
             .set_default("ui.show_stats_on_start", false)?
             .set_default("debug.debug_placement", true)?
             .set_default("debug.verbose_logging", false)?
+            .set_default("debug.brush_size", 1_i64)?
             .set_default("rendering.scanline_intensity", 0.15)?
             .set_default("rendering.vignette_intensity", 0.25)?
             .set_default("rendering.bloom_intensity", 0.3)?
@@ -200,6 +236,47 @@ impl GameConfig {
             .try_deserialize()
             .context("Failed to deserialize configuration")
     }
+}
+
+/// Multiplayer configuration
+#[cfg(feature = "multiplayer")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiplayerConfig {
+    pub servers: Vec<ServerEntry>,
+    pub last_server: Option<String>,
+    pub connection_timeout_secs: u64,
+    pub reconnect_max_attempts: u32,
+    pub reconnect_max_delay_secs: u64,
+}
+
+#[cfg(feature = "multiplayer")]
+impl Default for MultiplayerConfig {
+    fn default() -> Self {
+        Self {
+            servers: vec![
+                ServerEntry {
+                    name: "Local Dev Server".to_string(),
+                    url: "http://localhost:3000".to_string(),
+                },
+                ServerEntry {
+                    name: "Official Server".to_string(),
+                    url: "http://sunaba.app42.blue".to_string(),
+                },
+            ],
+            last_server: Some("http://sunaba.app42.blue".to_string()),
+            connection_timeout_secs: 10,
+            reconnect_max_attempts: 10,
+            reconnect_max_delay_secs: 30,
+        }
+    }
+}
+
+/// Server entry in multiplayer config
+#[cfg(feature = "multiplayer")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerEntry {
+    pub name: String,
+    pub url: String,
 }
 
 #[cfg(test)]

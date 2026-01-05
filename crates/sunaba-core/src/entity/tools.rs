@@ -134,7 +134,7 @@ impl ToolRegistry {
             can_harvest: vec![MaterialTag::Mineral, MaterialTag::Ore],
         });
 
-        // TODO Phase 8: Add axes, shovels, swords
+        // Future (Phase 8): Add axes, shovels, swords for expanded gameplay
     }
 
     fn register(&mut self, tool: ToolDef) {

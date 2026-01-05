@@ -64,23 +64,10 @@ pub struct CppnConnection {
     pub innovation_number: u64,
 }
 
-/// Serializable edge representation (stores source/target node IDs)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializedEdge {
-    pub source_id: u64,
-    pub target_id: u64,
-    pub connection: CppnConnection,
-}
-
 /// CPPN network for morphology generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppnGenome {
-    #[serde(skip)]
     pub graph: DiGraph<CppnNode, CppnConnection>,
-
-    // Serializable graph representation (synced before save, used to rebuild after load)
-    pub serialized_nodes: Vec<CppnNode>,
-    pub serialized_edges: Vec<SerializedEdge>,
 
     pub input_node_ids: Vec<u64>,  // Node IDs for input nodes
     pub output_node_ids: Vec<u64>, // Node IDs for output nodes
@@ -154,7 +141,7 @@ impl CppnGenome {
                     .unwrap();
 
                 let connection = CppnConnection {
-                    weight: (rand::random::<f32>() * 2.0 - 1.0) * 0.5, // [-0.5, 0.5]
+                    weight: 0.1, // Small deterministic weight for minimal network
                     enabled: true,
                     innovation_number: next_innovation,
                 };
@@ -165,45 +152,14 @@ impl CppnGenome {
             }
         }
 
-        let mut cppn = Self {
+        Self {
             graph,
-            serialized_nodes: Vec::new(),
-            serialized_edges: Vec::new(),
             input_node_ids,
             output_node_ids,
             innovation_numbers,
             next_node_id,
             next_innovation,
-        };
-        cppn.sync_to_serializable();
-        cppn
-    }
-
-    /// Sync graph structure to serializable fields (call before serialization)
-    pub fn sync_to_serializable(&mut self) {
-        // Collect all nodes
-        self.serialized_nodes = self
-            .graph
-            .node_indices()
-            .map(|idx| self.graph[idx].clone())
-            .collect();
-
-        // Collect all edges with their source/target node IDs
-        self.serialized_edges = self
-            .graph
-            .edge_indices()
-            .filter_map(|edge_idx| {
-                let (source_idx, target_idx) = self.graph.edge_endpoints(edge_idx)?;
-                let source_id = self.graph[source_idx].id;
-                let target_id = self.graph[target_idx].id;
-                let connection = self.graph[edge_idx].clone();
-                Some(SerializedEdge {
-                    source_id,
-                    target_id,
-                    connection,
-                })
-            })
-            .collect();
+        }
     }
 
     /// Query CPPN at spatial position (x, y, d)
@@ -266,62 +222,30 @@ impl CppnGenome {
         }
     }
 
-    /// Rebuild graph from serialized data (called after deserialization)
-    pub fn rebuild_graph(&mut self) {
-        // If no serialized data, fall back to minimal
-        if self.serialized_nodes.is_empty() {
-            *self = Self::minimal();
-            return;
-        }
-
-        // Create new graph
-        self.graph = DiGraph::new();
-
-        // Map from node ID to NodeIndex for edge reconstruction
-        let mut id_to_idx: std::collections::HashMap<u64, NodeIndex> =
-            std::collections::HashMap::new();
-
-        // Add all nodes
-        for node in &self.serialized_nodes {
-            let idx = self.graph.add_node(node.clone());
-            id_to_idx.insert(node.id, idx);
-        }
-
-        // Add all edges
-        for edge in &self.serialized_edges {
-            if let (Some(&source_idx), Some(&target_idx)) = (
-                id_to_idx.get(&edge.source_id),
-                id_to_idx.get(&edge.target_id),
-            ) {
-                self.graph
-                    .add_edge(source_idx, target_idx, edge.connection.clone());
-            }
-        }
-    }
-
     // ===== NEAT Mutation Operators =====
 
     /// Mutate connection weights with given probability and perturbation power
     /// Returns number of weights mutated
+    #[cfg(feature = "evolution")]
     pub fn mutate_weights(&mut self, mutation_rate: f32, mutation_power: f32) -> usize {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let mut mutated_count = 0;
 
         for edge_idx in self.graph.edge_indices() {
-            if rng.random::<f32>() < mutation_rate {
+            if rng.r#gen::<f32>() < mutation_rate {
                 let connection = &mut self.graph[edge_idx];
 
                 // 90% chance to perturb, 10% chance to replace
-                if rng.random::<f32>() < 0.9 {
+                if rng.r#gen::<f32>() < 0.9 {
                     // Perturb weight
-                    let perturbation = rng.random_range(-mutation_power..mutation_power);
+                    let perturbation = rng.gen_range(-mutation_power..mutation_power);
                     connection.weight += perturbation;
                     // Clamp to prevent extreme values
                     connection.weight = connection.weight.clamp(-4.0, 4.0);
                 } else {
                     // Replace with new random weight
-                    connection.weight = rng.random_range(-2.0..2.0);
+                    connection.weight = rng.gen_range(-2.0..2.0);
                 }
                 mutated_count += 1;
             }
@@ -332,10 +256,11 @@ impl CppnGenome {
 
     /// Add a new connection between two random unconnected nodes
     /// Returns true if a connection was added
+    #[cfg(feature = "evolution")]
     pub fn add_connection(&mut self) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         // Get all non-input nodes (can be targets)
         let target_nodes: Vec<NodeIndex> = self
@@ -388,7 +313,7 @@ impl CppnGenome {
 
             // Add the connection
             let connection = CppnConnection {
-                weight: rng.random_range(-1.0..1.0),
+                weight: rng.gen_range(-1.0..1.0),
                 enabled: true,
                 innovation_number: innovation,
             };
@@ -403,10 +328,11 @@ impl CppnGenome {
     /// Split an existing connection by adding a new node
     /// The old connection is disabled, and two new connections are created
     /// Returns true if a node was added
+    #[cfg(feature = "evolution")]
     pub fn add_node(&mut self) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         // Get enabled edges
         let enabled_edges: Vec<_> = self
@@ -439,7 +365,7 @@ impl CppnGenome {
             ActivationFunction::Sine,
             ActivationFunction::Relu,
         ];
-        let activation = activations[rng.random_range(0..activations.len())];
+        let activation = activations[rng.gen_range(0..activations.len())];
 
         let new_node_id = self.next_node_id;
         self.next_node_id += 1;
@@ -489,10 +415,11 @@ impl CppnGenome {
 
     /// Randomly enable or disable a connection
     /// Returns true if a connection was toggled
+    #[cfg(feature = "evolution")]
     pub fn toggle_connection(&mut self, disable_rate: f32) -> bool {
         use rand::Rng;
-        use rand::prelude::IndexedRandom;
-        let mut rng = rand::rng();
+        use rand::prelude::SliceRandom;
+        let mut rng = rand::thread_rng();
 
         let edges: Vec<_> = self.graph.edge_indices().collect();
         if edges.is_empty() {
@@ -504,13 +431,13 @@ impl CppnGenome {
 
         if connection.enabled {
             // Disable with given probability
-            if rng.random::<f32>() < disable_rate {
+            if rng.r#gen::<f32>() < disable_rate {
                 connection.enabled = false;
                 return true;
             }
         } else {
             // Re-enable with 25% chance
-            if rng.random::<f32>() < 0.25 {
+            if rng.r#gen::<f32>() < 0.25 {
                 connection.enabled = true;
                 return true;
             }
@@ -520,28 +447,26 @@ impl CppnGenome {
     }
 
     /// Apply all mutations with given probabilities
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, config: &MutationConfig) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Weight mutations (most common)
         self.mutate_weights(config.weight_mutation_rate, config.weight_mutation_power);
 
         // Structural mutations (less common)
-        if rng.random::<f32>() < config.add_connection_rate {
+        if rng.r#gen::<f32>() < config.add_connection_rate {
             self.add_connection();
         }
 
-        if rng.random::<f32>() < config.add_node_rate {
+        if rng.r#gen::<f32>() < config.add_node_rate {
             self.add_node();
         }
 
-        if rng.random::<f32>() < config.toggle_connection_rate {
+        if rng.r#gen::<f32>() < config.toggle_connection_rate {
             self.toggle_connection(0.5);
         }
-
-        // Sync graph changes to serializable fields
-        self.sync_to_serializable();
     }
 }
 
@@ -572,6 +497,7 @@ impl Default for MutationConfig {
 /// Crossover two CPPN genomes using NEAT-style gene alignment
 /// parent1_fitness and parent2_fitness determine which parent's genes are preferred
 /// Returns a new offspring genome
+#[cfg(feature = "evolution")]
 pub fn crossover_cppn(
     parent1: &CppnGenome,
     parent2: &CppnGenome,
@@ -579,7 +505,7 @@ pub fn crossover_cppn(
     parent2_fitness: f32,
 ) -> CppnGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     // Determine which parent is more fit
     let (more_fit, less_fit, more_fit_first) = if parent1_fitness >= parent2_fitness {
@@ -663,7 +589,7 @@ pub fn crossover_cppn(
         let gene = match (in_p1, in_p2) {
             // Matching gene - randomly inherit from either parent
             (Some(g1), Some(g2)) => {
-                if rng.random::<bool>() {
+                if rng.r#gen::<bool>() {
                     g1.clone()
                 } else {
                     g2.clone()
@@ -708,14 +634,12 @@ pub fn crossover_cppn(
         offspring.innovation_numbers.entry(*k).or_insert(*v);
     }
 
-    // Sync to serializable before returning
-    offspring.sync_to_serializable();
-
     offspring
 }
 
 /// Crossover two controller genomes
 /// Simply averages weights for matching dimensions
+#[cfg(feature = "evolution")]
 pub fn crossover_controller(
     parent1: &ControllerGenome,
     parent2: &ControllerGenome,
@@ -723,7 +647,7 @@ pub fn crossover_controller(
     parent2_fitness: f32,
 ) -> ControllerGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     // Determine bias toward more fit parent
     let bias = if parent1_fitness > parent2_fitness {
@@ -742,7 +666,7 @@ pub fn crossover_controller(
                 let v1 = w1.get(i).copied().unwrap_or(0.0);
                 let v2 = w2.get(i).copied().unwrap_or(0.0);
 
-                if rng.random::<f32>() < bias { v1 } else { v2 }
+                if rng.r#gen::<f32>() < bias { v1 } else { v2 }
             })
             .collect()
     };
@@ -751,12 +675,12 @@ pub fn crossover_controller(
         message_weights: crossover_weights(&parent1.message_weights, &parent2.message_weights),
         update_weights: crossover_weights(&parent1.update_weights, &parent2.update_weights),
         output_weights: crossover_weights(&parent1.output_weights, &parent2.output_weights),
-        message_passing_steps: if rng.random::<f32>() < bias {
+        message_passing_steps: if rng.r#gen::<f32>() < bias {
             parent1.message_passing_steps
         } else {
             parent2.message_passing_steps
         },
-        hidden_dim: if rng.random::<f32>() < bias {
+        hidden_dim: if rng.r#gen::<f32>() < bias {
             parent1.hidden_dim
         } else {
             parent2.hidden_dim
@@ -765,6 +689,7 @@ pub fn crossover_controller(
 }
 
 /// Crossover two creature genomes
+#[cfg(feature = "evolution")]
 pub fn crossover_genome(
     parent1: &CreatureGenome,
     parent2: &CreatureGenome,
@@ -772,7 +697,7 @@ pub fn crossover_genome(
     parent2_fitness: f32,
 ) -> CreatureGenome {
     use rand::Rng;
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
 
     let bias = if parent1_fitness >= parent2_fitness {
         0.6
@@ -794,22 +719,22 @@ pub fn crossover_genome(
             parent2_fitness,
         ),
         traits: BehavioralTraits {
-            aggression: if rng.random::<f32>() < bias {
+            aggression: if rng.r#gen::<f32>() < bias {
                 parent1.traits.aggression
             } else {
                 parent2.traits.aggression
             },
-            curiosity: if rng.random::<f32>() < bias {
+            curiosity: if rng.r#gen::<f32>() < bias {
                 parent1.traits.curiosity
             } else {
                 parent2.traits.curiosity
             },
-            sociality: if rng.random::<f32>() < bias {
+            sociality: if rng.r#gen::<f32>() < bias {
                 parent1.traits.sociality
             } else {
                 parent2.traits.sociality
             },
-            territoriality: if rng.random::<f32>() < bias {
+            territoriality: if rng.r#gen::<f32>() < bias {
                 parent1.traits.territoriality
             } else {
                 parent2.traits.territoriality
@@ -853,10 +778,35 @@ pub struct ControllerGenome {
 }
 
 impl ControllerGenome {
+    /// Create minimal controller genome with small deterministic weights
+    pub fn minimal(hidden_dim: usize, message_passing_steps: usize) -> Self {
+        // Estimate sizes (will be adjusted when morphology is known)
+        let input_dim_estimate = 10; // Joint angles, velocities, contacts, etc.
+        let output_dim_estimate = 5; // Motor commands per joint
+
+        let message_weight_count = input_dim_estimate * hidden_dim;
+        let update_weight_count = hidden_dim * hidden_dim;
+        let output_weight_count = hidden_dim * output_dim_estimate;
+
+        // Use small constant weights for deterministic initialization
+        let message_weights = vec![0.1; message_weight_count];
+        let update_weights = vec![0.1; update_weight_count];
+        let output_weights = vec![0.1; output_weight_count];
+
+        Self {
+            message_weights,
+            update_weights,
+            output_weights,
+            message_passing_steps,
+            hidden_dim,
+        }
+    }
+
     /// Create random controller genome
+    #[cfg(feature = "evolution")]
     pub fn random(hidden_dim: usize, message_passing_steps: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // For a simple feedforward network:
         // message_weights: input_dim -> hidden_dim
@@ -872,15 +822,15 @@ impl ControllerGenome {
         let output_weight_count = hidden_dim * output_dim_estimate;
 
         let message_weights: Vec<f32> = (0..message_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         let update_weights: Vec<f32> = (0..update_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         let output_weights: Vec<f32> = (0..output_weight_count)
-            .map(|_| rng.random_range(-0.5..0.5))
+            .map(|_| rng.gen_range(-0.5..0.5))
             .collect();
 
         Self {
@@ -893,9 +843,10 @@ impl ControllerGenome {
     }
 
     /// Mutate controller weights
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, mutation_rate: f32, mutation_power: f32) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Mutate all weight vectors
         for weights in [
@@ -904,14 +855,14 @@ impl ControllerGenome {
             &mut self.output_weights,
         ] {
             for weight in weights.iter_mut() {
-                if rng.random::<f32>() < mutation_rate {
-                    if rng.random::<f32>() < 0.9 {
+                if rng.r#gen::<f32>() < mutation_rate {
+                    if rng.r#gen::<f32>() < 0.9 {
                         // Perturb
-                        *weight += rng.random_range(-mutation_power..mutation_power);
+                        *weight += rng.gen_range(-mutation_power..mutation_power);
                         *weight = weight.clamp(-4.0, 4.0);
                     } else {
                         // Replace
-                        *weight = rng.random_range(-2.0..2.0);
+                        *weight = rng.gen_range(-2.0..2.0);
                     }
                 }
             }
@@ -970,6 +921,7 @@ pub struct CreatureGenome {
 impl CreatureGenome {
     /// Create test biped genome (for validation)
     /// Simple two-legged creature with central body
+    #[cfg(feature = "evolution")]
     pub fn test_biped() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(16, 2);
@@ -996,6 +948,7 @@ impl CreatureGenome {
 
     /// Create test quadruped genome (for validation)
     /// Four-legged creature
+    #[cfg(feature = "evolution")]
     pub fn test_quadruped() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(24, 3);
@@ -1022,6 +975,7 @@ impl CreatureGenome {
 
     /// Create test worm genome (for validation)
     /// Segmented creature with many body parts
+    #[cfg(feature = "evolution")]
     pub fn test_worm() -> Self {
         let cppn = CppnGenome::minimal();
         let controller = ControllerGenome::random(8, 1);
@@ -1053,7 +1007,7 @@ impl CreatureGenome {
     pub fn archetype_spider() -> Self {
         let cppn = CppnGenome::minimal();
         // 8 legs = 8 motor outputs, larger hidden dim for coordination
-        let controller = ControllerGenome::random(32, 3);
+        let controller = ControllerGenome::minimal(32, 3);
         let traits = BehavioralTraits {
             aggression: 0.4,
             curiosity: 0.6,
@@ -1079,7 +1033,7 @@ impl CreatureGenome {
     pub fn archetype_snake() -> Self {
         let cppn = CppnGenome::minimal();
         // 5 joints between 6 segments, need coordination for wave propagation
-        let controller = ControllerGenome::random(24, 3);
+        let controller = ControllerGenome::minimal(24, 3);
         let traits = BehavioralTraits {
             aggression: 0.3,
             curiosity: 0.5,
@@ -1105,7 +1059,7 @@ impl CreatureGenome {
     pub fn archetype_worm() -> Self {
         let cppn = CppnGenome::minimal();
         // 3 joints between 4 segments, simple but flexible
-        let controller = ControllerGenome::random(12, 2);
+        let controller = ControllerGenome::minimal(12, 2);
         let traits = BehavioralTraits {
             aggression: 0.1,
             curiosity: 0.4,
@@ -1131,7 +1085,7 @@ impl CreatureGenome {
     pub fn archetype_flyer() -> Self {
         let cppn = CppnGenome::minimal();
         // 2 wings + 1 tail, need fast coordination for flight
-        let controller = ControllerGenome::random(20, 2);
+        let controller = ControllerGenome::minimal(20, 2);
         let traits = BehavioralTraits {
             aggression: 0.2,
             curiosity: 0.8, // Curious/exploratory
@@ -1154,9 +1108,10 @@ impl CreatureGenome {
     }
 
     /// Mutate the complete genome
+    #[cfg(feature = "evolution")]
     pub fn mutate(&mut self, cppn_config: &MutationConfig, controller_rate: f32) {
         use rand::Rng;
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
 
         // Mutate CPPN (morphology)
         self.cppn.mutate(cppn_config);
@@ -1165,27 +1120,27 @@ impl CreatureGenome {
         self.controller.mutate(controller_rate, 0.5);
 
         // Mutate behavioral traits (small perturbations)
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.aggression =
-                (self.traits.aggression + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.aggression + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.curiosity =
-                (self.traits.curiosity + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.curiosity + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.sociality =
-                (self.traits.sociality + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.sociality + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
-        if rng.random::<f32>() < 0.1 {
+        if rng.r#gen::<f32>() < 0.1 {
             self.traits.territoriality =
-                (self.traits.territoriality + rng.random_range(-0.1..0.1)).clamp(0.0, 1.0);
+                (self.traits.territoriality + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
         }
 
         // Mutate metabolic params (small perturbations)
-        if rng.random::<f32>() < 0.05 {
+        if rng.r#gen::<f32>() < 0.05 {
             self.metabolic.hunger_rate =
-                (self.metabolic.hunger_rate + rng.random_range(-0.02..0.02)).clamp(0.01, 1.0);
+                (self.metabolic.hunger_rate + rng.gen_range(-0.02..0.02)).clamp(0.01, 1.0);
         }
 
         // Increment generation
@@ -1303,12 +1258,9 @@ mod tests {
                 .expect("Failed to serialize genome");
 
         // Deserialize
-        let (mut deserialized, _): (CreatureGenome, _) =
+        let (deserialized, _): (CreatureGenome, _) =
             bincode_next::serde::decode_from_slice(&serialized, bincode_next::config::standard())
                 .expect("Failed to deserialize genome");
-
-        // Graph needs to be rebuilt after deserialization
-        deserialized.cppn.rebuild_graph();
 
         // Check values match
         assert_eq!(deserialized.generation, genome.generation);
@@ -1354,11 +1306,9 @@ mod tests {
                 .expect("Failed to serialize mutated genome");
 
         // Deserialize
-        let (mut deserialized, _): (CreatureGenome, _) =
+        let (deserialized, _): (CreatureGenome, _) =
             bincode_next::serde::decode_from_slice(&serialized, bincode_next::config::standard())
                 .expect("Failed to deserialize genome");
-
-        deserialized.cppn.rebuild_graph();
 
         // Verify structure preserved (should have more nodes than minimal due to mutations)
         assert_eq!(deserialized.cppn.graph.node_count(), orig_node_count);

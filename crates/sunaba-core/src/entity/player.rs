@@ -7,6 +7,7 @@ use super::{
     inventory::Inventory,
 };
 use crate::simulation::mining::MiningProgress;
+use sunaba_simulation::MaterialId;
 
 /// The player entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +24,7 @@ pub struct Player {
     pub selected_slot: usize, // Currently selected inventory slot (for hotbar)
     pub equipped_tool: Option<u16>, // Currently equipped tool ID (1000+)
     pub mining_progress: MiningProgress, // Mining progress tracker
+    pub is_dead: bool,        // Track death state explicitly
 }
 
 impl Player {
@@ -52,14 +54,14 @@ impl Player {
             selected_slot: 0,
             equipped_tool: None,
             mining_progress: MiningProgress::new(),
+            is_dead: false,
         };
 
         // Give player some starting materials for testing
-        // Using material IDs from simulation/materials.rs
-        player.inventory.add_item(2, 1000); // Stone
-        player.inventory.add_item(3, 1000); // Sand
-        player.inventory.add_item(4, 1000); // Water
-        player.inventory.add_item(5, 1000); // Wood
+        player.inventory.add_item(MaterialId::SAND, 1000);
+        player.inventory.add_item(MaterialId::WATER, 1000);
+        player.inventory.add_item(MaterialId::WOOD, 1000);
+        player.inventory.add_item(MaterialId::FIRE, 1000);
 
         player
     }
@@ -76,6 +78,7 @@ impl Player {
         selected_slot: usize,
         equipped_tool: Option<u16>,
         mining_progress: MiningProgress,
+        is_dead: bool,
     ) -> Self {
         Player {
             id,
@@ -90,21 +93,25 @@ impl Player {
             selected_slot,
             equipped_tool,
             mining_progress,
+            is_dead,
         }
     }
 
     /// Update player state (hunger, health, etc.)
-    /// Returns true if the player died
+    /// Returns true if the player died this frame
     pub fn update(&mut self, delta_time: f32) -> bool {
         // Update hunger and get starvation damage
         let starvation_damage = self.hunger.update(delta_time);
 
         // Apply starvation damage
         if starvation_damage > 0.0 {
-            let died = self.health.take_damage(starvation_damage);
-            if died {
-                return true;
-            }
+            self.health.take_damage(starvation_damage);
+        }
+
+        // Check if player died this frame
+        if self.health.is_dead() && !self.is_dead {
+            self.is_dead = true;
+            return true; // Signal death to caller
         }
 
         false
@@ -222,6 +229,7 @@ impl Player {
         self.velocity = Vec2::ZERO;
         self.health = Health::new(100.0);
         self.hunger = Hunger::new(100.0, 0.1, 1.0);
+        self.is_dead = false; // Clear death flag
         // Keep inventory on respawn (optional: can clear if you want)
     }
 }
