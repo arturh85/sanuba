@@ -1,0 +1,37 @@
+# Cargo configuration for faster builds
+# See: https://doc.rust-lang.org/cargo/reference/config.html
+
+[build]
+# Use faster linker (lld) - reduces link time by 50-70%
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+]
+
+# Compiler cache for faster clean builds (50-80% speedup after first build)
+rustc-wrapper = "sccache"
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.wasm32-unknown-unknown]
+# WASM builds don't use native linker
+rustflags = []
+
+[profile.dev]
+incremental = true
+
+# Faster debug builds - trade debuggability for 20-30% faster builds
+[profile.dev.package."*"]
+debug = "line-tables-only"
+
+[net]
+git-fetch-with-cli = false
+
+[registries.crates-io]
+protocol = "sparse"

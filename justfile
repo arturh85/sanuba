@@ -42,10 +42,6 @@ start:
 load:
     cargo run -p sunaba --bin sunaba --release
 
-# Run with puffin profiling enabled (F3 to toggle profiler)
-profile:
-    cargo run -p sunaba --bin sunaba --release --features profiling
-
 # Run multiplayer client (connects to specified SpacetimeDB server)
 start-multiplayer server="http://localhost:3000":
     @echo "Starting multiplayer client (connecting to {{server}})..."
@@ -60,47 +56,61 @@ join:
 join-prod:
     just start-multiplayer https://sunaba.app42.blue
 
+# Fast development test: clippy + fmt + tests (no release builds, no WASM)
 [unix]
-test crate="":
+test package="":
     #!/usr/bin/env bash
     set -euo pipefail
     just _ensure-generated
-    if [ -z "{{crate}}" ]; then
-        echo "Running full test suite..."
-        just fmt
-        just clippy
-        cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
-        cargo build --features "headless,multiplayer_native" -p sunaba --release
-        just build-web
-        just spacetime-build
-        just spacetime-verify-clients
-        just spacetime-verify-ts
-        echo "✅ All tests passed"
-    else
-        echo "Testing crate: {{crate}}..."
-        cargo test -p {{crate}}
-        echo "✅ Tests passed for {{crate}}"
+    echo "Running fast test suite..."
+    just fmt
+    just clippy
+    if [ -z "{{package}}" ]; then \
+        cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
+    else \
+        cargo test -p {{package}} --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
     fi
+    echo "✅ Fast tests passed"
 
 [windows]
-test crate="":
+test package="":
     @just _ensure-generated
-    @if ("{{crate}}" -eq "") { \
-        Write-Host "Running full test suite..."; \
-        just fmt; \
-        just clippy; \
-        cargo test --workspace --quiet; \
-        cargo build --features "headless,multiplayer_native" -p sunaba --release; \
-        just build-web; \
-        just spacetime-build; \
-        just spacetime-verify-clients; \
-        just spacetime-verify-ts; \
-        Write-Host "✅ All tests passed"; \
-    } else { \
-        Write-Host "Testing crate: {{crate}}..."; \
-        cargo test -p {{crate}}; \
-        Write-Host "✅ Tests passed for {{crate}}"; \
-    }
+    @Write-Host "Running fast test suite..."
+    just fmt
+    just clippy
+    @if ("{{package}}" -eq "") { cargo test --workspace --quiet } else { cargo test -p {{package}} --quiet }
+    @Write-Host "✅ Fast tests passed"
+
+# CI-equivalent: full validation with all builds
+[unix]
+test-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _ensure-generated
+    echo "Running CI-equivalent test suite..."
+    just fmt
+    just clippy
+    cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
+    cargo build --features "headless,multiplayer_native" -p sunaba --release
+    just build-web
+    just spacetime-build
+    just spacetime-verify-clients
+    just spacetime-verify-ts
+    echo "✅ All CI checks passed"
+
+[windows]
+test-ci:
+    @just _ensure-generated
+    @Write-Host "Running CI-equivalent test suite..."
+    just fmt
+    just clippy
+    cargo test --workspace --quiet
+    cargo build --features "headless,multiplayer_native" -p sunaba --release
+    just build-web
+    just spacetime-build
+    just spacetime-verify-clients
+    just spacetime-verify-ts
+    @Write-Host "✅ All CI checks passed"
 
 fmt:
     @just _ensure-generated
@@ -152,6 +162,18 @@ check crate="":
         cargo check -p {{crate}}; \
     }
     @Write-Host "✅ Check complete"
+
+# Check sccache compiler cache statistics
+profile-cache:
+    @if command -v sccache >/dev/null 2>&1; then \
+        echo "sccache statistics:"; \
+        sccache --show-stats; \
+    else \
+        echo "sccache not installed. Install with: cargo install sccache"; \
+        echo "Then add to .cargo/config.toml:"; \
+        echo "  [build]"; \
+        echo "  rustc-wrapper = \"sccache\""; \
+    fi
 
 [unix]
 build-web:

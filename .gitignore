@@ -1,4 +1,6 @@
 /target
+# Build profiling outputs
+/target/cargo-timings/
 .idea/
 *.iml
 /worlds/

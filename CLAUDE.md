@@ -12,11 +12,12 @@ A 2D falling-sand survival game combining Noita's emergent physics simulation wi
 
 **Primary Commands:**
 ```bash
-just test           # Comprehensive validation (fmt, clippy --fix, tests, builds, spacetime)
-just test <crate>   # Test specific crate (e.g., just test sunaba-core)
-just check          # Rapid iteration (clippy --fix, fmt, check - no tests)
-just check <crate>  # Check specific crate
+just check [crate]  # After code changes: clippy + fmt + check (10-50s) - USE THIS FIRST
+just test [crate]   # Before commit: check + tests (1-2min)
+just test-ci        # Before push: full CI validation (10-12min)
 ```
+
+> **Development Workflow**: Always run `just check` after making code changes. Run `just test` before committing. Run `just test-ci` before pushing to ensure full CI passes.
 
 **Development:**
 ```bash
