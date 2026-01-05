@@ -29,22 +29,44 @@ join-prod:
     just start-multiplayer https://sunaba.app42.blue
 
 [unix]
-test: fmt clippy
-    @cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
-    cargo build --features "headless,multiplayer_native" -p sunaba --release
-    just build-web
-    just spacetime-build
-    just spacetime-verify-clients
-    just spacetime-verify-ts
+test crate="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{crate}}" ]; then
+        echo "Running full test suite..."
+        just fmt
+        just clippy
+        cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
+        cargo build --features "headless,multiplayer_native" -p sunaba --release
+        just build-web
+        just spacetime-build
+        just spacetime-verify-clients
+        just spacetime-verify-ts
+        echo "✅ All tests passed"
+    else
+        echo "Testing crate: {{crate}}..."
+        cargo test -p {{crate}}
+        echo "✅ Tests passed for {{crate}}"
+    fi
 
 [windows]
-test: fmt clippy
-    cargo test --workspace --quiet
-    cargo build --features "headless,multiplayer_native" -p sunaba --release
-    just build-web
-    just spacetime-build
-    just spacetime-verify-clients
-    just spacetime-verify-ts
+test crate="":
+    @if ("{{crate}}" -eq "") { \
+        Write-Host "Running full test suite..."; \
+        just fmt; \
+        just clippy; \
+        cargo test --workspace --quiet; \
+        cargo build --features "headless,multiplayer_native" -p sunaba --release; \
+        just build-web; \
+        just spacetime-build; \
+        just spacetime-verify-clients; \
+        just spacetime-verify-ts; \
+        Write-Host "✅ All tests passed"; \
+    } else { \
+        Write-Host "Testing crate: {{crate}}..."; \
+        cargo test -p {{crate}}; \
+        Write-Host "✅ Tests passed for {{crate}}"; \
+    }
 
 fmt:
     cargo fmt --all
@@ -52,6 +74,42 @@ fmt:
 
 clippy:
     cargo clippy --fix --workspace --tests --allow-dirty
+
+[unix]
+check crate="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{crate}}" ]; then
+        echo "Checking workspace..."
+        cargo clippy --fix --workspace --tests --allow-dirty
+        cargo fmt --all
+        cargo fmt --all -- --check
+        cargo check --workspace
+    else
+        echo "Checking crate: {{crate}}..."
+        cargo clippy --fix -p {{crate}} --tests --allow-dirty
+        cargo fmt --manifest-path crates/{{crate}}/Cargo.toml
+        cargo fmt --manifest-path crates/{{crate}}/Cargo.toml -- --check
+        cargo check -p {{crate}}
+    fi
+    echo "✅ Check complete"
+
+[windows]
+check crate="":
+    @if ("{{crate}}" -eq "") { \
+        Write-Host "Checking workspace..."; \
+        cargo clippy --fix --workspace --tests --allow-dirty; \
+        cargo fmt --all; \
+        cargo fmt --all -- --check; \
+        cargo check --workspace; \
+    } else { \
+        Write-Host "Checking crate: {{crate}}..."; \
+        cargo clippy --fix -p {{crate}} --tests --allow-dirty; \
+        cargo fmt --manifest-path crates/{{crate}}/Cargo.toml; \
+        cargo fmt --manifest-path crates/{{crate}}/Cargo.toml -- --check; \
+        cargo check -p {{crate}}; \
+    }
+    @Write-Host "✅ Check complete"
 
 [unix]
 build-web:

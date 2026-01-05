@@ -12,7 +12,10 @@ A 2D falling-sand survival game combining Noita's emergent physics simulation wi
 
 ```bash
 # Primary command - run this to validate all changes
-just test    # fmt, clippy --fix, tests, release build, web build, spacetime build
+just test           # fmt, clippy --fix, tests, release build, web build, spacetime build
+just test <crate>   # Run tests for a single crate only (e.g., just test sunaba-core)
+just check          # Quick validation: clippy --fix, format, cargo check (no tests/build)
+just check <crate>  # Check individual crate (e.g., just check sunaba-core)
 
 # Development
 just start   # Run with --regenerate (new world)
@@ -120,7 +123,10 @@ pub fn load_chunk(&self, x: i32, y: i32) -> Result<Chunk> {
 - Use `assert_eq!()` and `assert!()` macros
 - Create helper functions for test fixtures: `make_test_material()`, etc.
 - No mocking libraries - instantiate real objects directly
-- Run `just test` to validate all changes
+- Run `just check` during development for rapid iteration (clippy --fix, fmt, check)
+- Run `just check <crate>` to check individual crates (e.g., `just check sunaba-core`)
+- Run `just test <crate>` to test individual crates (e.g., `just test sunaba-core`)
+- Run `just test` for comprehensive validation before pushing (includes tests, builds, spacetime)
 
 ### Code Style
 - Use `rustfmt` defaults
@@ -294,6 +300,5 @@ When changing or adding new controls, update help in web/index.html.
 9. **Deterministic evolution**: Seeded RNG for reproducible training runs
 10. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
 11. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
-12. **Multiplayer architecture**: See `.claude/skills/spacetimedb/SKILL.md` for runtime switching, client sync, subscriptions, and performance optimization patterns.
-13. **Phase 2 optimizations (2026-01)**: Raycasting now uses Bresenham algorithm for exact pixel traversal (~2x faster). Neighbor queries use SmallVec for stack allocation (avoids heap for typical radii). CPPN genomes use petgraph's serde-1 feature directly (~100 lines removed, 50% memory reduction per genome, maintains SpacetimeDB bincode compatibility).
-14. **Phase 7 optimizations (2026-01)**: Noise generation now uses fastnoise-lite for WASM-compatible procedural terrain. OpenSimplex2 with FBm for biomes, terrain height, caves, ores, and vegetation. 2-4× faster than previous noise crate. Light propagation uses VecDeque-based BFS flood-fill (already optimal, no changes needed).
+12. **Rapid iteration workflow**: Use `just check [crate]` as the first validation step after making changes - it automatically fixes clippy issues (including unused imports), formats code, and runs cargo check. Use `just test [crate]` to run tests for specific crates. Always run `just test` (no params) for final comprehensive validation before pushing. Examples: `just check sunaba-core`, `just test sunaba-creature`.
+13. **Rust LSP tools**: Prefer LSP tools for code navigation and refactoring when appropriate: `mcp__rust__lsp_rename_symbol` for renaming symbols across the codebase (safer than grep + edit), `mcp__rust__search_symbols` or `mcp__rust__lsp_get_workspace_symbols` for finding functions/types in large codebases, `mcp__rust__lsp_find_references` to find all usages, `mcp__rust__lsp_get_definitions` to jump to definitions. Use `mcp__rust__get_symbol_details` for comprehensive information about a symbol (type, definition, references). These tools leverage rust-analyzer for accuracy and handle Rust-specific nuances like macros and trait implementations.
