@@ -8,41 +8,40 @@ A 2D falling-sand survival game combining Noita's emergent physics simulation wi
 3. **Persistent World**: Player changes persist across sessions
 4. **Survival Sandbox**: Terraria-style crafting, building, exploration, creature taming/breeding
 
-## Commands
+## Quick Start
 
+**Primary Commands:**
 ```bash
-# Primary command - run this to validate all changes
-just test           # fmt, clippy --fix, tests, release build, web build, spacetime build
-just test <crate>   # Run tests for a single crate only (e.g., just test sunaba-core)
-just check          # Quick validation: clippy --fix, format, cargo check (no tests/build)
-just check <crate>  # Check individual crate (e.g., just check sunaba-core)
-
-# Development
-just start   # Run with --regenerate (new world)
-just load    # Run release (load existing world)
-just profile # Run with puffin profiler (F3 to toggle flamegraph)
-just web     # Build and serve web version at localhost:8080
-
-# Individual commands (prefer just test)
-cargo run -p sunaba --release
-cargo test --workspace
-cargo clippy --workspace
-cargo fmt --all
+just test           # Comprehensive validation (fmt, clippy --fix, tests, builds, spacetime)
+just test <crate>   # Test specific crate (e.g., just test sunaba-core)
+just check          # Rapid iteration (clippy --fix, fmt, check - no tests)
+just check <crate>  # Check specific crate
 ```
 
-## SpacetimeDB Multiplayer
-
+**Development:**
 ```bash
-just spacetime-build      # Build WASM server module
+just start   # Run with --regenerate (new world)
+just load    # Run release (load existing)
+just profile # Run with puffin profiler (F3 to toggle flamegraph)
+just web     # Build and serve WASM (localhost:8080)
+```
+
+**SpacetimeDB Multiplayer:**
+```bash
+just spacetime-build      # Build WASM server
 just spacetime-start      # Start local server (localhost:3000)
 just spacetime-stop       # Stop local server
-just spacetime-publish    # Publish module to local server
-just spacetime-logs-tail  # Follow server logs
+just spacetime-publish    # Publish to server
+just spacetime-logs-tail  # Follow logs
 ```
 
-**For detailed SpacetimeDB patterns, schema changes, subscriptions, and performance optimization, see `.claude/skills/spacetimedb/SKILL.md` or consult the spacetimedb-reference skill.**
+> For SpacetimeDB patterns, schema changes, and subscriptions, see `.claude/skills/spacetimedb/SKILL.md`
 
-## Workspace Structure
+> **Note:** All commands support optional `<crate>` parameter for targeted operations.
+
+## Architecture
+
+### Workspace Structure
 
 sunaba is organized as a Cargo workspace with 5 crates:
 
@@ -68,79 +67,6 @@ sunaba-server (SpacetimeDB cdylib for WASM)
 ├── sunaba-creature
 └── spacetimedb
 ```
-
-### Developing Individual Crates
-```bash
-# Test individual crates
-cargo test -p sunaba-simulation
-cargo test -p sunaba-creature
-cargo test -p sunaba-core
-cargo test -p sunaba
-
-# Check workspace
-cargo check --workspace
-
-# Build only the game binary
-cargo build --release -p sunaba
-```
-
-## Rust Coding Guidelines
-
-### Error Handling
-- Use `anyhow::Result` for all fallible functions
-- Use `.context("message")` to add context to errors
-- Use `anyhow::anyhow!("message")` for custom errors
-- Avoid `.unwrap()` in library code - use `.expect("reason")` or propagate with `?`
-- Use `.unwrap_or()` / `.unwrap_or_default()` for safe fallbacks
-
-```rust
-use anyhow::{Context, Result};
-
-pub fn load_chunk(&self, x: i32, y: i32) -> Result<Chunk> {
-    let path = self.chunk_path(x, y);
-    let data = std::fs::read(&path)
-        .context("Failed to read chunk file")?;
-    let (chunk, _) = bincode::serde::decode_from_slice(&data, bincode::config::standard())
-        .context("Failed to deserialize chunk")?;
-    Ok(chunk)
-}
-```
-
-### Async Runtime
-- Minimal async - only for wgpu initialization
-- Uses `pollster::block_on()` for single-threaded blocking
-- Main game loop is synchronous (winit event loop)
-- No tokio or async-std
-
-### Memory Management
-- Prefer direct ownership over smart pointers (Arc/Rc/RefCell)
-- Clone liberally for data-driven types (`MaterialDef`, `ItemStack`, etc.)
-- Use `AtomicU64` for thread-safe ID generation (see `entity/mod.rs`)
-- Avoid interior mutability unless truly needed
-
-### Testing
-- Inline `#[cfg(test)] mod tests` at end of source files
-- Use `assert_eq!()` and `assert!()` macros
-- Create helper functions for test fixtures: `make_test_material()`, etc.
-- No mocking libraries - instantiate real objects directly
-- Run `just check` during development for rapid iteration (clippy --fix, fmt, check)
-- Run `just check <crate>` to check individual crates (e.g., `just check sunaba-core`)
-- Run `just test <crate>` to test individual crates (e.g., `just test sunaba-core`)
-- Run `just test` for comprehensive validation before pushing (includes tests, builds, spacetime)
-
-### Code Style
-- Use `rustfmt` defaults
-- Use `log` + `env_logger` for logging
-- Use `#[derive(Debug, Clone, Serialize, Deserialize)]` liberally
-- Data-driven design: define behaviors in data, not code
-
-### Performance
-- Hot path (CA update loop) must avoid allocations
-- Use `rayon` for parallel chunk updates (checkerboard pattern)
-- Profile before optimizing - use `tracy` or `puffin`
-- GPU texture upload is often the bottleneck
-
-## Architecture Overview
 
 ### Tech Stack
 | Component        | Crate                                         |
@@ -179,106 +105,88 @@ World
 3. **Structural Integrity** (event-driven) - debris conversion on disconnect
 4. **Falling Chunks** (kinematic, 60fps) - debris falls with gravity, settles into world
 
-## Project Structure
-
+### Project Structure
 ```
 crates/
-├── sunaba-simulation/                 # Material simulation foundation
+├── sunaba-simulation/          # Material definitions, reactions, pixel data
+│   └── src/ (materials.rs, reactions.rs, pixel.rs)
+├── sunaba-creature/            # ML-evolved creatures, neural control, physics
+│   └── src/ (genome.rs, morphology.rs, neural.rs, behavior.rs, creature.rs, ...)
+├── sunaba-core/                # World + entity + levels
 │   └── src/
-│       ├── lib.rs
-│       ├── materials.rs               # MaterialDef, MaterialId, Materials
-│       ├── reactions.rs               # Reaction, ReactionRegistry
-│       └── pixel.rs                   # Pixel, pixel_flags, CHUNK_SIZE
-│
-├── sunaba-creature/                   # ML-evolved creatures + physics
+│       ├── world/*.rs          # 20+ modules: world.rs, chunk*.rs, *_system.rs, *_queries.rs
+│       ├── simulation/         # Temperature, state changes, structural, mining, light
+│       ├── entity/             # Player, inventory, crafting, tools, health
+│       └── levels/             # Level definitions, 16 demo scenarios
+├── sunaba/                     # Main binary + rendering
 │   └── src/
-│       ├── lib.rs
-│       ├── traits.rs                  # WorldAccess, WorldMutAccess traits
-│       ├── types.rs                   # EntityId, Health, Hunger
-│       ├── simple_physics.rs          # CreaturePhysicsState (no external engine)
-│       ├── genome.rs                  # CPPN-NEAT genome
-│       ├── morphology.rs              # Body generation from CPPN
-│       ├── neural.rs                  # DeepNeuralController brain
-│       ├── behavior.rs                # GOAP planner
-│       ├── sensors.rs                 # Raycasts, material detection
-│       ├── spawning.rs                # CreatureManager
-│       ├── world_interaction.rs       # Eating, mining, building
-│       └── creature.rs                # Main Creature entity
-│
-├── sunaba-core/                       # World + entity + levels
-│   └── src/
-│       ├── lib.rs                     # Re-exports simulation + creature
-│       ├── world/                     # World management (20+ modules)
-│       │   ├── world.rs               # Main orchestrator (~1,200 lines, refactored)
-│       │   ├── chunk*.rs              # Chunk data, manager, status
-│       │   ├── *_system.rs            # Extracted systems (chemistry, debris, light, mining, persistence, player_physics)
-│       │   ├── *_queries.rs           # Stateless utilities (pixel, neighbor, raycasting, collision)
-│       │   └── ...                    # Generation, biomes, stats, CA update, RNG traits
-│       ├── simulation/
-│       │   ├── temperature.rs         # Heat diffusion
-│       │   ├── state_changes.rs       # Melt, freeze, boil
-│       │   ├── structural.rs          # Structural integrity
-│       │   ├── mining.rs              # Mining mechanics
-│       │   ├── regeneration.rs        # Resource regeneration
-│       │   └── light.rs               # Light propagation
-│       ├── entity/
-│       │   ├── player.rs              # Player controller
-│       │   ├── input.rs               # InputState
-│       │   ├── inventory.rs           # Inventory system
-│       │   ├── crafting.rs            # Crafting recipes
-│       │   ├── tools.rs               # Tool definitions
-│       │   └── health.rs              # Health/hunger system
-│       └── levels/
-│           ├── level_def.rs           # Level definition
-│           └── demo_levels.rs         # 16 demo scenarios
-│
-└── sunaba/                            # Main binary + rendering crate
-    └── src/
-        ├── main.rs                    # Entry point, CLI
-        ├── lib.rs                     # Library root, WASM entry
-        ├── app.rs                     # Application state, game loop
-        ├── render/
-        │   └── renderer.rs            # wgpu pipeline, camera
-        ├── ui/
-        │   ├── ui_state.rs            # Central UI state
-        │   ├── hud.rs                 # Heads-up display
-        │   ├── stats.rs               # Debug stats (F1)
-        │   ├── tooltip.rs             # Mouse hover info
-        │   ├── inventory_ui.rs        # Inventory panel
-        │   ├── crafting_ui.rs         # Crafting interface
-        │   ├── level_selector.rs      # Level dropdown (L)
-        │   └── controls_help.rs       # Help overlay (H)
-        └── headless/                  # Offline training (native only)
-            ├── training_env.rs
-            ├── scenario.rs
-            └── map_elites.rs
-│
-└── sunaba-server/                     # SpacetimeDB multiplayer server
-    └── src/
-        ├── lib.rs                     # Module declarations + re-exports
-        ├── tables.rs                  # SpacetimeDB table definitions (8 tables)
-        ├── state.rs                   # Global server state (SERVER_WORLD)
-        ├── reducers/
-        │   ├── mod.rs                 # Reducer re-exports
-        │   ├── lifecycle.rs           # init, client connect/disconnect
-        │   ├── world_ticks.rs         # Scheduled simulation ticks (60fps, 30fps, 10fps)
-        │   ├── player_actions.rs      # Player movement, placement, mining
-        │   ├── creatures.rs           # Creature spawning + feature extraction
-        │   ├── monitoring.rs          # Ping, metrics cleanup
-        │   └── testing.rs             # Debug/test reducers
-        ├── helpers.rs                 # Chunk loading, sync, physics utilities
-        ├── world_access.rs            # WorldAccess impl over SpacetimeDB
-        └── encoding.rs                # Bincode serialization helpers
+│       ├── main.rs, lib.rs, app.rs
+│       ├── render/renderer.rs  # wgpu pipeline
+│       ├── ui/                 # HUD, stats, inventory, crafting, tooltips
+│       └── headless/           # Offline training (MAP-Elites)
+└── sunaba-server/              # SpacetimeDB multiplayer
+    └── src/ (tables.rs, state.rs, reducers/, helpers.rs, world_access.rs)
 ```
 
-## Development Phases
+## Development Guide
 
-### Completed
+### Error Handling
+- Use `anyhow::Result` for all fallible functions
+- Use `.context("message")` to add context to errors
+- Use `anyhow::anyhow!("message")` for custom errors
+- Avoid `.unwrap()` in library code - use `.expect("reason")` or propagate with `?`
+- Use `.unwrap_or()` / `.unwrap_or_default()` for safe fallbacks
+
+```rust
+use anyhow::{Context, Result};
+
+pub fn load_chunk(&self, x: i32, y: i32) -> Result<Chunk> {
+    let path = self.chunk_path(x, y);
+    let data = std::fs::read(&path)
+        .context("Failed to read chunk file")?;
+    let (chunk, _) = bincode::serde::decode_from_slice(&data, bincode::config::standard())
+        .context("Failed to deserialize chunk")?;
+    Ok(chunk)
+}
+```
+
+### Async Runtime
+- Minimal async - only for wgpu initialization
+- Uses `pollster::block_on()` for single-threaded blocking
+- Main game loop is synchronous (winit event loop)
+- No tokio or async-std
+
+### Memory Management
+- Prefer direct ownership over smart pointers (Arc/Rc/RefCell)
+- Clone liberally for data-driven types (`MaterialDef`, `ItemStack`, etc.)
+- Use `AtomicU64` for thread-safe ID generation (see `entity/mod.rs`)
+- Avoid interior mutability unless truly needed
+
+### Testing
+- Inline `#[cfg(test)] mod tests` at end of source files
+- Use `assert_eq!()` and `assert!()` macros
+- Create helper functions for test fixtures: `make_test_material()`, etc.
+- No mocking libraries - instantiate real objects directly
+
+### Code Style
+- Use `rustfmt` defaults
+- Use `log` + `env_logger` for logging
+- Use `#[derive(Debug, Clone, Serialize, Deserialize)]` liberally
+- Data-driven design: define behaviors in data, not code
+
+### Performance
+- Hot path (CA update loop) must avoid allocations
+- Use `rayon` for parallel chunk updates (checkerboard pattern)
+- Profile before optimizing - use `tracy` or `puffin`
+- GPU texture upload is often the bottleneck
+
+### Development Phases
+
+**Completed:**
 - **Phase 1-4**: Core simulation, materials, structural integrity, persistence
 - **Phase 5**: Extended materials, ore/mining, crafting, inventory, light system
 
-### In Progress (See [DESIGN.md](./DESIGN.md) for design details and [PLAN.md](./PLAN.md) for detailed development plans)
-
+**In Progress:** (See [DESIGN.md](./DESIGN.md) for design details and [PLAN.md](./PLAN.md) for detailed development plans)
 - **Phase 6**: Creature architecture (CPPN-NEAT, neural control, GOAP)
 - **Phase 7**: Offline evolution pipeline (MAP-Elites, training scenarios)
 - **Phase 8**: Survival integration (taming, breeding, creature persistence)
@@ -287,18 +195,30 @@ crates/
 
 When changing or adding new controls, update help in web/index.html.
 
-## Notes for Claude
+## Domain-Specific Notes
 
-1. **Start simple**: Get basic functionality working before adding complexity
-2. **Profile early**: The CA loop is the hot path, measure before optimizing
-3. **Data-driven materials**: Resist hardcoding material behaviors
-4. **Chunk boundaries**: Most bugs occur at chunk edges - test thoroughly
-5. **Rand compatibility**: Always use rand 0.8 stable APIs (`thread_rng()`, `gen_range()`, `r#gen()`). Import `Rng` trait. WorldRng abstraction handles SpacetimeDB `ctx.rng()` and client `thread_rng()`.
-6. **SpacetimeDB development**: See `.claude/skills/spacetimedb/SKILL.md` for detailed patterns. CRITICAL: Always run `just test` after schema changes to regenerate and validate both Rust and TypeScript clients.
-7. **Data-driven creatures**: Behaviors should emerge from evolution, not code
-8. **Neural inference profiling**: Brain updates are hot path for many creatures
-9. **Deterministic evolution**: Seeded RNG for reproducible training runs
-10. **Behavioral diversity**: MAP-Elites should produce genuinely different strategies
-11. **Morphology-controller coupling**: CPPN and brain genome should co-evolve together
-12. **Rapid iteration workflow**: Use `just check [crate]` as the first validation step after making changes - it automatically fixes clippy issues (including unused imports), formats code, and runs cargo check. Use `just test [crate]` to run tests for specific crates. Always run `just test` (no params) for final comprehensive validation before pushing. Examples: `just check sunaba-core`, `just test sunaba-creature`.
-13. **Rust LSP tools**: Prefer LSP tools for code navigation and refactoring when appropriate: `mcp__rust__lsp_rename_symbol` for renaming symbols across the codebase (safer than grep + edit), `mcp__rust__search_symbols` or `mcp__rust__lsp_get_workspace_symbols` for finding functions/types in large codebases, `mcp__rust__lsp_find_references` to find all usages, `mcp__rust__lsp_get_definitions` to jump to definitions. Use `mcp__rust__get_symbol_details` for comprehensive information about a symbol (type, definition, references). These tools leverage rust-analyzer for accuracy and handle Rust-specific nuances like macros and trait implementations.
+### Simulation
+- **Start simple** - get basic functionality working before adding complexity
+- **Profile early** - CA update loop is the hot path, measure before optimizing
+- **Data-driven materials** - resist hardcoding material behaviors
+- **Chunk boundaries** - most bugs occur at chunk edges, test thoroughly
+- **GPU texture upload** is often the bottleneck (not CA logic)
+
+### Creatures & Evolution
+- **Data-driven creatures** - behaviors should emerge from evolution, not code
+- **Neural inference profiling** - brain updates are hot path for many creatures
+- **Deterministic evolution** - seeded RNG for reproducible training runs
+- **Behavioral diversity** - MAP-Elites should produce genuinely different strategies
+- **Morphology-controller coupling** - CPPN and brain genome should co-evolve together
+
+### Multiplayer (SpacetimeDB)
+- See `.claude/skills/spacetimedb/SKILL.md` for detailed patterns
+- **Always run `just test` after schema changes** to regenerate and validate both Rust and TypeScript clients
+- **Rand compatibility** - WorldRng abstraction handles `ctx.rng()` (SpacetimeDB) vs `thread_rng()` (client)
+  - Use rand 0.8 stable APIs: `thread_rng()`, `gen_range()`, `r#gen()`, import `Rng` trait
+
+### Development Workflow & Tooling
+- **Rapid iteration**: `just check [crate]` for fast validation (clippy --fix, fmt, check)
+- **Comprehensive validation**: `just test [crate]` or `just test` before pushing
+- **LSP tools**: Prefer `mcp__rust__lsp_*` tools for refactoring (rename_symbol, find_references, get_definitions)
+  - These leverage rust-analyzer for accuracy with macros and trait implementations

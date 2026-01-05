@@ -86,9 +86,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Install SpacetimeDB CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh -s -- -y
+          echo "$HOME/.local/share/spacetime/bin" >> $GITHUB_PATH
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: just fmt-check
 
   coverage:
     name: Coverage

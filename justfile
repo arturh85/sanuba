@@ -4,6 +4,38 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 # Environment variable for RUST_LOG
 export RUST_LOG := "info"
 
+# Internal helper: ensure SpacetimeDB CLI is installed and generated files exist
+[unix]
+_ensure-generated:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Check if generated.rs exists
+    if [ ! -f "crates/sunaba/src/multiplayer/generated.rs" ]; then
+        echo "⚠️  Generated files missing, setting up..."
+        # Check if spacetime CLI is installed
+        if ! command -v spacetime &> /dev/null; then
+            echo "Installing SpacetimeDB CLI..."
+            curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh -s -- -y
+            export PATH="$HOME/.local/share/spacetime/bin:$PATH"
+        fi
+        echo "Generating Rust client..."
+        just spacetime-generate-rust > /dev/null 2>&1
+        echo "✅ Generated files ready"
+    fi
+
+[windows]
+_ensure-generated:
+    @if (-not (Test-Path "crates/sunaba/src/multiplayer/generated.rs")) { \
+        Write-Host "⚠️  Generated files missing, setting up..."; \
+        if (-not (Get-Command spacetime -ErrorAction SilentlyContinue)) { \
+            Write-Host "Installing SpacetimeDB CLI..."; \
+            irm https://windows.spacetimedb.com | iex; \
+        } \
+        Write-Host "Generating Rust client..."; \
+        just spacetime-generate-rust | Out-Null; \
+        Write-Host "✅ Generated files ready"; \
+    }
+
 start:
     cargo run -p sunaba --bin sunaba --release --features multiplayer_native -- --regenerate
 
@@ -32,6 +64,7 @@ join-prod:
 test crate="":
     #!/usr/bin/env bash
     set -euo pipefail
+    just _ensure-generated
     if [ -z "{{crate}}" ]; then
         echo "Running full test suite..."
         just fmt
@@ -51,6 +84,7 @@ test crate="":
 
 [windows]
 test crate="":
+    @just _ensure-generated
     @if ("{{crate}}" -eq "") { \
         Write-Host "Running full test suite..."; \
         just fmt; \
@@ -69,7 +103,13 @@ test crate="":
     }
 
 fmt:
+    @just _ensure-generated
     cargo fmt --all
+    cargo fmt --all -- --check
+
+# Format check for CI (ensures generated files exist first)
+fmt-check:
+    @just _ensure-generated
     cargo fmt --all -- --check
 
 clippy:
@@ -79,6 +119,7 @@ clippy:
 check crate="":
     #!/usr/bin/env bash
     set -euo pipefail
+    just _ensure-generated
     if [ -z "{{crate}}" ]; then
         echo "Checking workspace..."
         cargo clippy --fix --workspace --tests --allow-dirty
@@ -96,6 +137,7 @@ check crate="":
 
 [windows]
 check crate="":
+    @just _ensure-generated
     @if ("{{crate}}" -eq "") { \
         Write-Host "Checking workspace..."; \
         cargo clippy --fix --workspace --tests --allow-dirty; \
