@@ -6,6 +6,12 @@ members = [
     "crates/sunaba",
     "crates/sunaba-server",
 ]
+default-members = [
+    "crates/sunaba-simulation",
+    "crates/sunaba-creature",
+    "crates/sunaba-core",
+    "crates/sunaba",
+]
 resolver = "2"
 
 [workspace.package]

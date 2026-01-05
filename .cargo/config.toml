@@ -2,14 +2,10 @@
 # See: https://doc.rust-lang.org/cargo/reference/config.html
 
 [build]
-# Use faster linker (lld) - reduces link time by 50-70%
-rustflags = [
-    "-C", "link-arg=-fuse-ld=lld",
-]
-
 # Compiler cache for faster clean builds (50-80% speedup after first build)
 rustc-wrapper = "sccache"
 
+# Use faster linker (lld) on native targets - reduces link time by 50-70%
 [target.x86_64-apple-darwin]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
