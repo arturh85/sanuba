@@ -147,4 +147,127 @@ mod tests {
         // Different cell unaffected
         assert_eq!(get_temperature_at_pixel(&chunk, 8, 8), 20.0);
     }
+
+    #[test]
+    fn test_temperature_simulator_new() {
+        let sim = TemperatureSimulator::new();
+        assert_eq!(sim.update_counter, 0);
+    }
+
+    #[test]
+    fn test_temperature_simulator_default() {
+        let sim = TemperatureSimulator::default();
+        assert_eq!(sim.update_counter, 0);
+    }
+
+    #[test]
+    fn test_temperature_simulator_throttling() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        chunks.insert(IVec2::new(0, 0), Chunk::new(0, 0));
+        let active_chunks = vec![IVec2::new(0, 0)];
+
+        // First update should be skipped (throttle counter = 1)
+        sim.update(&mut chunks, &active_chunks);
+        assert_eq!(sim.update_counter, 1);
+
+        // Second update should run (throttle counter resets)
+        sim.update(&mut chunks, &active_chunks);
+        assert_eq!(sim.update_counter, 0);
+    }
+
+    #[test]
+    fn test_temperature_diffusion_hot_center() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        let mut chunk = Chunk::new(0, 0);
+
+        // Set center cell to high temperature
+        chunk.temperature[temp_to_index(4, 4)] = 100.0;
+        chunks.insert(IVec2::new(0, 0), chunk);
+
+        let active_chunks = vec![IVec2::new(0, 0)];
+
+        // Run two updates to trigger diffusion
+        sim.update(&mut chunks, &active_chunks);
+        sim.update(&mut chunks, &active_chunks);
+
+        let chunk = chunks.get(&IVec2::new(0, 0)).unwrap();
+
+        // Center should have cooled down (diffused to neighbors)
+        let center_temp = chunk.temperature[temp_to_index(4, 4)];
+        assert!(center_temp < 100.0, "Center should cool down from 100, got {}", center_temp);
+
+        // Neighbors should have warmed up from room temperature (20.0)
+        let neighbor_temp = chunk.temperature[temp_to_index(4, 5)];
+        assert!(neighbor_temp > 20.0, "Neighbor should warm up from 20, got {}", neighbor_temp);
+    }
+
+    #[test]
+    fn test_temperature_diffusion_corner() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        let mut chunk = Chunk::new(0, 0);
+
+        // Set corner cell to high temperature
+        chunk.temperature[temp_to_index(0, 0)] = 100.0;
+        chunks.insert(IVec2::new(0, 0), chunk);
+
+        let active_chunks = vec![IVec2::new(0, 0)];
+
+        // Run diffusion
+        sim.update(&mut chunks, &active_chunks);
+        sim.update(&mut chunks, &active_chunks);
+
+        let chunk = chunks.get(&IVec2::new(0, 0)).unwrap();
+
+        // Corner has only 2 neighbors (edge effect)
+        let corner_temp = chunk.temperature[temp_to_index(0, 0)];
+        assert!(corner_temp < 100.0, "Corner should cool down");
+    }
+
+    #[test]
+    fn test_temperature_uniform_no_change() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        let chunk = Chunk::new(0, 0); // All temperatures at 20.0
+        chunks.insert(IVec2::new(0, 0), chunk);
+
+        let active_chunks = vec![IVec2::new(0, 0)];
+
+        // Uniform temperature should remain uniform
+        sim.update(&mut chunks, &active_chunks);
+        sim.update(&mut chunks, &active_chunks);
+
+        let chunk = chunks.get(&IVec2::new(0, 0)).unwrap();
+
+        // All cells should still be at room temperature
+        for temp in &chunk.temperature {
+            assert!((temp - 20.0).abs() < 0.001, "Uniform temp should not change");
+        }
+    }
+
+    #[test]
+    fn test_temperature_empty_active_chunks() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        chunks.insert(IVec2::new(0, 0), Chunk::new(0, 0));
+
+        // No active chunks - should not crash
+        let active_chunks: Vec<IVec2> = vec![];
+        sim.update(&mut chunks, &active_chunks);
+        sim.update(&mut chunks, &active_chunks);
+    }
+
+    #[test]
+    fn test_temperature_missing_chunk() {
+        let mut sim = TemperatureSimulator::new();
+        let mut chunks = HashMap::new();
+        // No chunks at all
+
+        // Active chunk not in map - should not crash
+        let active_chunks = vec![IVec2::new(5, 5)];
+        sim.update(&mut chunks, &active_chunks);
+        sim.update(&mut chunks, &active_chunks);
+    }
 }

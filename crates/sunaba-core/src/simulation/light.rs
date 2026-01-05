@@ -251,3 +251,153 @@ impl Default for LightPropagation {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::simulation::MaterialId;
+    use crate::world::Chunk;
+
+    fn setup_test_chunks() -> (std::collections::HashMap<glam::IVec2, crate::world::Chunk>, Materials) {
+        let mut chunks = std::collections::HashMap::new();
+        for cy in -1..=1 {
+            for cx in -1..=1 {
+                chunks.insert(glam::IVec2::new(cx, cy), Chunk::new(cx, cy));
+            }
+        }
+        (chunks, Materials::new())
+    }
+
+    #[test]
+    fn test_light_emission_fire() {
+        let light = LightPropagation::new();
+        assert_eq!(light.get_light_emission(MaterialId::FIRE), LIGHT_FIRE);
+        assert_eq!(LIGHT_FIRE, 15, "Fire should emit maximum light");
+    }
+
+    #[test]
+    fn test_light_emission_lava() {
+        let light = LightPropagation::new();
+        assert_eq!(light.get_light_emission(MaterialId::LAVA), LIGHT_LAVA);
+        assert_eq!(LIGHT_LAVA, 12, "Lava should emit bright light");
+    }
+
+    #[test]
+    fn test_light_emission_other_materials() {
+        let light = LightPropagation::new();
+
+        // Non-emitting materials should return 0
+        assert_eq!(light.get_light_emission(MaterialId::AIR), 0);
+        assert_eq!(light.get_light_emission(MaterialId::STONE), 0);
+        assert_eq!(light.get_light_emission(MaterialId::WATER), 0);
+        assert_eq!(light.get_light_emission(MaterialId::SAND), 0);
+    }
+
+    #[test]
+    fn test_calculate_transmission_gas() {
+        let light = LightPropagation::new();
+
+        // Gas (air) transmits light with -1 per step
+        assert_eq!(light.calculate_transmission(15, &MaterialType::Gas), 14);
+        assert_eq!(light.calculate_transmission(5, &MaterialType::Gas), 4);
+        assert_eq!(light.calculate_transmission(1, &MaterialType::Gas), 0);
+        assert_eq!(light.calculate_transmission(0, &MaterialType::Gas), 0);
+    }
+
+    #[test]
+    fn test_calculate_transmission_liquid() {
+        let light = LightPropagation::new();
+
+        // Liquids absorb more light (-2 per step)
+        assert_eq!(light.calculate_transmission(15, &MaterialType::Liquid), 13);
+        assert_eq!(light.calculate_transmission(5, &MaterialType::Liquid), 3);
+        assert_eq!(light.calculate_transmission(2, &MaterialType::Liquid), 0);
+        assert_eq!(light.calculate_transmission(1, &MaterialType::Liquid), 0);
+    }
+
+    #[test]
+    fn test_calculate_transmission_solid() {
+        let light = LightPropagation::new();
+
+        // Solids block light completely
+        assert_eq!(light.calculate_transmission(15, &MaterialType::Solid), 0);
+        assert_eq!(light.calculate_transmission(5, &MaterialType::Solid), 0);
+    }
+
+    #[test]
+    fn test_calculate_transmission_powder() {
+        let light = LightPropagation::new();
+
+        // Powder also blocks light completely
+        assert_eq!(light.calculate_transmission(15, &MaterialType::Powder), 0);
+    }
+
+    #[test]
+    fn test_world_to_chunk_coords_positive() {
+        // Positive coordinates
+        let (chunk, lx, ly) = LightPropagation::world_to_chunk_coords(65, 70);
+        assert_eq!(chunk, glam::IVec2::new(1, 1));
+        assert_eq!(lx, 1);
+        assert_eq!(ly, 6);
+    }
+
+    #[test]
+    fn test_world_to_chunk_coords_negative() {
+        // Negative coordinates
+        let (chunk, lx, ly) = LightPropagation::world_to_chunk_coords(-1, -1);
+        assert_eq!(chunk, glam::IVec2::new(-1, -1));
+        assert_eq!(lx, 63);
+        assert_eq!(ly, 63);
+    }
+
+    #[test]
+    fn test_world_to_chunk_coords_boundary() {
+        // At chunk boundary
+        let (chunk, lx, ly) = LightPropagation::world_to_chunk_coords(64, 64);
+        assert_eq!(chunk, glam::IVec2::new(1, 1));
+        assert_eq!(lx, 0);
+        assert_eq!(ly, 0);
+    }
+
+    #[test]
+    fn test_light_propagation_new() {
+        let light = LightPropagation::new();
+        // Queue should start empty
+        assert_eq!(light.queue.len(), 0);
+    }
+
+    #[test]
+    fn test_propagate_light_empty_world() {
+        let (mut chunks, materials) = setup_test_chunks();
+        let mut light = LightPropagation::new();
+
+        // No active chunks, should complete without error
+        let active_chunks = vec![];
+        light.propagate_light(&mut chunks, &materials, 0, &active_chunks);
+
+        // No crash means success
+    }
+
+    #[test]
+    fn test_propagate_light_marks_clean() {
+        let (mut chunks, materials) = setup_test_chunks();
+        let mut light = LightPropagation::new();
+
+        // Mark chunk as light dirty
+        let chunk_pos = glam::IVec2::new(0, 0);
+        chunks.get_mut(&chunk_pos).unwrap().light_dirty = true;
+
+        let active_chunks = vec![chunk_pos];
+        light.propagate_light(&mut chunks, &materials, 0, &active_chunks);
+
+        // Should mark chunk as clean
+        assert!(!chunks.get(&chunk_pos).unwrap().light_dirty);
+    }
+
+    #[test]
+    fn test_light_constants() {
+        assert_eq!(LIGHT_MAX, 15, "Max light should be 15");
+        assert!(LIGHT_FIRE <= LIGHT_MAX, "Fire light should not exceed max");
+        assert!(LIGHT_LAVA <= LIGHT_MAX, "Lava light should not exceed max");
+    }
+}
