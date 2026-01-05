@@ -45,6 +45,9 @@ impl SpiralChunkIterator {
     ///
     /// # Example
     /// ```
+    /// use sunaba::multiplayer::chunk_loader::SpiralChunkIterator;
+    /// use glam::IVec2;
+    ///
     /// let spiral = SpiralChunkIterator::new(IVec2::ZERO, 10);
     /// // Yields 441 chunks in spiral order (21x21 grid)
     /// ```
@@ -86,11 +89,12 @@ impl Iterator for SpiralChunkIterator {
                 return Some(result);
             }
 
-            // Move to radius 1 (starts at (1, 0), walks down to (1, -1))
+            // Move to radius 1 (starts at (R, R-1), walks down through (R, 0) to (R, -R))
             self.current_radius = 1;
-            self.current_pos = self.center + IVec2::new(self.current_radius, 0);
+            self.current_pos =
+                self.center + IVec2::new(self.current_radius, self.current_radius - 1);
             self.side = 0; // Start on right side
-            self.steps_in_side = self.current_radius + 1; // R+1 positions on first side
+            self.steps_in_side = self.current_radius * 2; // 2R positions on right edge
             self.steps_remaining = self.steps_in_side;
             return Some(result);
         }
@@ -120,10 +124,11 @@ impl Iterator for SpiralChunkIterator {
                     return Some(result);
                 }
 
-                // Start new ring from right side (starts at (R, 0), walks down to (R, -R))
-                self.current_pos = self.center + IVec2::new(self.current_radius, 0);
+                // Start new ring from right side (starts at (R, R-1), walks down through (R, 0) to (R, -R))
+                self.current_pos =
+                    self.center + IVec2::new(self.current_radius, self.current_radius - 1);
                 self.side = 0;
-                self.steps_in_side = self.current_radius + 1; // R+1 positions on first side
+                self.steps_in_side = self.current_radius * 2; // 2R positions on right edge
                 self.steps_remaining = self.steps_in_side;
                 return Some(result);
             } else {
