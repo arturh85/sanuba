@@ -1322,3 +1322,7 @@ impl sunaba_creature::WorldMutAccess for World {
         World::set_pixel_full(self, x, y, pixel)
     }
 }
+
+#[cfg(test)]
+#[path = "world_tests.rs"]
+mod world_tests;
