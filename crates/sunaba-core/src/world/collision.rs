@@ -173,7 +173,12 @@ mod tests {
     }
 
     /// Set a pixel at world coordinates in the chunk map
-    fn set_world_pixel(chunks: &mut HashMap<IVec2, Chunk>, world_x: i32, world_y: i32, material_id: u16) {
+    fn set_world_pixel(
+        chunks: &mut HashMap<IVec2, Chunk>,
+        world_x: i32,
+        world_y: i32,
+        material_id: u16,
+    ) {
         let (chunk_pos, local_x, local_y) = ChunkManager::world_to_chunk_coords(world_x, world_y);
         if let Some(chunk) = chunks.get_mut(&chunk_pos) {
             chunk.set_material(local_x, local_y, material_id);
@@ -185,9 +190,8 @@ mod tests {
         let (chunks, materials) = setup_test_world();
 
         // Rectangle in empty space (air) should not collide
-        let collision = CollisionDetector::check_solid_collision(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
-        );
+        let collision =
+            CollisionDetector::check_solid_collision(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
         assert!(!collision, "Should not collide with air");
     }
 
@@ -201,10 +205,12 @@ mod tests {
         // - bottom-center check point is at (32, 27.25) -> (32, 27)
         set_world_pixel(&mut chunks, 32, 27, MaterialId::STONE);
 
-        let collision = CollisionDetector::check_solid_collision(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
+        let collision =
+            CollisionDetector::check_solid_collision(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
+        assert!(
+            collision,
+            "Should collide with stone at bottom-center check point"
         );
-        assert!(collision, "Should collide with stone at bottom-center check point");
     }
 
     #[test]
@@ -214,9 +220,8 @@ mod tests {
         // Place water at (32, 32) - should not cause collision
         set_world_pixel(&mut chunks, 32, 32, MaterialId::WATER);
 
-        let collision = CollisionDetector::check_solid_collision(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
-        );
+        let collision =
+            CollisionDetector::check_solid_collision(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
         assert!(!collision, "Should not collide with liquids");
     }
 
@@ -227,9 +232,8 @@ mod tests {
         // Place sand at (32, 32) - powder should not cause collision (it can be pushed aside)
         set_world_pixel(&mut chunks, 32, 32, MaterialId::SAND);
 
-        let collision = CollisionDetector::check_solid_collision(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
-        );
+        let collision =
+            CollisionDetector::check_solid_collision(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
         assert!(!collision, "Should not collide with powder");
     }
 
@@ -238,9 +242,8 @@ mod tests {
         let (chunks, materials) = setup_test_world();
 
         // Circle in empty space
-        let collision = CollisionDetector::check_circle_collision(
-            &chunks, &materials, 32.0, 32.0, 5.0
-        );
+        let collision =
+            CollisionDetector::check_circle_collision(&chunks, &materials, 32.0, 32.0, 5.0);
         assert!(!collision, "Should not collide in air");
     }
 
@@ -251,9 +254,8 @@ mod tests {
         // Place stone at circle center
         set_world_pixel(&mut chunks, 32, 32, MaterialId::STONE);
 
-        let collision = CollisionDetector::check_circle_collision(
-            &chunks, &materials, 32.0, 32.0, 5.0
-        );
+        let collision =
+            CollisionDetector::check_circle_collision(&chunks, &materials, 32.0, 32.0, 5.0);
         assert!(collision, "Should collide with stone at center");
     }
 
@@ -264,9 +266,8 @@ mod tests {
         // Place stone at right edge of circle (radius 5)
         set_world_pixel(&mut chunks, 37, 32, MaterialId::STONE);
 
-        let collision = CollisionDetector::check_circle_collision(
-            &chunks, &materials, 32.0, 32.0, 5.0
-        );
+        let collision =
+            CollisionDetector::check_circle_collision(&chunks, &materials, 32.0, 32.0, 5.0);
         assert!(collision, "Should collide with stone at perimeter");
     }
 
@@ -281,9 +282,8 @@ mod tests {
             set_world_pixel(&mut chunks, x, 25, MaterialId::STONE);
         }
 
-        let grounded = CollisionDetector::is_rect_grounded(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
-        );
+        let grounded =
+            CollisionDetector::is_rect_grounded(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
         assert!(grounded, "Should be grounded on solid floor");
     }
 
@@ -292,9 +292,8 @@ mod tests {
         let (chunks, materials) = setup_test_world();
 
         // No floor - rectangle floating in air
-        let grounded = CollisionDetector::is_rect_grounded(
-            &chunks, &materials, 32.0, 32.0, 10.0, 10.0
-        );
+        let grounded =
+            CollisionDetector::is_rect_grounded(&chunks, &materials, 32.0, 32.0, 10.0, 10.0);
         assert!(!grounded, "Should not be grounded in air");
     }
 
@@ -323,9 +322,7 @@ mod tests {
         let (chunks, materials) = setup_test_world();
 
         // No floor - creature floating
-        let positions = vec![
-            (glam::Vec2::new(32.0, 50.0), 3.0),
-        ];
+        let positions = vec![(glam::Vec2::new(32.0, 50.0), 3.0)];
 
         let grounded = CollisionDetector::is_creature_grounded(&chunks, &materials, &positions);
         assert!(!grounded, "Floating creature should not be grounded");

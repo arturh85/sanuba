@@ -86,11 +86,11 @@ impl Iterator for SpiralChunkIterator {
                 return Some(result);
             }
 
-            // Move to radius 1
+            // Move to radius 1 (starts at (1, 0), walks down to (1, -1))
             self.current_radius = 1;
             self.current_pos = self.center + IVec2::new(self.current_radius, 0);
             self.side = 0; // Start on right side
-            self.steps_in_side = self.current_radius * 2;
+            self.steps_in_side = self.current_radius + 1; // R+1 positions on first side
             self.steps_remaining = self.steps_in_side;
             return Some(result);
         }
@@ -120,9 +120,12 @@ impl Iterator for SpiralChunkIterator {
                     return Some(result);
                 }
 
-                // Start new ring from right side
+                // Start new ring from right side (starts at (R, 0), walks down to (R, -R))
                 self.current_pos = self.center + IVec2::new(self.current_radius, 0);
-                self.steps_in_side = self.current_radius * 2;
+                self.side = 0;
+                self.steps_in_side = self.current_radius + 1; // R+1 positions on first side
+                self.steps_remaining = self.steps_in_side;
+                return Some(result);
             } else {
                 // Continue on new side of current ring
                 self.steps_in_side = self.current_radius * 2;

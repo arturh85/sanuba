@@ -66,9 +66,9 @@ test package="":
     just fmt
     just clippy
     if [ -z "{{package}}" ]; then \
-        cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
+        cargo test --workspace --all-features --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
     else \
-        cargo test -p {{package}} --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
+        cargo test -p {{package}} --all-features --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
     fi
     echo "✅ Fast tests passed"
 
@@ -78,7 +78,7 @@ test package="":
     @Write-Host "Running fast test suite..."
     just fmt
     just clippy
-    @if ("{{package}}" -eq "") { cargo test --workspace --quiet } else { cargo test -p {{package}} --quiet }
+    @if ("{{package}}" -eq "") { cargo test --workspace --all-features --quiet } else { cargo test -p {{package}} --all-features --quiet }
     @Write-Host "✅ Fast tests passed"
 
 # CI-equivalent: full validation with all builds
@@ -244,7 +244,7 @@ coverage package="" path_filter="":
     command -v cargo-llvm-cov >/dev/null 2>&1 || cargo install cargo-llvm-cov
     if [ -z "{{package}}" ] && [ -z "{{path_filter}}" ]; then \
         echo "Running coverage for entire workspace..."; \
-        cargo llvm-cov --workspace --all-features --summary-only; \
+        RUSTC_WRAPPER="" RUSTFLAGS="-C link-arg=-framework -C link-arg=Accelerate" cargo llvm-cov --workspace --all-features --summary-only; \
     else \
         PKG_FLAG=""; \
         if [ -n "{{package}}" ]; then \
@@ -253,7 +253,7 @@ coverage package="" path_filter="":
         else \
             echo "Running coverage for entire workspace..."; \
         fi; \
-        cargo llvm-cov $PKG_FLAG --all-features 2>/dev/null > /tmp/coverage_output.txt; \
+        RUSTC_WRAPPER="" RUSTFLAGS="-C link-arg=-framework -C link-arg=Accelerate" cargo llvm-cov $PKG_FLAG --all-features 2>/dev/null > /tmp/coverage_output.txt; \
         if [ -n "{{path_filter}}" ]; then \
             echo "Filtering results for: {{path_filter}}"; \
             echo ""; \
@@ -273,14 +273,14 @@ coverage package="" path_filter="":
     @if (-not (Get-Command cargo-llvm-cov -ErrorAction SilentlyContinue)) { cargo install cargo-llvm-cov }
     @if ("{{package}}" -eq "" -and "{{path_filter}}" -eq "") { \
         Write-Host "Running coverage for entire workspace..."; \
-        cargo llvm-cov --workspace --all-features --summary-only; \
+        $env:RUSTC_WRAPPER=""; $env:RUSTFLAGS=""; cargo llvm-cov --workspace --all-features --summary-only; \
     } else { \
         if ("{{package}}" -ne "") { \
             Write-Host "Running coverage for package: {{package}}"; \
-            cargo llvm-cov -p {{package}} --all-features --text 2>$null | Select-String "{{path_filter}}"; \
+            $env:RUSTC_WRAPPER=""; $env:RUSTFLAGS=""; cargo llvm-cov -p {{package}} --all-features --text 2>$null | Select-String "{{path_filter}}"; \
         } else { \
             Write-Host "Running coverage for entire workspace..."; \
-            cargo llvm-cov --workspace --all-features --text 2>$null | Select-String "{{path_filter}}"; \
+            $env:RUSTC_WRAPPER=""; $env:RUSTFLAGS=""; cargo llvm-cov --workspace --all-features --text 2>$null | Select-String "{{path_filter}}"; \
         } \
     }
 

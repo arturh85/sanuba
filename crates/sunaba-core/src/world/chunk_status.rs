@@ -122,7 +122,9 @@ mod tests {
         let mut manager = ChunkManager::new();
         for cy in -1..=1 {
             for cx in -1..=1 {
-                manager.chunks.insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
+                manager
+                    .chunks
+                    .insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
             }
         }
         manager
@@ -160,7 +162,10 @@ mod tests {
         }
 
         let needs_update = ChunkStatus::needs_ca_update(&manager, IVec2::new(0, 0));
-        assert!(needs_update, "Chunk with active simulation should need CA update");
+        assert!(
+            needs_update,
+            "Chunk with active simulation should need CA update"
+        );
     }
 
     #[test]
@@ -174,7 +179,10 @@ mod tests {
 
         // Center chunk should need update because neighbor is dirty
         let needs_update = ChunkStatus::needs_ca_update(&manager, IVec2::new(0, 0));
-        assert!(needs_update, "Chunk should need update when neighbor is dirty");
+        assert!(
+            needs_update,
+            "Chunk should need update when neighbor is dirty"
+        );
     }
 
     #[test]
@@ -219,7 +227,11 @@ mod tests {
         ChunkStatus::update_active_chunks(&mut manager, player_pos, active_radius);
 
         // All old chunks should be removed
-        assert_eq!(manager.active_chunks.len(), 0, "Distant chunks should be removed");
+        assert_eq!(
+            manager.active_chunks.len(),
+            0,
+            "Distant chunks should be removed"
+        );
     }
 
     #[test]
@@ -234,7 +246,10 @@ mod tests {
         // Newly activated chunks should have simulation_active set
         for pos in &manager.active_chunks {
             let chunk = manager.chunks.get(pos).unwrap();
-            assert!(chunk.is_simulation_active(), "Activated chunk should have simulation_active=true");
+            assert!(
+                chunk.is_simulation_active(),
+                "Activated chunk should have simulation_active=true"
+            );
         }
     }
 
@@ -293,7 +308,11 @@ mod tests {
         ChunkStatus::ensure_chunks_for_area(&mut manager, 0, 0, 50, 50);
 
         let chunk = manager.chunks.get(&IVec2::new(0, 0)).unwrap();
-        assert_eq!(chunk.get_material(10, 10), 5, "Existing chunk data should be preserved");
+        assert_eq!(
+            chunk.get_material(10, 10),
+            5,
+            "Existing chunk data should be preserved"
+        );
     }
 
     #[test]
@@ -304,7 +323,11 @@ mod tests {
         // CHUNK_SIZE=64, so -100..=-50 spans chunks -2 to -1 (2x2 = 4 chunks)
         ChunkStatus::ensure_chunks_for_area(&mut manager, -100, -100, -50, -50);
 
-        assert_eq!(manager.chunks.len(), 4, "Should create 4 chunks in negative space (2x2)");
+        assert_eq!(
+            manager.chunks.len(),
+            4,
+            "Should create 4 chunks in negative space (2x2)"
+        );
         assert!(manager.chunks.contains_key(&IVec2::new(-2, -2)));
         assert!(manager.chunks.contains_key(&IVec2::new(-1, -1)));
     }

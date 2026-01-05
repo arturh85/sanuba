@@ -118,7 +118,9 @@ mod tests {
         let mut manager = ChunkManager::new();
         for cy in -1..=1 {
             for cx in -1..=1 {
-                manager.chunks.insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
+                manager
+                    .chunks
+                    .insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
             }
         }
         manager
@@ -152,7 +154,7 @@ mod tests {
 
         // Place different materials around (32, 32)
         set_world_pixel(&mut manager, 31, 31, MaterialId::STONE); // NW
-        set_world_pixel(&mut manager, 32, 31, MaterialId::SAND);  // N
+        set_world_pixel(&mut manager, 32, 31, MaterialId::SAND); // N
         set_world_pixel(&mut manager, 33, 31, MaterialId::WATER); // NE
 
         let neighbors = NeighborQueries::get_8_neighbors(&manager, 32, 32);
@@ -172,7 +174,11 @@ mod tests {
         let neighbors = NeighborQueries::get_8_neighbors(&manager, 0, 0);
 
         // Only 3 neighbors in the existing chunk (E, S, SE)
-        assert_eq!(neighbors.len(), 3, "Only neighbors in loaded chunks are returned");
+        assert_eq!(
+            neighbors.len(),
+            3,
+            "Only neighbors in loaded chunks are returned"
+        );
     }
 
     #[test]
@@ -183,7 +189,11 @@ mod tests {
         let neighbors = NeighborQueries::get_8_neighbors(&manager, 0, 0);
 
         // All 8 neighbors should be available now
-        assert_eq!(neighbors.len(), 8, "All neighbors accessible with chunks loaded");
+        assert_eq!(
+            neighbors.len(),
+            8,
+            "All neighbors accessible with chunks loaded"
+        );
     }
 
     #[test]
@@ -192,9 +202,9 @@ mod tests {
 
         // Place materials in 4 cardinal directions
         set_world_pixel(&mut manager, 32, 33, MaterialId::STONE); // S
-        set_world_pixel(&mut manager, 33, 32, MaterialId::SAND);  // E
+        set_world_pixel(&mut manager, 33, 32, MaterialId::SAND); // E
         set_world_pixel(&mut manager, 32, 31, MaterialId::WATER); // N
-        set_world_pixel(&mut manager, 31, 32, MaterialId::LAVA);  // W
+        set_world_pixel(&mut manager, 31, 32, MaterialId::LAVA); // W
 
         let mut collected = Vec::new();
         NeighborQueries::for_each_orthogonal_neighbor(&manager, 32, 32, |x, y, mat| {
@@ -205,10 +215,22 @@ mod tests {
 
         // Verify the materials were collected (order: S, E, N, W)
         let materials: Vec<u16> = collected.iter().map(|(_, _, m)| *m).collect();
-        assert!(materials.contains(&MaterialId::STONE), "Should include stone (S)");
-        assert!(materials.contains(&MaterialId::SAND), "Should include sand (E)");
-        assert!(materials.contains(&MaterialId::WATER), "Should include water (N)");
-        assert!(materials.contains(&MaterialId::LAVA), "Should include lava (W)");
+        assert!(
+            materials.contains(&MaterialId::STONE),
+            "Should include stone (S)"
+        );
+        assert!(
+            materials.contains(&MaterialId::SAND),
+            "Should include sand (E)"
+        );
+        assert!(
+            materials.contains(&MaterialId::WATER),
+            "Should include water (N)"
+        );
+        assert!(
+            materials.contains(&MaterialId::LAVA),
+            "Should include lava (W)"
+        );
     }
 
     #[test]
@@ -221,7 +243,10 @@ mod tests {
             count += 1;
         });
 
-        assert_eq!(count, 2, "Only 2 orthogonal neighbors in single chunk at corner");
+        assert_eq!(
+            count, 2,
+            "Only 2 orthogonal neighbors in single chunk at corner"
+        );
     }
 
     #[test]
@@ -274,7 +299,10 @@ mod tests {
 
         // Corner (34, 34) is at distance sqrt(8) > 2, should not be included
         let has_corner = pixels.iter().any(|(x, y, _)| *x == 34 && *y == 34);
-        assert!(!has_corner, "Corner at distance sqrt(8) should not be in radius 2");
+        assert!(
+            !has_corner,
+            "Corner at distance sqrt(8) should not be in radius 2"
+        );
 
         // But (34, 32) is at distance 2, should be included
         let has_edge = pixels.iter().any(|(x, y, _)| *x == 34 && *y == 32);

@@ -96,7 +96,9 @@ mod tests {
         // Create chunks around origin
         for cy in -1..=1 {
             for cx in -1..=1 {
-                manager.chunks.insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
+                manager
+                    .chunks
+                    .insert(IVec2::new(cx, cy), Chunk::new(cx, cy));
             }
         }
         manager
@@ -120,12 +122,7 @@ mod tests {
         }
 
         // Cast ray from (10, 32) going right, should hit wall at x=40
-        let hit = Raycasting::raycast(
-            &manager,
-            Vec2::new(10.0, 32.0),
-            Vec2::new(1.0, 0.0),
-            100.0,
-        );
+        let hit = Raycasting::raycast(&manager, Vec2::new(10.0, 32.0), Vec2::new(1.0, 0.0), 100.0);
 
         assert!(hit.is_some(), "Raycast should hit stone wall");
         let (x, y, material_id) = hit.unwrap();
@@ -139,12 +136,7 @@ mod tests {
         let manager = setup_test_chunk_manager();
 
         // Cast ray through empty air
-        let hit = Raycasting::raycast(
-            &manager,
-            Vec2::new(10.0, 32.0),
-            Vec2::new(1.0, 0.0),
-            20.0,
-        );
+        let hit = Raycasting::raycast(&manager, Vec2::new(10.0, 32.0), Vec2::new(1.0, 0.0), 20.0);
 
         assert!(hit.is_none(), "Raycast through air should not hit anything");
     }
@@ -158,12 +150,7 @@ mod tests {
 
         // Cast diagonal ray from (10, 10) toward (30, 30)
         let direction = Vec2::new(1.0, 1.0).normalize();
-        let hit = Raycasting::raycast(
-            &manager,
-            Vec2::new(10.0, 10.0),
-            direction,
-            50.0,
-        );
+        let hit = Raycasting::raycast(&manager, Vec2::new(10.0, 10.0), direction, 50.0);
 
         assert!(hit.is_some(), "Diagonal ray should hit stone");
         let (x, y, _) = hit.unwrap();
@@ -204,7 +191,7 @@ mod tests {
             &materials,
             Vec2::new(10.0, 32.0),
             Vec2::new(1.0, 0.0),
-            0.0,  // start at origin
+            0.0, // start at origin
             100.0,
             MaterialType::Solid,
         );
@@ -260,7 +247,10 @@ mod tests {
             MaterialType::Solid,
         );
 
-        assert!(hit.is_none(), "Should not match liquid when filtering for solid");
+        assert!(
+            hit.is_none(),
+            "Should not match liquid when filtering for solid"
+        );
     }
 
     #[test]

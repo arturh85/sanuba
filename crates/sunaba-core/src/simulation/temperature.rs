@@ -196,11 +196,19 @@ mod tests {
 
         // Center should have cooled down (diffused to neighbors)
         let center_temp = chunk.temperature[temp_to_index(4, 4)];
-        assert!(center_temp < 100.0, "Center should cool down from 100, got {}", center_temp);
+        assert!(
+            center_temp < 100.0,
+            "Center should cool down from 100, got {}",
+            center_temp
+        );
 
         // Neighbors should have warmed up from room temperature (20.0)
         let neighbor_temp = chunk.temperature[temp_to_index(4, 5)];
-        assert!(neighbor_temp > 20.0, "Neighbor should warm up from 20, got {}", neighbor_temp);
+        assert!(
+            neighbor_temp > 20.0,
+            "Neighbor should warm up from 20, got {}",
+            neighbor_temp
+        );
     }
 
     #[test]
@@ -243,7 +251,10 @@ mod tests {
 
         // All cells should still be at room temperature
         for temp in &chunk.temperature {
-            assert!((temp - 20.0).abs() < 0.001, "Uniform temp should not change");
+            assert!(
+                (temp - 20.0).abs() < 0.001,
+                "Uniform temp should not change"
+            );
         }
     }
 

@@ -2,8 +2,9 @@
 # See: https://doc.rust-lang.org/cargo/reference/config.html
 
 [build]
-# Compiler cache for faster clean builds (50-80% speedup after first build)
-rustc-wrapper = "sccache"
+# Optional: Enable sccache for faster clean builds (50-80% speedup after first build)
+# To enable: export RUSTC_WRAPPER=sccache in your shell profile
+# Not enabled by default to avoid CI issues and conflicts with cargo-llvm-cov
 
 # Use faster linker (lld) on native targets - reduces link time by 50-70%
 [target.x86_64-apple-darwin]

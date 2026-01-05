@@ -221,5 +221,10 @@ When changing or adding new controls, update help in web/index.html.
 ### Development Workflow & Tooling
 - **Rapid iteration**: `just check [crate]` for fast validation (clippy --fix, fmt, check)
 - **Comprehensive validation**: `just test [crate]` or `just test` before pushing
+- **Build caching (optional)**: Enable sccache for 50-80% faster clean builds
+  - Install: `cargo install sccache` (or `brew install sccache` on macOS)
+  - Enable: `export RUSTC_WRAPPER=sccache` in your shell profile (~/.zshrc or ~/.bashrc)
+  - Verify: `sccache --show-stats` to see cache hits
+  - Note: Not required for CI or coverage (automatically disabled where needed)
 - **LSP tools**: Prefer `mcp__rust__lsp_*` tools for refactoring (rename_symbol, find_references, get_definitions)
   - These leverage rust-analyzer for accuracy with macros and trait implementations

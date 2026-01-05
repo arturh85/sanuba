@@ -105,17 +105,32 @@ fn test_spawn_material_circular_brush() {
     world.spawn_material(50, 50, MaterialId::SAND, 2);
 
     // Center should be sand
-    assert_eq!(world.get_pixel(50, 50).unwrap().material_id, MaterialId::SAND);
+    assert_eq!(
+        world.get_pixel(50, 50).unwrap().material_id,
+        MaterialId::SAND
+    );
 
     // Adjacent pixels (within radius) should also be sand
-    assert_eq!(world.get_pixel(51, 50).unwrap().material_id, MaterialId::SAND);
-    assert_eq!(world.get_pixel(50, 51).unwrap().material_id, MaterialId::SAND);
+    assert_eq!(
+        world.get_pixel(51, 50).unwrap().material_id,
+        MaterialId::SAND
+    );
+    assert_eq!(
+        world.get_pixel(50, 51).unwrap().material_id,
+        MaterialId::SAND
+    );
 
     // Pixels at radius 2 but not exceeding should be sand
-    assert_eq!(world.get_pixel(52, 50).unwrap().material_id, MaterialId::SAND);
+    assert_eq!(
+        world.get_pixel(52, 50).unwrap().material_id,
+        MaterialId::SAND
+    );
 
     // Corners at distance sqrt(8) > 2 should not be set
-    assert_eq!(world.get_pixel(52, 52).unwrap().material_id, MaterialId::AIR);
+    assert_eq!(
+        world.get_pixel(52, 52).unwrap().material_id,
+        MaterialId::AIR
+    );
 }
 
 #[test]
@@ -321,9 +336,7 @@ fn test_is_creature_grounded() {
 
     // Body part that should be grounded - center at y=100, radius=3
     // Bottom at y=97, ground check at y=95.5 rounds to 95 or 96
-    let positions = vec![
-        (glam::Vec2::new(100.0, 100.0), 3.0),
-    ];
+    let positions = vec![(glam::Vec2::new(100.0, 100.0), 3.0)];
 
     assert!(world.is_creature_grounded(&positions));
 }
@@ -333,9 +346,7 @@ fn test_is_creature_grounded_floating() {
     let world = create_test_world();
 
     // No floor - body parts floating
-    let positions = vec![
-        (glam::Vec2::new(100.0, 100.0), 3.0),
-    ];
+    let positions = vec![(glam::Vec2::new(100.0, 100.0), 3.0)];
 
     assert!(!world.is_creature_grounded(&positions));
 }
@@ -406,7 +417,11 @@ fn test_get_temperature_at_pixel() {
 
     // Temperature at any valid location should return room temperature (~20)
     let temp = world.get_temperature_at_pixel(50, 50);
-    assert!((temp - 20.0).abs() < 1.0, "Expected room temperature, got {}", temp);
+    assert!(
+        (temp - 20.0).abs() < 1.0,
+        "Expected room temperature, got {}",
+        temp
+    );
 }
 
 #[test]
@@ -415,7 +430,7 @@ fn test_get_growth_progress_percent() {
 
     // Growth progress should be 0-100
     let progress = world.get_growth_progress_percent();
-    assert!(progress >= 0.0 && progress <= 100.0);
+    assert!((0.0..=100.0).contains(&progress));
 }
 
 #[test]

@@ -258,7 +258,10 @@ mod tests {
     use crate::simulation::MaterialId;
     use crate::world::Chunk;
 
-    fn setup_test_chunks() -> (std::collections::HashMap<glam::IVec2, crate::world::Chunk>, Materials) {
+    fn setup_test_chunks() -> (
+        std::collections::HashMap<glam::IVec2, crate::world::Chunk>,
+        Materials,
+    ) {
         let mut chunks = std::collections::HashMap::new();
         for cy in -1..=1 {
             for cx in -1..=1 {
