@@ -22,6 +22,9 @@ mod player_physics;
 mod raycasting;
 pub mod rng_trait;
 pub mod stats;
+pub mod structure_placement;
+pub mod structure_templates;
+pub mod structures;
 #[allow(clippy::module_inception)]
 mod world;
 pub mod worldgen_config;
@@ -48,10 +51,11 @@ pub use player_physics::PlayerPhysicsSystem;
 pub use raycasting::Raycasting;
 pub use rng_trait::WorldRng;
 pub use stats::{NoopStats, SimStats};
+pub use structures::{AnchorType, StructureTemplate, StructureVariants};
 pub use world::World;
 pub use worldgen_config::{
-    BiomeBlendModeConfig, BiomeConfig, BiomeParams, BiomeTransitionConfig, CaveParams,
-    FeatureParams, FractalTypeConfig, LavaPoolConfig, NoiseLayerConfig, NoiseTypeConfig, OreConfig,
-    StalactiteConfig, TerrainParams, UndergroundLayers, VegetationParams, WorldGenConfig,
-    WorldParams,
+    BiomeBlendModeConfig, BiomeConfig, BiomeParams, BiomeTransitionConfig, BridgeConfig,
+    CaveParams, FeatureParams, FractalTypeConfig, LavaPoolConfig, NoiseLayerConfig,
+    NoiseTypeConfig, OreConfig, RuinConfig, StalactiteConfig, StructureConfig, TerrainParams,
+    TreeConfig, UndergroundLayers, VegetationParams, WorldGenConfig, WorldParams,
 };

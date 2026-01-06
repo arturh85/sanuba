@@ -214,7 +214,8 @@ pub struct FeatureParams {
     pub lava_pools: LavaPoolConfig,
     /// Stalactite generation
     pub stalactites: StalactiteConfig,
-    // Future: structures, dungeons, etc.
+    /// Structure generation (bridges, trees, ruins)
+    pub structures: StructureConfig,
 }
 
 /// Lava pool generation in deep caverns
@@ -256,6 +257,72 @@ pub struct StalactiteConfig {
     pub placement_chance: f32,
     /// Whether stalactites should taper to a point (default: true)
     pub taper: bool,
+}
+
+/// Structure generation configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StructureConfig {
+    /// Wooden bridges over gaps
+    pub bridges: BridgeConfig,
+    /// Surface trees (normal and marker variants)
+    pub trees: TreeConfig,
+    /// Underground ruins
+    pub ruins: RuinConfig,
+}
+
+/// Wooden bridge generation over gaps
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeConfig {
+    /// Enable bridge generation
+    pub enabled: bool,
+    /// Grid sampling spacing (default: 32)
+    pub spacing: i32,
+    /// Minimum gap width to place bridge (default: 16)
+    pub min_gap_width: i32,
+    /// Maximum gap width to bridge (default: 48)
+    pub max_gap_width: i32,
+    /// Placement probability (0.0-1.0, default: 0.3)
+    pub placement_chance: f32,
+    /// Minimum depth for bridge placement (default: -100)
+    pub min_depth: i32,
+    /// Noise seed offset
+    pub seed_offset: i32,
+}
+
+/// Tree generation (normal and marker trees)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeConfig {
+    /// Enable tree generation
+    pub enabled: bool,
+    /// Grid spacing for tree placement (default: 24)
+    pub spacing: i32,
+    /// Base placement probability (default: 0.2)
+    pub placement_chance: f32,
+    /// Marker tree chance when cave detected below (default: 0.6)
+    pub marker_tree_chance: f32,
+    /// Minimum air above for tree placement (default: 15)
+    pub min_air_above: i32,
+    /// Depth to scan below for cave detection (default: 50)
+    pub cave_scan_depth: i32,
+    /// Noise seed offset
+    pub seed_offset: i32,
+}
+
+/// Underground ruin generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuinConfig {
+    /// Enable ruin generation
+    pub enabled: bool,
+    /// Grid spacing (default: 64)
+    pub spacing: i32,
+    /// Placement probability (default: 0.1)
+    pub placement_chance: f32,
+    /// Minimum depth (default: -500)
+    pub min_depth: i32,
+    /// Maximum depth (default: -50)
+    pub max_depth: i32,
+    /// Noise seed offset
+    pub seed_offset: i32,
 }
 
 /// Reusable noise layer configuration
@@ -476,6 +543,47 @@ impl Default for StalactiteConfig {
             seed_offset: 100,
             placement_chance: 0.5,
             taper: true,
+        }
+    }
+}
+
+impl Default for BridgeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            spacing: 32,
+            min_gap_width: 16,
+            max_gap_width: 48,
+            placement_chance: 0.3,
+            min_depth: -100,
+            seed_offset: 200,
+        }
+    }
+}
+
+impl Default for TreeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            spacing: 24,
+            placement_chance: 0.2,
+            marker_tree_chance: 0.6,
+            min_air_above: 15,
+            cave_scan_depth: 50,
+            seed_offset: 300,
+        }
+    }
+}
+
+impl Default for RuinConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            spacing: 64,
+            placement_chance: 0.1,
+            min_depth: -500,
+            max_depth: -50,
+            seed_offset: 400,
         }
     }
 }

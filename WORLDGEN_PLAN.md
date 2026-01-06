@@ -29,28 +29,34 @@ The core editor is fully functional:
 - `crates/sunaba/src/ui/ui_state.rs` - WorldGenEditor integration
 - `crates/sunaba/src/app.rs` - F7 shortcut + apply handling
 
-**Phase 2: Context-Aware Generation - IN PROGRESS**
+**Phase 2: Context-Aware Generation - COMPLETE ✅**
 
-Context scanner system, stalactite generation, and biome transitions implemented:
+Context scanner system, stalactite generation, biome transitions, and structure template system:
 - `ContextScanner` - Queries placement context from WorldGenerator
 - `PlacementContext` - Ground/ceiling distance, air above/below, enclosure detection, biome, light
 - `PlacementPredicate` - Composable rules (IsCaveInterior, IsSurface, MinAirAbove, DepthRange, etc.)
 - Builder methods for common patterns: `stalactite()`, `stalagmite()`, `surface_tree()`, `cave_mushroom()`
 - **Stalactite generation** - Proof-of-concept feature using context scanner, fully configurable via F7 editor
 - **Biome transition system** - Physics-stable blending between biomes with 3 modes (Sharp, Gradient, StableLayer)
+- **Structure template system** - Flexible template-based placement for bridges, trees, and ruins
+- **8 structure variants** - 3 bridge types, 3 tree types, 2 ruin types
 
 **Files Created:**
 - `crates/sunaba-core/src/world/context_scanner.rs` (~750 lines) - Context scanning system
-- `crates/sunaba-core/src/world/features.rs` (~250 lines) - Post-generation feature placement, stalactite logic
+- `crates/sunaba-core/src/world/features.rs` (~370 lines) - Feature placement (stalactites, bridges, trees, ruins)
 - `crates/sunaba-core/src/world/biome_transition.rs` (~420 lines) - Physics-aware biome blending system
+- `crates/sunaba-core/src/world/structures.rs` (~220 lines) - Core structure types (StructureTemplate, AnchorType, StructureVariants)
+- `crates/sunaba-core/src/world/structure_templates.rs` (~330 lines) - TemplateBuilder API + all builtin templates
+- `crates/sunaba-core/src/world/structure_placement.rs` (~310 lines) - Placement engine + physics validation
 
 **Files Modified:**
-- `crates/sunaba-core/src/world/generation.rs` - Added biome transition integration, `get_material_with_transition()`
-- `crates/sunaba-core/src/world/mod.rs` - Export biome_transition types
-- `crates/sunaba-core/src/world/worldgen_config.rs` - Added `BiomeTransitionConfig` with 5 parameters
-- `crates/sunaba/src/ui/worldgen_editor/mod.rs` - (TODO: Add biome transition UI controls to Biomes tab)
+- `crates/sunaba-core/src/world/generation.rs` - Biome transition integration, `get_material_with_transition()`
+- `crates/sunaba-core/src/world/mod.rs` - Export structure modules and config types
+- `crates/sunaba-core/src/world/worldgen_config.rs` - Added StructureConfig, BridgeConfig, TreeConfig, RuinConfig
+- `crates/sunaba-core/src/world/context_scanner.rs` - Made `get_material()` public for structure placement
+- `crates/sunaba/src/ui/worldgen_editor/mod.rs` - Added UI controls for structures (3 collapsible sections)
 
-**Next:** Structure template system for bridges, ruins, etc.
+**Next:** Biome zones system (underground biomes)
 
 ---
 
@@ -370,8 +376,10 @@ pub struct TerrainSensoryInput {
 | `crates/sunaba-core/src/world/features.rs` | Post-generation features (stalactites, etc.) | ✅ Complete |
 | `crates/sunaba/src/ui/worldgen_editor/*.rs` | Editor UI (8 files) | ✅ Complete |
 | `crates/sunaba-core/src/world/biome_transition.rs` | Physics-stable biome blending | ✅ Complete |
+| `crates/sunaba-core/src/world/structures.rs` | Core structure types (StructureTemplate, AnchorType, StructureVariants) | ✅ Complete |
+| `crates/sunaba-core/src/world/structure_templates.rs` | TemplateBuilder API + builtin templates | ✅ Complete |
+| `crates/sunaba-core/src/world/structure_placement.rs` | Placement engine + physics validation | ✅ Complete |
 | `crates/sunaba-core/src/world/biome_zones.rs` | Depth-based zone system | Planned |
-| `crates/sunaba-core/src/world/structures.rs` | Structure templates + placer | Planned |
 | `crates/sunaba-core/src/world/material_provider.rs` | Context-based material selection | Planned |
 | `crates/sunaba/src/headless/terrain_gen.rs` | Training terrain generation | Planned |
 | `crates/sunaba/src/headless/env_distribution.rs` | Environment sampling | Planned |
@@ -412,12 +420,12 @@ pub struct TerrainSensoryInput {
 4. [x] Apply to world functionality
 5. [x] F7 keyboard shortcut
 
-### Sprint 3: Context-Aware Generation (5-6 days)
+### Sprint 3: Context-Aware Generation - COMPLETE ✅
 1. [x] `ContextScanner` + `PlacementContext`
 2. [x] `PlacementPredicate` evaluation
 3. [x] Stalactite generation (proof of concept)
 4. [x] Biome transition system (stability-aware)
-5. [ ] Structure template system
+5. [x] Structure template system (bridges, trees, ruins)
 
 ### Sprint 4: Training Integration (5-6 days)
 1. [ ] `TrainingTerrainConfig` + `TrainingWorld`

@@ -310,9 +310,12 @@ impl<'a> ContextScanner<'a> {
         left + right + 1
     }
 
-    // Private helper methods
+    // Helper methods
 
-    fn get_material(&self, x: i32, y: i32) -> u16 {
+    /// Get material at a world position (deterministic)
+    ///
+    /// Public to allow structure placement systems to query materials.
+    pub fn get_material(&self, x: i32, y: i32) -> u16 {
         // Use generator to get material at position
         // This works because generator.get_material_at is deterministic
         self.generator.generate_single_pixel(x, y)

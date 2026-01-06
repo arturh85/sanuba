@@ -849,6 +849,164 @@ impl WorldGenEditor {
             }
         });
 
+        ui.add_space(8.0);
+        ui.collapsing("Wooden Bridges", |ui| {
+            changed |= ui
+                .checkbox(
+                    &mut self.config.features.structures.bridges.enabled,
+                    "Enable Bridges",
+                )
+                .changed();
+
+            if self.config.features.structures.bridges.enabled {
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.bridges.spacing,
+                            16..=64,
+                        )
+                        .text("Spacing"),
+                    )
+                    .on_hover_text("Grid spacing for bridge placement")
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.bridges.min_gap_width,
+                            8..=32,
+                        )
+                        .text("Min Gap Width"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.bridges.max_gap_width,
+                            24..=64,
+                        )
+                        .text("Max Gap Width"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.bridges.placement_chance,
+                            0.0..=1.0,
+                        )
+                        .text("Placement Chance"),
+                    )
+                    .changed();
+            }
+        });
+
+        ui.add_space(8.0);
+        ui.collapsing("Surface Trees", |ui| {
+            changed |= ui
+                .checkbox(
+                    &mut self.config.features.structures.trees.enabled,
+                    "Enable Trees",
+                )
+                .changed();
+
+            if self.config.features.structures.trees.enabled {
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.trees.spacing,
+                            16..=48,
+                        )
+                        .text("Spacing"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.trees.placement_chance,
+                            0.0..=1.0,
+                        )
+                        .text("Placement Chance"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.trees.marker_tree_chance,
+                            0.0..=1.0,
+                        )
+                        .text("Marker Tree Chance"),
+                    )
+                    .on_hover_text("Chance of tall marker tree when cave detected below")
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.trees.cave_scan_depth,
+                            20..=100,
+                        )
+                        .text("Cave Scan Depth"),
+                    )
+                    .changed();
+            }
+        });
+
+        ui.add_space(8.0);
+        ui.collapsing("Underground Ruins", |ui| {
+            changed |= ui
+                .checkbox(
+                    &mut self.config.features.structures.ruins.enabled,
+                    "Enable Ruins",
+                )
+                .changed();
+
+            if self.config.features.structures.ruins.enabled {
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.ruins.spacing,
+                            32..=128,
+                        )
+                        .text("Spacing"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.ruins.placement_chance,
+                            0.0..=0.5,
+                        )
+                        .text("Placement Chance"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.ruins.min_depth,
+                            -1000..=-100,
+                        )
+                        .text("Min Depth"),
+                    )
+                    .changed();
+
+                changed |= ui
+                    .add(
+                        egui::Slider::new(
+                            &mut self.config.features.structures.ruins.max_depth,
+                            -500..=-50,
+                        )
+                        .text("Max Depth"),
+                    )
+                    .changed();
+            }
+        });
+
         changed
     }
 
