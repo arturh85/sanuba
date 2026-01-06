@@ -2,6 +2,7 @@
 
 pub mod biome;
 pub mod biome_transition;
+pub mod biome_zones;
 mod ca_update;
 mod chemistry_system;
 mod chunk;
@@ -33,6 +34,7 @@ pub use biome::{BiomeDefinition, BiomeRegistry, BiomeType};
 pub use biome_transition::{
     BiomeTransition, BlendMode, MaterialStability, classify_material_stability, find_biome_boundary,
 };
+pub use biome_zones::{BiomeZoneRegistry, UndergroundZone, ZoneDefinition, ZoneTransition};
 pub use chunk::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
 pub use chunk_manager::ChunkManager;
 pub use chunk_status::ChunkStatus;
@@ -57,5 +59,6 @@ pub use worldgen_config::{
     BiomeBlendModeConfig, BiomeConfig, BiomeParams, BiomeTransitionConfig, BridgeConfig,
     CaveParams, FeatureParams, FractalTypeConfig, LavaPoolConfig, NoiseLayerConfig,
     NoiseTypeConfig, OreConfig, RuinConfig, StalactiteConfig, StructureConfig, TerrainParams,
-    TreeConfig, UndergroundLayers, VegetationParams, WorldGenConfig, WorldParams,
+    TreeConfig, UndergroundLayers, UndergroundZonesConfig, VegetationParams, WorldGenConfig,
+    WorldParams, ZoneOverrideConfig,
 };

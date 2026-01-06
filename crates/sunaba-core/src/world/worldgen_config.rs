@@ -40,6 +40,9 @@ pub struct WorldGenConfig {
 
     /// Special features (lava pools, etc.)
     pub features: FeatureParams,
+
+    /// Underground biome zones (depth-based themed caves)
+    pub underground_zones: UndergroundZonesConfig,
 }
 
 /// Global world boundaries and layer depths
@@ -325,6 +328,34 @@ pub struct RuinConfig {
     pub seed_offset: i32,
 }
 
+/// Underground biome zones configuration
+///
+/// Controls depth-based underground biomes like Mushroom Grotto, Crystal Caves, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UndergroundZonesConfig {
+    /// Enable underground zone system (replaces stone with zone-specific materials)
+    pub enabled: bool,
+    /// Whether surface biomes should influence underground zones
+    pub surface_influence: bool,
+    /// Individual zone overrides (optional, uses defaults if not specified)
+    pub zone_overrides: Vec<ZoneOverrideConfig>,
+}
+
+/// Override configuration for a specific zone
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZoneOverrideConfig {
+    /// Zone name ("ShallowCaves", "MushroomGrotto", "CrystalCaves", "LavaCaverns", "Abyss")
+    pub zone_name: String,
+    /// Override minimum Y (top of zone)
+    pub min_y: Option<i32>,
+    /// Override maximum Y (bottom of zone)
+    pub max_y: Option<i32>,
+    /// Override primary stone material
+    pub primary_stone: Option<u16>,
+    /// Override feature density (0.0-1.0)
+    pub feature_density: Option<f32>,
+}
+
 /// Reusable noise layer configuration
 ///
 /// Abstracts FastNoiseLite settings for UI editing and serialization.
@@ -383,6 +414,7 @@ impl Default for WorldGenConfig {
             biomes: BiomeParams::default(),
             vegetation: VegetationParams::default(),
             features: FeatureParams::default(),
+            underground_zones: UndergroundZonesConfig::default(),
         }
     }
 }
@@ -584,6 +616,16 @@ impl Default for RuinConfig {
             min_depth: -500,
             max_depth: -50,
             seed_offset: 400,
+        }
+    }
+}
+
+impl Default for UndergroundZonesConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            surface_influence: false,
+            zone_overrides: Vec::new(),
         }
     }
 }

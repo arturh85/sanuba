@@ -1,6 +1,7 @@
 use crate::simulation::{MaterialId, Materials};
 use crate::world::biome::{BiomeDefinition, BiomeRegistry, BiomeType, select_biome};
 use crate::world::biome_transition::{BiomeTransition, BlendMode};
+use crate::world::biome_zones::BiomeZoneRegistry;
 use crate::world::chunk::{CHUNK_SIZE, Chunk};
 use crate::world::worldgen_config::{BiomeBlendModeConfig, WorldGenConfig};
 use fastnoise_lite::{FastNoiseLite, NoiseType};
@@ -57,6 +58,9 @@ pub struct WorldGenerator {
     // Biome transition system
     biome_transition: BiomeTransition,
     materials: Materials,
+
+    // Underground zone system
+    zone_registry: BiomeZoneRegistry,
 }
 
 impl WorldGenerator {
@@ -114,6 +118,11 @@ impl WorldGenerator {
         biome_transition.transition_width = config.biomes.transition.width;
         biome_transition.enforce_stability = config.biomes.transition.enforce_stability;
 
+        // Initialize zone registry from config
+        let mut zone_registry = BiomeZoneRegistry::new();
+        zone_registry.set_enabled(config.underground_zones.enabled);
+        zone_registry.set_surface_influence(config.underground_zones.surface_influence);
+
         Self {
             seed,
             config,
@@ -132,6 +141,7 @@ impl WorldGenerator {
             plant_noise,
             biome_transition,
             materials: Materials::new(),
+            zone_registry,
         }
     }
 
@@ -161,6 +171,16 @@ impl WorldGenerator {
     /// Get cavern layer depth from config
     pub fn cavern_layer(&self) -> i32 {
         self.config.world.underground_layers.cavern
+    }
+
+    /// Get the underground zone registry
+    pub fn zone_registry(&self) -> &BiomeZoneRegistry {
+        &self.zone_registry
+    }
+
+    /// Get mutable access to the underground zone registry
+    pub fn zone_registry_mut(&mut self) -> &mut BiomeZoneRegistry {
+        &mut self.zone_registry
     }
 
     /// Generate a complete chunk at the given chunk coordinates
@@ -385,8 +405,9 @@ impl WorldGenerator {
             }
         }
 
-        // Default: stone
-        MaterialId::STONE
+        // Step 9: Zone-based stone selection
+        // Underground zones have different primary stone materials
+        self.zone_registry.get_stone_material(world_y)
     }
 
     /// Helper method to get material with biome transitions

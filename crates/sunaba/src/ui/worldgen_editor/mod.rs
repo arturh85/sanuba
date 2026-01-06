@@ -1007,6 +1007,40 @@ impl WorldGenEditor {
             }
         });
 
+        ui.add_space(8.0);
+        ui.separator();
+        ui.heading("Underground Zones");
+
+        ui.collapsing("Biome Zones", |ui| {
+            changed |= ui
+                .checkbox(
+                    &mut self.config.underground_zones.enabled,
+                    "Enable Underground Zones",
+                )
+                .on_hover_text(
+                    "Depth-based themed zones: Mushroom Grotto, Crystal Caves, Lava Caverns",
+                )
+                .changed();
+
+            if self.config.underground_zones.enabled {
+                changed |= ui
+                    .checkbox(
+                        &mut self.config.underground_zones.surface_influence,
+                        "Surface Biome Influence",
+                    )
+                    .on_hover_text("Surface biome affects underground zone materials")
+                    .changed();
+
+                ui.add_space(4.0);
+                ui.label("Zone Depths:");
+                ui.label("  0 to -500: Shallow Caves (Stone)");
+                ui.label("  -500 to -1200: Mushroom Grotto (Mossy Stone)");
+                ui.label("  -1200 to -2000: Crystal Caves (Stone + Crystals)");
+                ui.label("  -2000 to -2800: Lava Caverns (Basalt)");
+                ui.label("  -2800 to bedrock: Abyss (Basalt)");
+            }
+        });
+
         changed
     }
 

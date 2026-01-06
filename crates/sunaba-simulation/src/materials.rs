@@ -49,6 +49,13 @@ impl MaterialId {
     pub const GUNPOWDER: u16 = 30;
     pub const POISON_GAS: u16 = 31;
     pub const FERTILIZER: u16 = 32;
+
+    // Underground zone materials
+    pub const MOSSY_STONE: u16 = 33;
+    pub const CRYSTAL: u16 = 34;
+    pub const BASALT: u16 = 35;
+    pub const GLOWING_MUSHROOM: u16 = 36;
+    pub const OBSIDIAN: u16 = 37;
 }
 
 /// How a material behaves physically
@@ -718,6 +725,90 @@ impl Materials {
             tags: vec![MaterialTag::Organic],
             ..Default::default()
         });
+
+        // ===== UNDERGROUND ZONE MATERIALS =====
+
+        // Mossy Stone - found in mushroom grotto zone
+        self.register(MaterialDef {
+            id: MaterialId::MOSSY_STONE,
+            name: "mossy_stone".to_string(),
+            material_type: MaterialType::Solid,
+            color: [96, 128, 96, 255], // Green-tinted gray
+            density: 2.4,
+            hardness: Some(4), // Slightly softer than stone
+            structural: true,
+            melting_point: Some(1100.0),
+            melts_to: Some(MaterialId::LAVA),
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Crystal - found in crystal caves zone
+        self.register(MaterialDef {
+            id: MaterialId::CRYSTAL,
+            name: "crystal".to_string(),
+            material_type: MaterialType::Solid,
+            color: [200, 220, 255, 180], // Light blue, semi-transparent
+            density: 2.6,
+            hardness: Some(6), // Harder than stone
+            structural: true,
+            melting_point: Some(1600.0),
+            melts_to: Some(MaterialId::GLASS),
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Basalt - found in lava caverns zone
+        self.register(MaterialDef {
+            id: MaterialId::BASALT,
+            name: "basalt".to_string(),
+            material_type: MaterialType::Solid,
+            color: [40, 40, 50, 255], // Very dark gray
+            density: 3.0,             // Dense volcanic rock
+            hardness: Some(5),
+            structural: true,
+            melting_point: Some(1200.0),
+            melts_to: Some(MaterialId::LAVA),
+            heat_conductivity: 0.7,
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Glowing Mushroom - bioluminescent fungus
+        self.register(MaterialDef {
+            id: MaterialId::GLOWING_MUSHROOM,
+            name: "glowing_mushroom".to_string(),
+            material_type: MaterialType::Solid,
+            color: [150, 255, 100, 255], // Bright green-yellow glow
+            density: 0.3,
+            hardness: Some(1), // Very soft
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(200.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.05,
+            nutritional_value: Some(20.0), // Edible
+            hardness_multiplier: 0.2,      // Easy to harvest
+            tags: vec![MaterialTag::Organic, MaterialTag::Edible],
+            ..Default::default()
+        });
+
+        // Obsidian - volcanic glass, forms when lava meets water
+        self.register(MaterialDef {
+            id: MaterialId::OBSIDIAN,
+            name: "obsidian".to_string(),
+            material_type: MaterialType::Solid,
+            color: [20, 10, 30, 255], // Very dark purple-black
+            density: 2.4,
+            hardness: Some(7), // Very hard
+            structural: true,
+            melting_point: Some(1400.0),
+            melts_to: Some(MaterialId::LAVA),
+            structural_strength: Some(120.0),
+            hardness_multiplier: 2.5, // Hard to mine
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
     }
 
     fn register(&mut self, material: MaterialDef) {
@@ -1027,5 +1118,50 @@ mod tests {
 
         assert!(!materials.get(MaterialId::STONE).conducts_electricity);
         assert!(!materials.get(MaterialId::WOOD).conducts_electricity);
+    }
+
+    #[test]
+    fn test_material_id_underground_zones() {
+        assert_eq!(MaterialId::MOSSY_STONE, 33);
+        assert_eq!(MaterialId::CRYSTAL, 34);
+        assert_eq!(MaterialId::BASALT, 35);
+        assert_eq!(MaterialId::GLOWING_MUSHROOM, 36);
+        assert_eq!(MaterialId::OBSIDIAN, 37);
+    }
+
+    #[test]
+    fn test_underground_zone_materials() {
+        let materials = Materials::new();
+
+        // Mossy Stone
+        let mossy = materials.get(MaterialId::MOSSY_STONE);
+        assert_eq!(mossy.name, "mossy_stone");
+        assert_eq!(mossy.material_type, MaterialType::Solid);
+        assert!(mossy.structural);
+        assert!(mossy.hardness.unwrap() < materials.get(MaterialId::STONE).hardness.unwrap());
+
+        // Crystal
+        let crystal = materials.get(MaterialId::CRYSTAL);
+        assert_eq!(crystal.name, "crystal");
+        assert_eq!(crystal.material_type, MaterialType::Solid);
+        assert!(crystal.structural);
+        assert_eq!(crystal.color[3], 180); // Semi-transparent
+
+        // Basalt
+        let basalt = materials.get(MaterialId::BASALT);
+        assert_eq!(basalt.name, "basalt");
+        assert!(basalt.density > materials.get(MaterialId::STONE).density);
+
+        // Glowing Mushroom
+        let mushroom = materials.get(MaterialId::GLOWING_MUSHROOM);
+        assert_eq!(mushroom.name, "glowing_mushroom");
+        assert!(mushroom.flammable);
+        assert!(mushroom.nutritional_value.is_some());
+        assert!(mushroom.tags.contains(&MaterialTag::Edible));
+
+        // Obsidian
+        let obsidian = materials.get(MaterialId::OBSIDIAN);
+        assert_eq!(obsidian.name, "obsidian");
+        assert!(obsidian.hardness.unwrap() > materials.get(MaterialId::STONE).hardness.unwrap());
     }
 }

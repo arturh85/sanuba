@@ -56,7 +56,24 @@ Context scanner system, stalactite generation, biome transitions, and structure 
 - `crates/sunaba-core/src/world/context_scanner.rs` - Made `get_material()` public for structure placement
 - `crates/sunaba/src/ui/worldgen_editor/mod.rs` - Added UI controls for structures (3 collapsible sections)
 
-**Next:** Biome zones system (underground biomes)
+**Phase 3: Underground Biome Zones - COMPLETE ✅**
+
+Depth-based themed underground zones with unique materials:
+- **5 Underground Zones**: Shallow Caves, Mushroom Grotto, Crystal Caves, Lava Caverns, Abyss
+- **5 New Materials**: Mossy Stone, Crystal, Basalt, Glowing Mushroom, Obsidian
+- **BiomeZoneRegistry** - Depth-based zone selection with configurable enabled/surface_influence flags
+- **Editor Integration** - Underground Zones section in F7 Features tab
+
+**Files Created:**
+- `crates/sunaba-core/src/world/biome_zones.rs` (~500 lines) - Zone system with transitions
+- `crates/sunaba-simulation/src/materials.rs` (+70 lines) - 5 new underground materials
+
+**Files Modified:**
+- `crates/sunaba-core/src/world/generation.rs` - Zone-based stone material selection
+- `crates/sunaba-core/src/world/worldgen_config.rs` - UndergroundZonesConfig struct
+- `crates/sunaba/src/ui/worldgen_editor/mod.rs` - Underground Zones UI section
+
+**Next:** Training integration (curriculum learning)
 
 ---
 
@@ -379,7 +396,7 @@ pub struct TerrainSensoryInput {
 | `crates/sunaba-core/src/world/structures.rs` | Core structure types (StructureTemplate, AnchorType, StructureVariants) | ✅ Complete |
 | `crates/sunaba-core/src/world/structure_templates.rs` | TemplateBuilder API + builtin templates | ✅ Complete |
 | `crates/sunaba-core/src/world/structure_placement.rs` | Placement engine + physics validation | ✅ Complete |
-| `crates/sunaba-core/src/world/biome_zones.rs` | Depth-based zone system | Planned |
+| `crates/sunaba-core/src/world/biome_zones.rs` | Depth-based zone system | ✅ Complete |
 | `crates/sunaba-core/src/world/material_provider.rs` | Context-based material selection | Planned |
 | `crates/sunaba/src/headless/terrain_gen.rs` | Training terrain generation | Planned |
 | `crates/sunaba/src/headless/env_distribution.rs` | Environment sampling | Planned |
@@ -435,10 +452,10 @@ pub struct TerrainSensoryInput {
 5. [ ] Extended terrain sensors
 
 ### Sprint 5: Polish & Biome Content (4-5 days)
-1. [ ] Biome zone system (underground biomes)
+1. [x] Biome zone system (underground biomes) - **COMPLETE**
 2. [ ] Biome specialist training mode
-3. [ ] More structures (bridges, ruins)
-4. [ ] Builtin presets (5+ varied configs)
+3. [x] More structures (bridges, ruins) - **COMPLETE** (in Sprint 3)
+4. [x] Builtin presets (5+ varied configs) - **COMPLETE** (Default, Cave Heavy, Flat, Desert, Mountain)
 5. [ ] Training report enhancements
 
 ---
