@@ -1,6 +1,7 @@
 //! World management - chunks, loading, saving
 
 pub mod biome;
+pub mod biome_transition;
 mod ca_update;
 mod chemistry_system;
 mod chunk;
@@ -26,6 +27,9 @@ mod world;
 pub mod worldgen_config;
 
 pub use biome::{BiomeDefinition, BiomeRegistry, BiomeType};
+pub use biome_transition::{
+    BiomeTransition, BlendMode, MaterialStability, classify_material_stability, find_biome_boundary,
+};
 pub use chunk::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
 pub use chunk_manager::ChunkManager;
 pub use chunk_status::ChunkStatus;
@@ -46,7 +50,8 @@ pub use rng_trait::WorldRng;
 pub use stats::{NoopStats, SimStats};
 pub use world::World;
 pub use worldgen_config::{
-    BiomeConfig, BiomeParams, CaveParams, FeatureParams, FractalTypeConfig, LavaPoolConfig,
-    NoiseLayerConfig, NoiseTypeConfig, OreConfig, StalactiteConfig, TerrainParams,
-    UndergroundLayers, VegetationParams, WorldGenConfig, WorldParams,
+    BiomeBlendModeConfig, BiomeConfig, BiomeParams, BiomeTransitionConfig, CaveParams,
+    FeatureParams, FractalTypeConfig, LavaPoolConfig, NoiseLayerConfig, NoiseTypeConfig, OreConfig,
+    StalactiteConfig, TerrainParams, UndergroundLayers, VegetationParams, WorldGenConfig,
+    WorldParams,
 };

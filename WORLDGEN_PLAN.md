@@ -31,24 +31,26 @@ The core editor is fully functional:
 
 **Phase 2: Context-Aware Generation - IN PROGRESS**
 
-Context scanner system and stalactite generation implemented:
+Context scanner system, stalactite generation, and biome transitions implemented:
 - `ContextScanner` - Queries placement context from WorldGenerator
 - `PlacementContext` - Ground/ceiling distance, air above/below, enclosure detection, biome, light
 - `PlacementPredicate` - Composable rules (IsCaveInterior, IsSurface, MinAirAbove, DepthRange, etc.)
 - Builder methods for common patterns: `stalactite()`, `stalagmite()`, `surface_tree()`, `cave_mushroom()`
 - **Stalactite generation** - Proof-of-concept feature using context scanner, fully configurable via F7 editor
+- **Biome transition system** - Physics-stable blending between biomes with 3 modes (Sharp, Gradient, StableLayer)
 
 **Files Created:**
 - `crates/sunaba-core/src/world/context_scanner.rs` (~750 lines) - Context scanning system
 - `crates/sunaba-core/src/world/features.rs` (~250 lines) - Post-generation feature placement, stalactite logic
+- `crates/sunaba-core/src/world/biome_transition.rs` (~420 lines) - Physics-aware biome blending system
 
 **Files Modified:**
-- `crates/sunaba-core/src/world/generation.rs` - Added `get_terrain_height()`, internal methods for scanner, `apply_features()` call
-- `crates/sunaba-core/src/world/mod.rs` - Export context_scanner and StalactiteConfig types
-- `crates/sunaba-core/src/world/worldgen_config.rs` - Added `StalactiteConfig` with 9 parameters
-- `crates/sunaba/src/ui/worldgen_editor/mod.rs` - Added stalactite UI controls to Features tab
+- `crates/sunaba-core/src/world/generation.rs` - Added biome transition integration, `get_material_with_transition()`
+- `crates/sunaba-core/src/world/mod.rs` - Export biome_transition types
+- `crates/sunaba-core/src/world/worldgen_config.rs` - Added `BiomeTransitionConfig` with 5 parameters
+- `crates/sunaba/src/ui/worldgen_editor/mod.rs` - (TODO: Add biome transition UI controls to Biomes tab)
 
-**Next:** Biome transition system (stability-aware) and structure templates
+**Next:** Structure template system for bridges, ruins, etc.
 
 ---
 
@@ -367,7 +369,7 @@ pub struct TerrainSensoryInput {
 | `crates/sunaba-core/src/world/context_scanner.rs` | Context queries for placement | ✅ Complete |
 | `crates/sunaba-core/src/world/features.rs` | Post-generation features (stalactites, etc.) | ✅ Complete |
 | `crates/sunaba/src/ui/worldgen_editor/*.rs` | Editor UI (8 files) | ✅ Complete |
-| `crates/sunaba-core/src/world/biome_transition.rs` | Physics-stable biome blending | Planned |
+| `crates/sunaba-core/src/world/biome_transition.rs` | Physics-stable biome blending | ✅ Complete |
 | `crates/sunaba-core/src/world/biome_zones.rs` | Depth-based zone system | Planned |
 | `crates/sunaba-core/src/world/structures.rs` | Structure templates + placer | Planned |
 | `crates/sunaba-core/src/world/material_provider.rs` | Context-based material selection | Planned |
@@ -414,7 +416,7 @@ pub struct TerrainSensoryInput {
 1. [x] `ContextScanner` + `PlacementContext`
 2. [x] `PlacementPredicate` evaluation
 3. [x] Stalactite generation (proof of concept)
-4. [ ] Biome transition system (stability-aware)
+4. [x] Biome transition system (stability-aware)
 5. [ ] Structure template system
 
 ### Sprint 4: Training Integration (5-6 days)

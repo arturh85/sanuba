@@ -1,7 +1,8 @@
-use crate::simulation::MaterialId;
-use crate::world::biome::{BiomeRegistry, BiomeType, select_biome};
+use crate::simulation::{MaterialId, Materials};
+use crate::world::biome::{BiomeDefinition, BiomeRegistry, BiomeType, select_biome};
+use crate::world::biome_transition::{BiomeTransition, BlendMode};
 use crate::world::chunk::{CHUNK_SIZE, Chunk};
-use crate::world::worldgen_config::WorldGenConfig;
+use crate::world::worldgen_config::{BiomeBlendModeConfig, WorldGenConfig};
 use fastnoise_lite::{FastNoiseLite, NoiseType};
 use std::collections::HashMap;
 
@@ -52,6 +53,10 @@ pub struct WorldGenerator {
     // Vegetation placement
     tree_noise: FastNoiseLite,
     plant_noise: FastNoiseLite,
+
+    // Biome transition system
+    biome_transition: BiomeTransition,
+    materials: Materials,
 }
 
 impl WorldGenerator {
@@ -104,6 +109,11 @@ impl WorldGenerator {
         let tree_noise = config.vegetation.tree_noise.to_fastnoise(seed);
         let plant_noise = config.vegetation.plant_noise.to_fastnoise(seed);
 
+        // Biome transition system
+        let mut biome_transition = BiomeTransition::new(seed as i32);
+        biome_transition.transition_width = config.biomes.transition.width;
+        biome_transition.enforce_stability = config.biomes.transition.enforce_stability;
+
         Self {
             seed,
             config,
@@ -120,6 +130,8 @@ impl WorldGenerator {
             gold_noise,
             tree_noise,
             plant_noise,
+            biome_transition,
+            materials: Materials::new(),
         }
     }
 
@@ -295,6 +307,14 @@ impl WorldGenerator {
         }
 
         // Step 6: Material layers based on depth and biome
+        // Check for biome transitions first
+        if let Some(material) =
+            self.get_material_with_transition(world_x, world_y, depth, biome, biome_type)
+        {
+            return material;
+        }
+
+        // No transition, use standard biome materials
         if depth < 1 {
             // Surface material (grass, sand, stone, etc.)
             return biome.surface_material;
@@ -367,6 +387,85 @@ impl WorldGenerator {
 
         // Default: stone
         MaterialId::STONE
+    }
+
+    /// Helper method to get material with biome transitions
+    ///
+    /// Checks for biome boundaries and blends materials if needed
+    fn get_material_with_transition(
+        &self,
+        world_x: i32,
+        world_y: i32,
+        depth: i32,
+        biome: &BiomeDefinition,
+        biome_type: BiomeType,
+    ) -> Option<u16> {
+        // Skip transitions if disabled
+        if !self.config.biomes.transition.enabled {
+            return None; // Fall through to normal material selection
+        }
+
+        // Check for nearby biome boundary
+        let scan_width = self.config.biomes.transition.width;
+
+        // Sample biomes to the left and right
+        let left_x = world_x - scan_width / 2;
+        let right_x = world_x + scan_width / 2;
+
+        let left_biome = self.get_biome_at_internal(left_x);
+        let right_biome = self.get_biome_at_internal(right_x);
+
+        // If all same biome, no transition needed
+        if left_biome == biome_type && right_biome == biome_type {
+            return None; // No transition
+        }
+
+        // We're in a transition zone - find which biomes we're between
+        let (other_biome_type, boundary_x) = if left_biome != biome_type {
+            // Transition from left biome to current
+            (left_biome, left_x)
+        } else {
+            // Transition from current to right biome
+            (right_biome, right_x)
+        };
+
+        // Get the other biome definition
+        let other_biome = self.biome_registry.get(other_biome_type);
+
+        // Convert config blend mode to runtime blend mode
+        let blend_mode = match self.config.biomes.transition.mode {
+            BiomeBlendModeConfig::Sharp => BlendMode::Sharp,
+            BiomeBlendModeConfig::Gradient => BlendMode::Gradient {
+                noise_scale_percent: self.config.biomes.transition.noise_scale_percent,
+            },
+            BiomeBlendModeConfig::StableLayer => BlendMode::StableLayer,
+        };
+
+        // Calculate blend factor
+        let blend_factor = self
+            .biome_transition
+            .calculate_blend_factor(world_x, world_y, boundary_x, blend_mode);
+
+        // Blend materials
+        let material = self.biome_transition.blend_material(
+            world_x,
+            world_y,
+            depth,
+            if left_biome != biome_type {
+                other_biome
+            } else {
+                biome
+            },
+            if left_biome != biome_type {
+                biome
+            } else {
+                other_biome
+            },
+            blend_factor,
+            &self.materials,
+        );
+
+        Some(material)
     }
 
     // Internal methods for ContextScanner access

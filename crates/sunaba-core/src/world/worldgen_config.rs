@@ -118,6 +118,8 @@ pub struct BiomeParams {
     pub moisture_noise: NoiseLayerConfig,
     /// Individual biome definitions
     pub biomes: Vec<BiomeConfig>,
+    /// Biome transition configuration
+    pub transition: BiomeTransitionConfig,
 }
 
 /// Single biome configuration
@@ -167,6 +169,29 @@ pub struct BiomeConfig {
     // Ore multipliers (material_id -> multiplier)
     /// Per-ore abundance multipliers
     pub ore_multipliers: HashMap<u16, f32>,
+}
+
+/// Biome transition configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BiomeTransitionConfig {
+    /// Enable biome transitions (false = sharp boundaries)
+    pub enabled: bool,
+    /// Transition width in pixels (default: 32)
+    pub width: i32,
+    /// Blend mode (0=Sharp, 1=Gradient, 2=StableLayer)
+    pub mode: BiomeBlendModeConfig,
+    /// Noise scale for gradient mode (0-100, controls boundary roughness)
+    pub noise_scale_percent: u32,
+    /// Enforce physics stability (prevent powder collapse)
+    pub enforce_stability: bool,
+}
+
+/// Blend mode configuration (serializable version)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BiomeBlendModeConfig {
+    Sharp,
+    Gradient,
+    StableLayer,
 }
 
 /// Vegetation placement parameters
@@ -383,6 +408,19 @@ impl Default for BiomeParams {
                 gain: 0.5,
             },
             biomes: default_biome_configs(),
+            transition: BiomeTransitionConfig::default(),
+        }
+    }
+}
+
+impl Default for BiomeTransitionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width: 32,
+            mode: BiomeBlendModeConfig::StableLayer,
+            noise_scale_percent: 30,
+            enforce_stability: true,
         }
     }
 }
