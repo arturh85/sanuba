@@ -11,7 +11,7 @@ pub mod temperature;
 // Re-export from sunaba-simulation for backward compatibility
 pub use sunaba_simulation::{
     CHUNK_AREA, CHUNK_SIZE, MaterialDef, MaterialId, MaterialTag, MaterialType, Materials, Pixel,
-    Reaction, ReactionRegistry, pixel_flags,
+    Reaction, ReactionRegistry, apply_texture_variation, pixel_flags,
 };
 
 pub use falling_chunks::{ChunkRenderData, FallingChunk, FallingChunkSystem, WorldCollisionQuery};
