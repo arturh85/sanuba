@@ -7,6 +7,7 @@
 /web/pkg/
 .DS_Store
 training_output/
+screenshots/
 /papers/
 /experiments/20*.md
 /reports/

@@ -75,6 +75,57 @@ run *args='--regenerate':
 # End Fast Development Commands
 # ============================================================================
 
+# ============================================================================
+# Screenshot Commands
+# ============================================================================
+
+# List all available demo levels for screenshots
+list-levels:
+    cargo run -p sunaba --bin sunaba --release --features headless -- --list-levels
+
+# Capture a screenshot of a specific level by ID
+# Usage: just screenshot <level_id> [width] [height] [settle_frames]
+# Example: just screenshot 0            # Basic Physics Playground (1920x1080)
+# Example: just screenshot 3 800 600    # Material Showcase (800x600)
+[unix]
+screenshot level_id width="1920" height="1080" settle="60":
+    @mkdir -p screenshots
+    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{level_id}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
+    @echo "Screenshot saved to: screenshots/level_{{level_id}}.png"
+
+[windows]
+screenshot level_id width="1920" height="1080" settle="60":
+    @if (-not (Test-Path screenshots)) { New-Item -ItemType Directory -Path screenshots | Out-Null }
+    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{level_id}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
+    @Write-Host "Screenshot saved to: screenshots/level_{{level_id}}.png"
+
+# Capture screenshots of all demo levels
+[unix]
+screenshot-all width="1920" height="1080":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p screenshots
+    echo "Capturing screenshots of all levels..."
+    for i in {0..20}; do
+        echo "  Level $i..."
+        just screenshot $i {{width}} {{height}} > /dev/null 2>&1 || true
+    done
+    echo "✅ All screenshots captured in screenshots/"
+
+[windows]
+screenshot-all width="1920" height="1080":
+    @if (-not (Test-Path screenshots)) { New-Item -ItemType Directory -Path screenshots | Out-Null }
+    @Write-Host "Capturing screenshots of all levels..."
+    @for ($i=0; $i -le 20; $i++) { \
+        Write-Host "  Level $i..."; \
+        just screenshot $i {{width}} {{height}} | Out-Null; \
+    }
+    @Write-Host "✅ All screenshots captured in screenshots/"
+
+# ============================================================================
+# End Screenshot Commands
+# ============================================================================
+
 # Run multiplayer client (connects to specified SpacetimeDB server)
 start-multiplayer server="http://localhost:3000":
     @echo "Starting multiplayer client (connecting to {{server}})..."

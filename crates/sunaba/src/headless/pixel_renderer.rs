@@ -7,6 +7,7 @@ use glam::Vec2;
 use crate::creature::CreatureRenderData;
 use crate::simulation::Materials;
 use crate::world::World;
+use sunaba_core::simulation::apply_texture_variation;
 
 /// CPU-based renderer that outputs to a pixel buffer
 pub struct PixelRenderer {
@@ -59,7 +60,21 @@ impl PixelRenderer {
 
                 if let Some(pixel) = world.get_pixel(world_x, world_y) {
                     let material = materials.get(pixel.material_id);
-                    let color = material.color;
+                    let base_color = material.color;
+
+                    // Check neighboring pixels for edge effects
+                    let has_neighbor_above = world.get_pixel(world_x, world_y + 1).is_some();
+                    let has_neighbor_left = world.get_pixel(world_x - 1, world_y).is_some();
+
+                    // Apply texture variation for visual depth
+                    let color = apply_texture_variation(
+                        base_color,
+                        pixel.material_id,
+                        world_x,
+                        world_y,
+                        has_neighbor_above,
+                        has_neighbor_left,
+                    );
 
                     // Flip Y for screen coordinates (world Y increases upward)
                     let flipped_y = self.height - 1 - screen_y;
