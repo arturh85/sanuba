@@ -74,7 +74,7 @@ impl Default for TrainingConfig {
             min_viability: 0.3,
             archetype: CreatureArchetype::default(),
             archetypes: Vec::new(), // Empty = use single archetype field
-            multi_env: None, // None = single environment (backward compatible)
+            multi_env: None,        // None = single environment (backward compatible)
         }
     }
 }
@@ -621,7 +621,11 @@ impl TrainingEnv {
     }
 
     /// Legacy single-environment evaluation (backward compatible)
-    fn evaluate_single_legacy(&self, genome: CreatureGenome, archetype: CreatureArchetype) -> EvalResult {
+    fn evaluate_single_legacy(
+        &self,
+        genome: CreatureGenome,
+        archetype: CreatureArchetype,
+    ) -> EvalResult {
         // Set up world with cached food positions
         let (mut world, food_positions) = self.scenario.setup_world();
         let mut creature_manager = CreatureManager::new(1);
@@ -709,8 +713,8 @@ impl TrainingEnv {
         multi_env: &MultiEnvironmentEvaluator,
     ) -> EvalResult {
         // Compute deterministic eval_id for this creature
-        let eval_id = (self.generation as u64) * (self.config.population_size as u64)
-            + (creature_idx as u64);
+        let eval_id =
+            (self.generation as u64) * (self.config.population_size as u64) + (creature_idx as u64);
 
         // Sample terrain configurations for this evaluation
         let terrains = multi_env

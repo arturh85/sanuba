@@ -81,13 +81,8 @@ impl MultiEnvironmentEvaluator {
         }
 
         match self.aggregation {
-            FitnessAggregation::Mean => {
-                scores.iter().sum::<f32>() / scores.len() as f32
-            }
-            FitnessAggregation::Min => scores
-                .iter()
-                .copied()
-                .fold(f32::INFINITY, f32::min),
+            FitnessAggregation::Mean => scores.iter().sum::<f32>() / scores.len() as f32,
+            FitnessAggregation::Min => scores.iter().copied().fold(f32::INFINITY, f32::min),
             FitnessAggregation::Median => {
                 let mut sorted = scores.to_vec();
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -125,21 +120,12 @@ impl MultiEnvironmentEvaluator {
         }
 
         let mean = scores.iter().sum::<f32>() / scores.len() as f32;
-        let variance = scores
-            .iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f32>()
-            / scores.len() as f32;
+        let variance =
+            scores.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / scores.len() as f32;
         let std_dev = variance.sqrt();
 
-        let min = scores
-            .iter()
-            .copied()
-            .fold(f32::INFINITY, f32::min);
-        let max = scores
-            .iter()
-            .copied()
-            .fold(f32::NEG_INFINITY, f32::max);
+        let min = scores.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
         let mut sorted = scores.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
