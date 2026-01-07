@@ -23,7 +23,7 @@ pub struct TrainingTerrainConfig {
 }
 
 /// Parameterized difficulty settings (0.0 = easiest, 1.0 = hardest)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DifficultyConfig {
     /// Terrain roughness (0.0 = flat, 1.0 = max variance)
     /// Maps to WorldGenConfig.terrain.height_scale

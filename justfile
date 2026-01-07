@@ -46,25 +46,34 @@ load:
 # Fast Development Commands (Auto-Rebuild + Instant Launch)
 # ============================================================================
 
-# Auto-rebuild on file changes (builds release profile)
+# Auto-rebuild on file changes (builds release + runs tests in parallel)
+[unix]
 watch:
-    bacon
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null; exit' INT TERM
+    echo "🔄 Starting dual watchers: build + tests"
+    echo "   Build output and test output will be interleaved below"
+    echo "   Press Ctrl+C to stop both watchers"
+    echo ""
+    bacon build & bacon test & wait
 
-# Auto-rebuild with clippy
+[windows]
+watch:
+    @Write-Host "🔄 Starting dual watchers: build + tests"
+    @Write-Host "   Press Ctrl+C to stop both watchers"
+    @Write-Host ""
+    Start-Job -ScriptBlock { bacon build } | Out-Null
+    Start-Job -ScriptBlock { bacon test } | Out-Null
+    Get-Job | Wait-Job | Receive-Job
+
+# Auto-rebuild with clippy only
 watch-check:
     bacon clippy
 
-# Auto-rebuild and run tests
+# Auto-rebuild and run tests only
 watch-test:
     bacon test
-
-# Watch both build AND tests in parallel (split tmux session)
-watch-all:
-    #!/usr/bin/env bash
-    tmux new-session -d -s sunaba-watch 'bacon build' \; \
-        split-window -v 'bacon test' \; \
-        select-layout even-vertical \; \
-        attach-session -d
 
 # Direct binary execution (instant launch, ~100ms, bypasses Cargo overhead)
 # Use with `just watch` for truly instant hot-reload
@@ -79,25 +88,31 @@ run *args='--regenerate':
 # Screenshot Commands
 # ============================================================================
 
+# List all available screenshot scenarios (levels + UI panels)
+list-scenarios:
+    cargo run -p sunaba --bin sunaba --release --features headless -- --list-scenarios
+
 # List all available demo levels for screenshots
 list-levels:
     cargo run -p sunaba --bin sunaba --release --features headless -- --list-levels
 
-# Capture a screenshot of a specific level by ID
-# Usage: just screenshot <level_id> [width] [height] [settle_frames]
-# Example: just screenshot 0            # Basic Physics Playground (1920x1080)
-# Example: just screenshot 3 800 600    # Material Showcase (800x600)
+# Capture a screenshot (level:N, ui:panel, or just N)
+# Usage: just screenshot <scenario> [width] [height] [settle_frames]
+# Example: just screenshot 0            # Level 0 (backward compatible)
+# Example: just screenshot level:3      # Level 3 (explicit)
+# Example: just screenshot ui:params    # Parameters panel (coming soon)
+# Example: just screenshot 3 800 600    # Custom resolution
 [unix]
-screenshot level_id width="1920" height="1080" settle="60":
+screenshot scenario width="1920" height="1080" settle="60":
     @mkdir -p screenshots
-    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{level_id}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
-    @echo "Screenshot saved to: screenshots/level_{{level_id}}.png"
+    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{scenario}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
+    @echo "Screenshot captured successfully!"
 
 [windows]
-screenshot level_id width="1920" height="1080" settle="60":
+screenshot scenario width="1920" height="1080" settle="60":
     @if (-not (Test-Path screenshots)) { New-Item -ItemType Directory -Path screenshots | Out-Null }
-    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{level_id}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
-    @Write-Host "Screenshot saved to: screenshots/level_{{level_id}}.png"
+    cargo run -p sunaba --bin sunaba --release --features headless -- --screenshot {{scenario}} --screenshot-width {{width}} --screenshot-height {{height}} --screenshot-settle {{settle}}
+    @Write-Host "Screenshot captured successfully!"
 
 # Capture screenshots of all demo levels
 [unix]

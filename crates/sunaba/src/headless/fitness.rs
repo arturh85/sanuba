@@ -89,7 +89,6 @@ impl FitnessFunction for DistanceFitness {
         spawn_pos: Vec2,
         _duration: f32,
     ) -> f32 {
-        
         (creature.position - spawn_pos).length()
     }
 

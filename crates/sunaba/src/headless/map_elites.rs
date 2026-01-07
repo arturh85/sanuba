@@ -244,10 +244,11 @@ impl MapElitesGrid {
         for _ in 0..actual_size {
             let idx = rng.gen_range(0..keys.len());
             if let Some(elite) = self.cells.get(keys[idx])
-                && elite.fitness > best_fitness {
-                    best_fitness = elite.fitness;
-                    best = Some(elite);
-                }
+                && elite.fitness > best_fitness
+            {
+                best_fitness = elite.fitness;
+                best = Some(elite);
+            }
         }
 
         best
@@ -267,9 +268,10 @@ impl MapElitesGrid {
         let mut attempts = 0;
         loop {
             if let Some(parent2) = self.sample_elite()
-                && !std::ptr::eq(parent1, parent2) {
-                    return Some((parent1, parent2));
-                }
+                && !std::ptr::eq(parent1, parent2)
+            {
+                return Some((parent1, parent2));
+            }
             attempts += 1;
             if attempts >= 10 {
                 break;
@@ -282,9 +284,10 @@ impl MapElitesGrid {
         for _ in 0..keys.len() {
             let idx = rng.gen_range(0..keys.len());
             if let Some(parent2) = self.cells.get(keys[idx])
-                && !std::ptr::eq(parent1, parent2) {
-                    return Some((parent1, parent2));
-                }
+                && !std::ptr::eq(parent1, parent2)
+            {
+                return Some((parent1, parent2));
+            }
         }
 
         None
@@ -368,12 +371,13 @@ impl MapElitesGrid {
             && !results.iter().any(|r| {
                 (r.elite.behavior[0] - elite.behavior[0]).abs() < 0.01
                     && (r.elite.behavior[1] - elite.behavior[1]).abs() < 0.01
-            }) {
-                results.push(DiverseElite {
-                    elite: elite.clone(),
-                    label: "Balanced".to_string(),
-                });
-            }
+            })
+        {
+            results.push(DiverseElite {
+                elite: elite.clone(),
+                label: "Balanced".to_string(),
+            });
+        }
 
         // Strategy 4: Random alternative (any cell not already picked)
         let stats = self.stats();

@@ -42,40 +42,54 @@ struct Args {
     #[cfg(feature = "multiplayer")]
     server: Option<String>,
 
-    /// Capture a screenshot of a level (specify level ID)
+    /// Capture a screenshot (level:N, ui:panel, or just N for backward compat)
     #[arg(long)]
-    screenshot: Option<usize>,
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    screenshot: Option<String>,
 
-    /// Output path for screenshot (default: screenshots/level_<id>.png)
+    /// Output path for screenshot (default: screenshots/<scenario_name>.png)
     #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     screenshot_output: Option<String>,
 
     /// Screenshot width in pixels
     #[arg(long, default_value = "1920")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     screenshot_width: usize,
 
     /// Screenshot height in pixels
     #[arg(long, default_value = "1080")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     screenshot_height: usize,
 
     /// Number of frames to simulate before capturing (let physics settle)
     #[arg(long, default_value = "60")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     screenshot_settle: usize,
 
     /// List available demo levels
     #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     list_levels: bool,
+
+    /// List all available screenshot scenarios (levels + UI panels)
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    list_scenarios: bool,
 
     /// Capture UI screenshot (requires full game initialization)
     #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     screenshot_ui: bool,
 
     /// UI panel to show in screenshot (params, inventory, crafting, logger, worldgen, levels)
     #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     ui_panel: Option<String>,
 
     /// List available UI panels
     #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     list_ui_panels: bool,
 }
 
@@ -96,42 +110,55 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Handle --list-levels flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     if args.list_levels {
         sunaba::screenshot::list_levels();
         return Ok(());
     }
 
+    // Handle --list-scenarios flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    if args.list_scenarios {
+        sunaba::screenshot::list_all_scenarios();
+        return Ok(());
+    }
+
     // Handle --list-ui-panels flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     if args.list_ui_panels {
         sunaba::screenshot::list_ui_panels();
         return Ok(());
     }
 
-    // Handle --screenshot flag (headless mode)
-    if let Some(level_id) = args.screenshot {
+    // Handle --screenshot flag (scenario-based)
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    if let Some(scenario_str) = args.screenshot {
         if args.screenshot_ui || args.ui_panel.is_some() {
             eprintln!("Error: --screenshot-ui and --ui-panel require running without --screenshot");
-            eprintln!("For UI screenshots, use the game's built-in screenshot feature (F12)");
-            eprintln!("Or launch the game with --screenshot <level> for headless capture");
+            eprintln!("For UI screenshots, use: --screenshot ui:panel");
             std::process::exit(1);
         }
 
+        // Parse scenario
+        let scenario =
+            sunaba::screenshot::ScreenshotScenario::parse(&scenario_str, args.screenshot_settle)?;
+
+        // Determine output path
         let output_path = args.screenshot_output.unwrap_or_else(|| {
             std::fs::create_dir_all("screenshots").ok();
-            format!("screenshots/level_{}.png", level_id)
+            format!("screenshots/{}.png", scenario.name())
         });
 
-        let config = sunaba::screenshot::ScreenshotConfig {
-            width: args.screenshot_width,
-            height: args.screenshot_height,
-            settle_frames: args.screenshot_settle,
-            camera_center: None,
-        };
-
-        return sunaba::screenshot::capture_level_screenshot(level_id, output_path, config);
+        return sunaba::screenshot::capture_scenario(
+            scenario,
+            output_path,
+            args.screenshot_width,
+            args.screenshot_height,
+        );
     }
 
     // Handle --screenshot-ui flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     if args.screenshot_ui || args.ui_panel.is_some() {
         eprintln!("UI screenshot mode is currently for documentation purposes.");
         eprintln!("To capture UI screenshots:");

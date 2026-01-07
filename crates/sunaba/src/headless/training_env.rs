@@ -445,11 +445,12 @@ impl TrainingEnv {
 
                 // Sample position every 5 seconds
                 if step % (60 * 5) == 0
-                    && let Some(creature) = creature_manager.get(creature_id) {
-                        pos_samples.push(creature.position);
-                        min_x = min_x.min(creature.position.x);
-                        max_x = max_x.max(creature.position.x);
-                    }
+                    && let Some(creature) = creature_manager.get(creature_id)
+                {
+                    pos_samples.push(creature.position);
+                    min_x = min_x.min(creature.position.x);
+                    max_x = max_x.max(creature.position.x);
+                }
             }
 
             // Get final position
@@ -949,9 +950,10 @@ impl TrainingEnv {
                     &result.behavior,
                     self.generation,
                     result.archetype,
-                ) {
-                    new_elites += 1;
-                }
+                )
+            {
+                new_elites += 1;
+            }
             total_fitness += result.fitness;
             total_displacement += result.displacement;
             max_displacement = max_displacement.max(result.displacement);
@@ -1083,79 +1085,80 @@ impl TrainingEnv {
 
             // Capture frame at intervals
             if step % capture_interval == 0
-                && let Some(creature) = creature_manager.get(creature_id) {
-                    let render_data = creature.get_render_data();
-                    let creatures: Vec<_> = render_data.into_iter().collect();
+                && let Some(creature) = creature_manager.get(creature_id)
+            {
+                let render_data = creature.get_render_data();
+                let creatures: Vec<_> = render_data.into_iter().collect();
 
-                    // Center camera on creature
-                    let center = creature.position;
-                    renderer.render(&world, &materials, center, &creatures);
+                // Center camera on creature
+                let center = creature.position;
+                renderer.render(&world, &materials, center, &creatures);
 
-                    // Draw debug overlays
-                    let half = (size / 2) as i32;
+                // Draw debug overlays
+                let half = (size / 2) as i32;
 
-                    // Draw vertical reference lines every 50 pixels for motion visibility
-                    let gray = [100, 100, 100, 200];
-                    for world_x in (-500i32..500).step_by(50) {
-                        let screen_x = half + world_x - center.x as i32;
-                        if screen_x >= 0 && screen_x < size as i32 {
-                            renderer.draw_dashed_vline(screen_x, 3, 5, gray);
-                        }
+                // Draw vertical reference lines every 50 pixels for motion visibility
+                let gray = [100, 100, 100, 200];
+                for world_x in (-500i32..500).step_by(50) {
+                    let screen_x = half + world_x - center.x as i32;
+                    if screen_x >= 0 && screen_x < size as i32 {
+                        renderer.draw_dashed_vline(screen_x, 3, 5, gray);
                     }
-
-                    // Draw ground level indicator (y=20 is ground in locomotion scenario)
-                    let ground_y = 20.0;
-                    let ground_screen_y = half - (ground_y - center.y) as i32;
-                    if ground_screen_y >= 0 && ground_screen_y < size as i32 {
-                        renderer.draw_dashed_hline(ground_screen_y, 5, 3, [139, 69, 19, 200]);
-                        // Brown
-                    }
-
-                    // Spawn position marker (red dot showing where creature started)
-                    let spawn_screen_x = half + (spawn_pos.x - center.x) as i32;
-                    let spawn_screen_y = half - (spawn_pos.y - center.y) as i32;
-                    if spawn_screen_x >= -10
-                        && spawn_screen_x < size as i32 + 10
-                        && spawn_screen_y >= -10
-                        && spawn_screen_y < size as i32 + 10
-                    {
-                        renderer.draw_filled_circle(
-                            spawn_screen_x,
-                            spawn_screen_y,
-                            4,
-                            [255, 0, 0, 255],
-                        );
-                    }
-
-                    // Velocity arrow (green) from creature center
-                    let vel = creature.velocity;
-                    renderer.draw_arrow(half, half, vel.x, vel.y, 3.0, [0, 255, 0, 255]);
-
-                    // Speed text (white on dark background area - top left)
-                    let speed = vel.length();
-                    let speed_text = format!("SPD:{:.0}", speed);
-                    renderer.draw_text(4, 4, &speed_text, [255, 255, 255, 255]);
-
-                    // Distance from spawn (displacement)
-                    let dist = (creature.position - spawn_pos).length();
-                    let dist_text = format!("DST:{:.0}", dist);
-                    renderer.draw_text(4, 12, &dist_text, [255, 255, 255, 255]);
-
-                    // Current position
-                    let pos_text = format!("X:{:.0}", creature.position.x);
-                    renderer.draw_text(4, 20, &pos_text, [255, 255, 255, 255]);
-
-                    // Food counter (white)
-                    let food_text = format!("FOOD:{}", creature.food_eaten);
-                    renderer.draw_text(4, 28, &food_text, [255, 255, 255, 255]);
-
-                    // Timestamp overlay (yellow, top right) - shows where GIF starts/loops
-                    let elapsed_time = step as f32 * dt;
-                    let time_text = format!("T:{:.1}s", elapsed_time);
-                    renderer.draw_text(size as i32 - 42, 4, &time_text, [255, 255, 100, 255]);
-
-                    gif.capture_frame(&renderer);
                 }
+
+                // Draw ground level indicator (y=20 is ground in locomotion scenario)
+                let ground_y = 20.0;
+                let ground_screen_y = half - (ground_y - center.y) as i32;
+                if ground_screen_y >= 0 && ground_screen_y < size as i32 {
+                    renderer.draw_dashed_hline(ground_screen_y, 5, 3, [139, 69, 19, 200]);
+                    // Brown
+                }
+
+                // Spawn position marker (red dot showing where creature started)
+                let spawn_screen_x = half + (spawn_pos.x - center.x) as i32;
+                let spawn_screen_y = half - (spawn_pos.y - center.y) as i32;
+                if spawn_screen_x >= -10
+                    && spawn_screen_x < size as i32 + 10
+                    && spawn_screen_y >= -10
+                    && spawn_screen_y < size as i32 + 10
+                {
+                    renderer.draw_filled_circle(
+                        spawn_screen_x,
+                        spawn_screen_y,
+                        4,
+                        [255, 0, 0, 255],
+                    );
+                }
+
+                // Velocity arrow (green) from creature center
+                let vel = creature.velocity;
+                renderer.draw_arrow(half, half, vel.x, vel.y, 3.0, [0, 255, 0, 255]);
+
+                // Speed text (white on dark background area - top left)
+                let speed = vel.length();
+                let speed_text = format!("SPD:{:.0}", speed);
+                renderer.draw_text(4, 4, &speed_text, [255, 255, 255, 255]);
+
+                // Distance from spawn (displacement)
+                let dist = (creature.position - spawn_pos).length();
+                let dist_text = format!("DST:{:.0}", dist);
+                renderer.draw_text(4, 12, &dist_text, [255, 255, 255, 255]);
+
+                // Current position
+                let pos_text = format!("X:{:.0}", creature.position.x);
+                renderer.draw_text(4, 20, &pos_text, [255, 255, 255, 255]);
+
+                // Food counter (white)
+                let food_text = format!("FOOD:{}", creature.food_eaten);
+                renderer.draw_text(4, 28, &food_text, [255, 255, 255, 255]);
+
+                // Timestamp overlay (yellow, top right) - shows where GIF starts/loops
+                let elapsed_time = step as f32 * dt;
+                let time_text = format!("T:{:.1}s", elapsed_time);
+                renderer.draw_text(size as i32 - 42, 4, &time_text, [255, 255, 100, 255]);
+
+                gif.capture_frame(&renderer);
+            }
         }
 
         // Encode GIF to bytes
@@ -1181,52 +1184,54 @@ impl TrainingEnv {
         // Capture best elite from each archetype
         for &archetype in &self.archetypes {
             if let Some(grid) = self.grids.get(&archetype)
-                && let Some(best) = grid.best_elite() {
-                    let label = format!("Best {}", archetype.name());
-                    pb.println(format!(
-                        "  Capturing: {} (fitness: {:.2})",
-                        label, best.fitness
-                    ));
-                    match self.capture_elite_gif(
-                        &best.genome,
-                        archetype,
-                        &label,
-                        best.fitness,
-                        &best.behavior,
-                    ) {
-                        Ok(gif) => gifs.push(gif),
-                        Err(e) => log::warn!("Failed to capture {} GIF: {}", label, e),
-                    }
+                && let Some(best) = grid.best_elite()
+            {
+                let label = format!("Best {}", archetype.name());
+                pb.println(format!(
+                    "  Capturing: {} (fitness: {:.2})",
+                    label, best.fitness
+                ));
+                match self.capture_elite_gif(
+                    &best.genome,
+                    archetype,
+                    &label,
+                    best.fitness,
+                    &best.behavior,
+                ) {
+                    Ok(gif) => gifs.push(gif),
+                    Err(e) => log::warn!("Failed to capture {} GIF: {}", label, e),
                 }
+            }
         }
 
         // Also capture overall champion if there are multiple archetypes
         if self.archetypes.len() > 1
-            && let Some((champion_archetype, best)) = self.best_elite() {
-                // Only add if not already captured (i.e., if it's different from individual archetype bests)
-                let overall_label = format!("Champion ({})", champion_archetype.name());
-                let already_have_champion = gifs.iter().any(|g| {
-                    g.label == format!("Best {}", champion_archetype.name())
-                        && (g.fitness - best.fitness).abs() < 0.01
-                });
+            && let Some((champion_archetype, best)) = self.best_elite()
+        {
+            // Only add if not already captured (i.e., if it's different from individual archetype bests)
+            let overall_label = format!("Champion ({})", champion_archetype.name());
+            let already_have_champion = gifs.iter().any(|g| {
+                g.label == format!("Best {}", champion_archetype.name())
+                    && (g.fitness - best.fitness).abs() < 0.01
+            });
 
-                if !already_have_champion {
-                    pb.println(format!(
-                        "  Capturing: {} (fitness: {:.2})",
-                        overall_label, best.fitness
-                    ));
-                    match self.capture_elite_gif(
-                        &best.genome,
-                        *champion_archetype,
-                        &overall_label,
-                        best.fitness,
-                        &best.behavior,
-                    ) {
-                        Ok(gif) => gifs.push(gif),
-                        Err(e) => log::warn!("Failed to capture overall champion GIF: {}", e),
-                    }
+            if !already_have_champion {
+                pb.println(format!(
+                    "  Capturing: {} (fitness: {:.2})",
+                    overall_label, best.fitness
+                ));
+                match self.capture_elite_gif(
+                    &best.genome,
+                    *champion_archetype,
+                    &overall_label,
+                    best.fitness,
+                    &best.behavior,
+                ) {
+                    Ok(gif) => gifs.push(gif),
+                    Err(e) => log::warn!("Failed to capture overall champion GIF: {}", e),
                 }
             }
+        }
 
         pb.println(format!("Captured {} GIFs", gifs.len()));
         gifs

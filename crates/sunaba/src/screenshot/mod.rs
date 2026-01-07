@@ -1,6 +1,30 @@
 //! Screenshot capture for visual iteration
 //!
 //! Allows capturing game state in specific scenarios for visual verification.
+//!
+//! ## Architecture
+//!
+//! - `scenario` - Scenario types and parsing (Level, UiPanel, Interactive)
+//! - `offscreen_renderer` - GPU offscreen rendering for UI screenshots (TODO)
+//! - `sample_data` - Test data generators for UI panels (TODO)
+//!
+//! ## Usage
+//!
+//! ```bash
+//! # Capture level screenshot
+//! just screenshot level:3
+//! just screenshot 3  # Backward compatible
+//!
+//! # Capture UI panel screenshot (coming soon)
+//! just screenshot ui:params
+//!
+//! # List available scenarios
+//! just list-scenarios
+//! ```
+
+mod offscreen_renderer;
+mod sample_data;
+pub mod scenario;
 
 use anyhow::Result;
 use glam::Vec2;
@@ -11,6 +35,8 @@ use crate::levels::LevelManager;
 use crate::simulation::Materials;
 use crate::world::{NoopStats, World};
 use rand::thread_rng;
+
+pub use scenario::{ScreenshotScenario, list_all_scenarios};
 
 /// Screenshot configuration
 pub struct ScreenshotConfig {
@@ -72,7 +98,11 @@ pub fn capture_level_screenshot(
     // Load the specified level
     let mut level_manager = LevelManager::new();
     if level_id >= level_manager.levels().len() {
-        anyhow::bail!("Invalid level ID: {} (max: {})", level_id, level_manager.levels().len() - 1);
+        anyhow::bail!(
+            "Invalid level ID: {} (max: {})",
+            level_id,
+            level_manager.levels().len() - 1
+        );
     }
     level_manager.load_level(level_id, &mut world);
 
@@ -83,7 +113,10 @@ pub fn capture_level_screenshot(
     let camera_center = config.camera_center.unwrap_or(Vec2::new(0.0, 32.0));
 
     // Let physics settle
-    log::info!("Simulating {} frames to settle physics...", config.settle_frames);
+    log::info!(
+        "Simulating {} frames to settle physics...",
+        config.settle_frames
+    );
     let mut stats = NoopStats;
     let mut rng = thread_rng();
     for _ in 0..config.settle_frames {
@@ -179,6 +212,47 @@ pub fn list_ui_panels() {
     println!("Use: just screenshot-ui <level_id> <panel_name>");
 }
 
+/// Capture a screenshot based on a scenario
+pub fn capture_scenario(
+    scenario: ScreenshotScenario,
+    output_path: impl AsRef<Path>,
+    width: usize,
+    height: usize,
+) -> Result<()> {
+    match scenario {
+        ScreenshotScenario::Level { id, settle_frames } => {
+            let config = ScreenshotConfig {
+                width,
+                height,
+                settle_frames,
+                camera_center: None,
+            };
+            capture_level_screenshot(id, output_path, config)
+        }
+        ScreenshotScenario::UiPanel { panel, .. } => {
+            // TODO: Implement GPU offscreen rendering for UI panels
+            eprintln!("UI panel screenshot requested: {}", panel.name());
+            eprintln!();
+            eprintln!("⚠️  UI screenshot capture is not yet implemented.");
+            eprintln!();
+            eprintln!("The infrastructure for scenario-based screenshots has been");
+            eprintln!("created, but GPU offscreen rendering is still in progress.");
+            eprintln!();
+            eprintln!("For now, capture UI screenshots manually:");
+            eprintln!("  1. Launch the game: just start");
+            eprintln!("  2. Open the {} panel", panel.name());
+            eprintln!("  3. Use OS screenshot tool (Shift+Cmd+5 on Mac, PrintScreen on Windows)");
+            eprintln!("  4. Save to: {:?}", output_path.as_ref());
+            eprintln!();
+            eprintln!("Coming soon: Automated GPU rendering for UI panels!");
+            anyhow::bail!("UI screenshot capture not yet implemented")
+        }
+        ScreenshotScenario::Interactive { ref name, .. } => {
+            anyhow::bail!("Interactive scenarios not yet implemented: {}", name)
+        }
+    }
+}
+
 /// Save RGBA buffer as PNG
 fn save_buffer_as_png(
     buffer: &[u8],
@@ -188,11 +262,9 @@ fn save_buffer_as_png(
 ) -> Result<()> {
     use image::{ImageBuffer, Rgba};
 
-    let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(
-        width as u32,
-        height as u32,
-        buffer.to_vec(),
-    ).ok_or_else(|| anyhow::anyhow!("Failed to create image buffer"))?;
+    let img: ImageBuffer<Rgba<u8>, _> =
+        ImageBuffer::from_raw(width as u32, height as u32, buffer.to_vec())
+            .ok_or_else(|| anyhow::anyhow!("Failed to create image buffer"))?;
 
     img.save(path)?;
     Ok(())

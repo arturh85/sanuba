@@ -128,9 +128,9 @@ fn get_variation_strength(material_id: u16) -> f32 {
         MaterialId::POISON_GAS => 4.0,
 
         // Special materials
-        MaterialId::FIRE => 8.0, // Flicker
+        MaterialId::FIRE => 8.0,     // Flicker
         MaterialId::OBSIDIAN => 4.0, // Smooth but with depth
-        MaterialId::ICE => 3.0, // Crystalline subtle variation
+        MaterialId::ICE => 3.0,      // Crystalline subtle variation
         MaterialId::GLOWING_MUSHROOM => 6.0,
 
         _ => 5.0, // Default moderate variation
@@ -159,7 +159,10 @@ fn apply_material_pattern(
         }
 
         // Ores - occasional bright sparkles
-        MaterialId::IRON_ORE | MaterialId::COPPER_ORE | MaterialId::GOLD_ORE | MaterialId::CRYSTAL => {
+        MaterialId::IRON_ORE
+        | MaterialId::COPPER_ORE
+        | MaterialId::GOLD_ORE
+        | MaterialId::CRYSTAL => {
             let sparkle_noise = noise_at(world_x * 3, world_y * 3);
             if sparkle_noise > 0.92 {
                 let brighten = 1.3;
@@ -212,9 +215,9 @@ fn apply_material_pattern(
             let rock_noise = noise_at(world_x * 5, world_y * 5);
             if rock_noise > 0.88 {
                 // Small gray rocks
-                *r = (*r * 0.6 + 100.0);
-                *g = (*g * 0.6 + 100.0);
-                *b = (*b * 0.6 + 100.0);
+                *r = *r * 0.6 + 100.0;
+                *g = *g * 0.6 + 100.0;
+                *b = *b * 0.6 + 100.0;
             }
         }
 
@@ -263,7 +266,7 @@ mod tests {
         for x in 0..100 {
             for y in 0..100 {
                 let noise = noise_at(x, y);
-                assert!(noise >= 0.0 && noise <= 1.0);
+                assert!((0.0..=1.0).contains(&noise));
             }
         }
     }
@@ -274,7 +277,7 @@ mod tests {
         for x in 0..100 {
             for y in 0..100 {
                 let noise = signed_noise_at(x, y);
-                assert!(noise >= -1.0 && noise <= 1.0);
+                assert!((-1.0..=1.0).contains(&noise));
             }
         }
     }
@@ -282,12 +285,7 @@ mod tests {
     #[test]
     fn test_texture_variation_preserves_alpha() {
         let base = [128, 128, 128, 200];
-        let varied = apply_texture_variation(
-            base,
-            MaterialId::STONE,
-            0, 0,
-            true, true
-        );
+        let varied = apply_texture_variation(base, MaterialId::STONE, 0, 0, true, true);
         assert_eq!(varied[3], 200); // Alpha unchanged
     }
 
@@ -296,16 +294,18 @@ mod tests {
         let base = [200, 200, 200, 255];
         for x in 0..50 {
             for y in 0..50 {
-                let varied = apply_texture_variation(
-                    base,
-                    MaterialId::STONE,
-                    x, y,
-                    true, true
-                );
-                // All channels should stay in valid range
-                assert!(varied[0] <= 255);
-                assert!(varied[1] <= 255);
-                assert!(varied[2] <= 255);
+                let varied = apply_texture_variation(base, MaterialId::STONE, x, y, true, true);
+                // Verify variation doesn't exceed reasonable bounds from base
+                // (u8 type guarantees 0-255 range, but we check variation magnitude)
+                for i in 0..3 {
+                    let delta = (varied[i] as i32 - base[i] as i32).abs();
+                    assert!(
+                        delta <= 60,
+                        "Color channel {} varied by {} (too much)",
+                        i,
+                        delta
+                    );
+                }
             }
         }
     }

@@ -98,11 +98,6 @@ impl CurriculumConfig {
         best_fitness: f32,
         avg_coverage: f32,
     ) -> (bool, Option<String>) {
-        // Already on final stage
-        if self.is_complete() {
-            return (false, None);
-        }
-
         let stage = self.current_stage();
 
         // Must complete minimum generations first
@@ -119,7 +114,10 @@ impl CurriculumConfig {
                 if best_fitness >= *target {
                     (
                         true,
-                        Some(format!("fitness {:.2} >= target {:.2}", best_fitness, target)),
+                        Some(format!(
+                            "fitness {:.2} >= target {:.2}",
+                            best_fitness, target
+                        )),
                     )
                 } else {
                     (false, None)
@@ -391,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_curriculum_advancement_fitness_threshold() {
-        let mut curriculum = CurriculumConfig::new(vec![
+        let curriculum = CurriculumConfig::new(vec![
             CurriculumStage {
                 name: "Stage 1".to_string(),
                 distribution: EnvironmentDistribution::default(),
@@ -527,10 +525,7 @@ mod tests {
 
         // All stages should use automatic advancement
         for stage in &curriculum.stages {
-            assert!(matches!(
-                stage.advancement,
-                AdvancementCriteria::Automatic
-            ));
+            assert!(matches!(stage.advancement, AdvancementCriteria::Automatic));
         }
     }
 
