@@ -41,6 +41,30 @@ struct Args {
     #[arg(long)]
     #[cfg(feature = "multiplayer")]
     server: Option<String>,
+
+    /// Capture a screenshot of a level (specify level ID)
+    #[arg(long)]
+    screenshot: Option<usize>,
+
+    /// Output path for screenshot (default: screenshots/level_<id>.png)
+    #[arg(long)]
+    screenshot_output: Option<String>,
+
+    /// Screenshot width in pixels
+    #[arg(long, default_value = "1920")]
+    screenshot_width: usize,
+
+    /// Screenshot height in pixels
+    #[arg(long, default_value = "1080")]
+    screenshot_height: usize,
+
+    /// Number of frames to simulate before capturing (let physics settle)
+    #[arg(long, default_value = "60")]
+    screenshot_settle: usize,
+
+    /// List available demo levels
+    #[arg(long)]
+    list_levels: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -58,6 +82,29 @@ fn main() -> anyhow::Result<()> {
 
     // Parse command-line arguments
     let args = Args::parse();
+
+    // Handle --list-levels flag
+    if args.list_levels {
+        sunaba::screenshot::list_levels();
+        return Ok(());
+    }
+
+    // Handle --screenshot flag
+    if let Some(level_id) = args.screenshot {
+        let output_path = args.screenshot_output.unwrap_or_else(|| {
+            std::fs::create_dir_all("screenshots").ok();
+            format!("screenshots/level_{}.png", level_id)
+        });
+
+        let config = sunaba::screenshot::ScreenshotConfig {
+            width: args.screenshot_width,
+            height: args.screenshot_height,
+            settle_frames: args.screenshot_settle,
+            camera_center: None,
+        };
+
+        return sunaba::screenshot::capture_level_screenshot(level_id, output_path, config);
+    }
 
     // Validate flag combinations
     if args.train && args.regenerate {

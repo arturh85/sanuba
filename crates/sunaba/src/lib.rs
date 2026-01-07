@@ -14,6 +14,10 @@ pub mod ui;
 #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
 pub mod headless;
 
+// Screenshot capture module (native only, requires headless for PixelRenderer)
+#[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+pub mod screenshot;
+
 // Multiplayer module (native: Rust SDK, WASM: TypeScript SDK via JS)
 #[cfg(feature = "multiplayer")]
 pub mod multiplayer;

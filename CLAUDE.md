@@ -72,6 +72,31 @@ just spacetime-logs-tail  # Follow logs
 
 > For SpacetimeDB patterns, schema changes, and subscriptions, see `.claude/skills/spacetimedb/SKILL.md`
 
+**Screenshots (Visual Iteration):**
+```bash
+just list-levels             # List all available demo levels with IDs
+just screenshot <level_id>   # Capture screenshot of level (1920x1080)
+just screenshot 3 800 600    # Custom resolution (800x600)
+just screenshot-all          # Capture all demo levels at once
+```
+
+> **Visual Iteration Workflow**: When working on visual features (UI, materials, rendering), use screenshots for rapid feedback:
+> 1. Make changes to your code
+> 2. `just screenshot <level_id>` to capture the result
+> 3. Use the Read tool to view the screenshot: `screenshots/level_<id>.png`
+> 4. Iterate based on visual feedback
+>
+> **Examples**:
+> - `just screenshot 0` - Basic Physics Playground
+> - `just screenshot 3` - Material Showcase
+> - `just screenshot 17` - Phase 5 Materials
+> - `just screenshot 18` - Alchemy Lab
+> - `just screenshot 20` - Day/Night Cycle
+>
+> **Custom scenarios**: To add custom screenshot scenarios, create new level generators in `crates/sunaba-core/src/levels/demo_levels.rs` and register them in `level_def.rs`.
+>
+> Screenshots are saved to `screenshots/` directory (gitignored). The screenshot command simulates 60 frames (1 second) before capturing to let physics settle.
+
 > **Note:** All commands support optional `<crate>` parameter for targeted operations.
 
 ## Architecture
