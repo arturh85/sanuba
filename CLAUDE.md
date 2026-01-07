@@ -27,6 +27,39 @@ just profile # Run with puffin profiler (F3 to toggle flamegraph)
 just web     # Build and serve WASM (localhost:8080)
 ```
 
+**Fast Iteration (Hot Reload):**
+```bash
+# Auto-rebuild on file changes (builds release profile)
+just watch         # Auto-build on save
+just watch-check   # Auto-compile with clippy
+just watch-test    # Auto-compile and run tests
+
+# INSTANT LAUNCH (~100ms, no Cargo overhead) - use with `just watch`
+just run           # Execute release binary directly (truly instant!)
+just run <args>    # Pass any arguments (e.g., just run --some-flag)
+
+# Traditional build (1-2s Cargo overhead for file locks)
+just start         # cargo run with --regenerate
+just load          # cargo run (load existing world)
+```
+
+> **Instant Launch Workflow** ⭐ **RECOMMENDED**:
+> 1. **Terminal 1**: Run `just watch` - auto-builds release on every save
+> 2. **Terminal 2**: Edit code in your editor, bacon compiles automatically
+> 3. **Terminal 3**: **`just run`** - **Truly instant launch (~100ms)**!
+>
+> **Bacon keyboard shortcuts** (while `just watch` is running):
+> - **b** - Build release (default, auto-selected)
+> - **r** - Build and run release
+> - **T** - Build tests (switch to this when working on tests for faster `just test`)
+> - **c** - Type-check only (no build)
+> - **l** - Lint with clippy
+> - **t** - Run tests
+>
+> **Fast testing workflow**: When working on tests, press **'T'** in bacon to switch to test-building mode. Bacon will compile test binaries on save, making `just test` run instantly (5-10s vs 30-60s).
+>
+> **Why instant?** `just run` executes `./target/release/sunaba --regenerate` directly, bypassing Cargo's file lock and dependency checks (1-2s overhead). With `just watch` pre-building artifacts, you get true hot-reload feel!
+
 **SpacetimeDB Multiplayer:**
 ```bash
 just spacetime-build      # Build WASM server

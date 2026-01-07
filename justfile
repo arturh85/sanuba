@@ -37,10 +37,35 @@ _ensure-generated:
     }
 
 start:
-    cargo run -p sunaba --bin sunaba --release --features multiplayer_native -- --regenerate
+    cargo run -p sunaba --bin sunaba --release --no-default-features --features native -- --regenerate
 
 load:
     cargo run -p sunaba --bin sunaba --release
+
+# ============================================================================
+# Fast Development Commands (Auto-Rebuild + Instant Launch)
+# ============================================================================
+
+# Auto-rebuild on file changes (builds release profile)
+watch:
+    bacon
+
+# Auto-rebuild with clippy
+watch-check:
+    bacon clippy
+
+# Auto-rebuild and run tests
+watch-test:
+    bacon test
+
+# Direct binary execution (instant launch, ~100ms, bypasses Cargo overhead)
+# Use with `just watch` for truly instant hot-reload
+run *args='--regenerate':
+    ./target/release/sunaba {{args}}
+
+# ============================================================================
+# End Fast Development Commands
+# ============================================================================
 
 # Run multiplayer client (connects to specified SpacetimeDB server)
 start-multiplayer server="http://localhost:3000":

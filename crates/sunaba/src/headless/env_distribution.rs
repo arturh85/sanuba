@@ -80,11 +80,7 @@ impl EnvironmentDistribution {
     }
 
     /// Sample multiple environments in batch (more efficient)
-    pub fn sample_batch(
-        &self,
-        eval_id: u64,
-        count: usize,
-    ) -> Result<Vec<TrainingTerrainConfig>> {
+    pub fn sample_batch(&self, eval_id: u64, count: usize) -> Result<Vec<TrainingTerrainConfig>> {
         (0..count).map(|i| self.sample(eval_id, i)).collect()
     }
 
@@ -127,7 +123,7 @@ impl EnvironmentDistribution {
             ),
         };
 
-        let seed = rng.gen();
+        let seed = rng.r#gen();
         Ok(self.difficulty_to_terrain(&diff, seed))
     }
 
@@ -253,9 +249,7 @@ mod tests {
         let config2 = dist.sample(12345, 1).unwrap();
 
         // Should get different presets or at least different seeds
-        assert!(
-            config1.base_seed != config2.base_seed || config1.difficulty != config2.difficulty
-        );
+        assert!(config1.base_seed != config2.base_seed || config1.difficulty != config2.difficulty);
     }
 
     #[test]
