@@ -72,6 +72,8 @@ pub fn render_debug_panels(
 ) {
     egui::SidePanel::right("debug_panels")
         .default_width(600.0) // Wider: 160px menu + 440px content
+        .min_width(600.0) // Lock width to prevent resizing
+        .max_width(600.0) // Lock width to prevent resizing
         .resizable(true)
         .frame(
             egui::Frame::NONE
@@ -108,11 +110,7 @@ pub fn render_debug_panels(
 fn render_panel_menu(ui: &mut egui::Ui, manager: &mut DebugPanelManager) {
     // Render vertical list of selectable panels
     for tab in DockTab::all_variants() {
-        // Skip feature-gated panels if not available
-        if !tab.is_available() {
-            continue;
-        }
-
+        let is_available = tab.is_available();
         let is_active = manager.is_active(tab);
 
         // Render button with active state
@@ -124,7 +122,18 @@ fn render_panel_menu(ui: &mut egui::Ui, manager: &mut DebugPanelManager) {
             ui.visuals().widgets.inactive.bg_fill
         });
 
-        if ui.add(button).clicked() {
+        let mut response = ui.add_enabled(is_available, button);
+
+        // Add tooltip for disabled buttons
+        if !is_available {
+            response = response.on_disabled_hover_text(match tab {
+                DockTab::Profiler => "Profiler requires compilation with --features profiling",
+                DockTab::Parameters => "Parameters panel not available on WASM",
+                _ => "Not available",
+            });
+        }
+
+        if response.clicked() {
             manager.select_tab(tab);
         }
     }
@@ -144,7 +153,6 @@ fn render_panel_content(ui: &mut egui::Ui, tab: DockTab, ctx: DockContext<'_>) {
         DockTab::Parameters => viewer.render_parameters(ui),
         #[cfg(feature = "multiplayer")]
         DockTab::MultiplayerStats => viewer.render_multiplayer_stats(ui),
-        #[cfg(feature = "profiling")]
         DockTab::Profiler => viewer.render_profiler(ui),
     }
 }

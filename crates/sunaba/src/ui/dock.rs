@@ -14,7 +14,6 @@ pub enum DockTab {
     #[cfg(feature = "multiplayer")]
     MultiplayerStats,
     Parameters,
-    #[cfg(feature = "profiling")]
     Profiler,
 }
 
@@ -30,7 +29,6 @@ impl std::fmt::Display for DockTab {
             #[cfg(feature = "multiplayer")]
             DockTab::MultiplayerStats => write!(f, "Multiplayer"),
             DockTab::Parameters => write!(f, "Parameters"),
-            #[cfg(feature = "profiling")]
             DockTab::Profiler => write!(f, "Profiler"),
         }
     }
@@ -49,7 +47,6 @@ impl DockTab {
             Self::Parameters,
             #[cfg(feature = "multiplayer")]
             Self::MultiplayerStats,
-            #[cfg(feature = "profiling")]
             Self::Profiler,
         ]
     }
@@ -67,8 +64,7 @@ impl DockTab {
                     true
                 }
             }
-            #[cfg(feature = "profiling")]
-            Self::Profiler => true,
+            Self::Profiler => cfg!(feature = "profiling"),
             #[cfg(feature = "multiplayer")]
             Self::MultiplayerStats => true,
             _ => true, // All other panels always available
@@ -87,7 +83,6 @@ impl DockTab {
             Self::Parameters => "⚙️",
             #[cfg(feature = "multiplayer")]
             Self::MultiplayerStats => "🌐",
-            #[cfg(feature = "profiling")]
             Self::Profiler => "🔍",
         }
     }
@@ -107,7 +102,6 @@ impl DockManager {
         #[cfg(feature = "multiplayer")]
         tabs.push(DockTab::MultiplayerStats);
 
-        #[cfg(feature = "profiling")]
         tabs.push(DockTab::Profiler);
 
         tabs.push(DockTab::Parameters);
@@ -124,6 +118,8 @@ impl DockManager {
 
         #[cfg(feature = "multiplayer")]
         tabs.push(DockTab::MultiplayerStats);
+
+        tabs.push(DockTab::Profiler);
 
         tabs.push(DockTab::Parameters);
 
@@ -228,7 +224,6 @@ impl<'a> TabViewer for DockTabViewer<'a> {
             #[cfg(feature = "multiplayer")]
             DockTab::MultiplayerStats => self.render_multiplayer_stats(ui),
             DockTab::Parameters => self.render_parameters(ui),
-            #[cfg(feature = "profiling")]
             DockTab::Profiler => self.render_profiler(ui),
         }
     }
@@ -399,6 +394,13 @@ impl<'a> DockTabViewer<'a> {
     #[cfg(feature = "profiling")]
     pub fn render_profiler(&self, ui: &mut egui::Ui) {
         puffin_egui::profiler_ui(ui);
+    }
+
+    #[cfg(not(feature = "profiling"))]
+    pub fn render_profiler(&self, ui: &mut egui::Ui) {
+        ui.heading("Profiler");
+        ui.label("Profiler not available");
+        ui.label("Compile with --features profiling to enable");
     }
 }
 
