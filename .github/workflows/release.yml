@@ -37,6 +37,14 @@ jobs:
         with:
           targets: ${{ matrix.platform.target }}
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -55,12 +63,11 @@ jobs:
           path: target
           key: ${{ runner.os }}-${{ matrix.platform.target }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
+
       - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
-            libgl1-mesa-dev libasound2-dev
+        uses: ./.github/actions/install-linux-deps
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.platform.target }}

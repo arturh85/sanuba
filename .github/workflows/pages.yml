@@ -27,6 +27,14 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Install just
         uses: extractions/setup-just@v2
 
@@ -39,19 +47,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
-          key: spacetime-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-spacetime-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo index
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
-          key: spacetime-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-spacetime-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
           path: target
-          key: spacetime-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-spacetime-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
 
       - name: Build SpacetimeDB module
         run: just spacetime-build
@@ -95,7 +106,6 @@ jobs:
   build:
     name: Build Documentation and WASM
     runs-on: ubuntu-latest
-    needs: publish-spacetimedb
     steps:
       - uses: actions/checkout@v4
 
@@ -114,23 +124,34 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
-          key: wasm-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-wasm-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo index
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
-          key: wasm-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-wasm-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
           path: target
-          key: wasm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-wasm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
 
       - name: Cache wasm-bindgen-cli
         id: cache-wasm-bindgen
@@ -201,7 +222,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, publish-spacetimedb]
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

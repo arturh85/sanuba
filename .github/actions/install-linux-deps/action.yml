@@ -1,0 +1,12 @@
+name: Install Linux Dependencies
+description: Install required Linux system dependencies for building Sunaba
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+          libgl1-mesa-dev libasound2-dev

@@ -25,6 +25,14 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -43,18 +51,20 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
+
       - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
-            libgl1-mesa-dev libasound2-dev
+        uses: ./.github/actions/install-linux-deps
 
       - name: Build
         run: cargo build --verbose
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo nextest run --workspace --verbose
 
   clippy:
     name: Clippy
@@ -67,11 +77,16 @@ jobs:
         with:
           components: clippy
 
-      - name: Install Linux dependencies
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
-            libgl1-mesa-dev libasound2-dev
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
+      - name: Install Linux dependencies
+        uses: ./.github/actions/install-linux-deps
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
@@ -110,14 +125,19 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
-            libgl1-mesa-dev libasound2-dev
+        uses: ./.github/actions/install-linux-deps
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -136,6 +156,9 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-coverage-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
+
       - name: Generate coverage
         run: cargo llvm-cov --workspace --codecov --output-path codecov.json
 
@@ -146,6 +169,13 @@ jobs:
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: codecov.json
+          retention-days: 30
 
   wasm:
     name: WASM Build
@@ -159,6 +189,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Install just
         uses: extractions/setup-just@v2
@@ -181,6 +219,9 @@ jobs:
           path: target
           key: ${{ runner.os }}-wasm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
+
       - name: Build WASM
         run: just build-web
 
@@ -194,6 +235,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Install just
         uses: extractions/setup-just@v2
@@ -220,6 +269,9 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-spacetime-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify Cargo.lock integrity
+        run: cargo tree --locked
 
       - name: Build SpacetimeDB server
         run: just spacetime-build
