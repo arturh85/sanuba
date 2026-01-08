@@ -136,6 +136,11 @@ struct Args {
     #[arg(long, default_value = "videos")]
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     video_output_dir: String,
+
+    /// Enable debug statistics output during video generation
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    debug_stats: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -256,7 +261,7 @@ fn main() -> anyhow::Result<()> {
             let output_path =
                 PathBuf::from(&args.video_output_dir).join(format!("{}.mp4", scenario.id));
 
-            match sunaba::screenshot::capture_video_scenario(scenario, &output_path) {
+            match sunaba::screenshot::capture_video_scenario(scenario, &output_path, args.debug_stats) {
                 Ok(_) => log::info!("✓ Successfully generated: {:?}", output_path),
                 Err(e) => {
                     log::error!("✗ Failed to generate {}: {}", scenario.id, e);
@@ -294,7 +299,7 @@ fn main() -> anyhow::Result<()> {
 
         log::info!("Generating video scenario: {}", scenario.name);
 
-        return sunaba::screenshot::capture_video_scenario(&scenario, output_path);
+        return sunaba::screenshot::capture_video_scenario(&scenario, output_path, args.debug_stats);
     }
 
     // Handle --test-scenario-stdin flag

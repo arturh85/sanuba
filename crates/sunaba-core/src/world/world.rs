@@ -1290,11 +1290,10 @@ impl World {
         rng: &mut R,
     ) {
         ChemistrySystem::update_burning_material(
-            &mut self.chunk_manager.chunks,
+            self,
             chunk_pos,
             x,
             y,
-            &self.materials,
             rng,
         );
     }

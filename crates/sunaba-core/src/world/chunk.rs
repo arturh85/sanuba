@@ -137,6 +137,18 @@ impl Chunk {
         self.set_pixel(x, y, Pixel::new(material_id));
     }
 
+    /// Set material at local coordinates with PLAYER_PLACED flag
+    ///
+    /// This marks the pixel as player-placed, making it subject to structural integrity checks.
+    /// Use this for demo levels that should exhibit collapse physics.
+    #[inline]
+    pub fn set_material_player_placed(&mut self, x: usize, y: usize, material_id: u16) {
+        debug_assert!(x < CHUNK_SIZE && y < CHUNK_SIZE);
+        let mut pixel = Pixel::new(material_id);
+        pixel.flags |= pixel_flags::PLAYER_PLACED;
+        self.set_pixel(x, y, pixel);
+    }
+
     /// Swap two pixels (useful for falling simulation)
     #[inline]
     pub fn swap_pixels(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) {

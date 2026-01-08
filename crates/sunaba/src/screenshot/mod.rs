@@ -33,11 +33,13 @@ pub use layouts::ScreenshotLayout;
 
 use anyhow::{Context, Result};
 use glam::Vec2;
+use std::collections::HashMap;
 use std::path::Path;
+use serde::Serialize;
 
 use crate::headless::PixelRenderer;
 use crate::levels::LevelManager;
-use crate::simulation::Materials;
+use crate::simulation::{Materials, MaterialId};
 use crate::world::{CHUNK_SIZE, NoopStats, World};
 use rand::thread_rng;
 
@@ -54,6 +56,137 @@ pub use video_scenarios::{
     CameraParams, CameraSpec, MaterialFilter, ScenarioAction, VideoScenario,
     get_all_scenarios as get_all_video_scenarios, get_scenario_by_id as get_video_scenario_by_id,
 };
+
+/// Statistics for a single frame during video generation
+#[derive(Debug, Clone, Serialize)]
+pub struct MaterialStats {
+    /// Frame number (0-based)
+    pub frame: usize,
+    /// Simulation time in seconds
+    pub time_seconds: f32,
+
+    // Absolute material counts
+    pub wood: usize,
+    pub air: usize,
+    pub ash: usize,
+    pub stone: usize,
+    pub fire: usize,
+    pub smoke: usize,
+    pub lava: usize,
+
+    // Deltas since last sample
+    pub wood_delta: i32,
+    pub air_delta: i32,
+    pub ash_delta: i32,
+    pub stone_delta: i32,
+}
+
+/// Collects per-frame material statistics during video generation
+pub struct MaterialStatsCollector {
+    samples: Vec<MaterialStats>,
+    last_counts: HashMap<u16, usize>,
+    sample_interval: usize, // Collect every N frames
+}
+
+impl MaterialStatsCollector {
+    pub fn new(sample_interval: usize) -> Self {
+        Self {
+            samples: Vec::new(),
+            last_counts: HashMap::new(),
+            sample_interval,
+        }
+    }
+
+    /// Collect material counts for current frame
+    pub fn collect(&mut self, world: &World, _materials: &Materials, frame: usize) {
+        // Skip if not at sample interval
+        if frame % self.sample_interval != 0 {
+            return;
+        }
+
+        // Count all materials in active chunks
+        let mut counts: HashMap<u16, usize> = HashMap::new();
+
+        for (_pos, chunk) in world.chunks() {
+            for y in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let pixel = chunk.get_pixel(x, y);
+                    let material_id = pixel.material_id;
+                    *counts.entry(material_id).or_insert(0) += 1;
+                }
+            }
+        }
+
+        // Extract specific materials
+        let wood = counts.get(&MaterialId::WOOD).copied().unwrap_or(0);
+        let air = counts.get(&MaterialId::AIR).copied().unwrap_or(0);
+        let ash = counts.get(&MaterialId::ASH).copied().unwrap_or(0);
+        let stone = counts.get(&MaterialId::STONE).copied().unwrap_or(0);
+        let fire = counts.get(&MaterialId::FIRE).copied().unwrap_or(0);
+        let smoke = counts.get(&MaterialId::SMOKE).copied().unwrap_or(0);
+        let lava = counts.get(&MaterialId::LAVA).copied().unwrap_or(0);
+
+        // Calculate deltas
+        let wood_delta = wood as i32 - self.last_counts.get(&MaterialId::WOOD).copied().unwrap_or(0) as i32;
+        let air_delta = air as i32 - self.last_counts.get(&MaterialId::AIR).copied().unwrap_or(0) as i32;
+        let ash_delta = ash as i32 - self.last_counts.get(&MaterialId::ASH).copied().unwrap_or(0) as i32;
+        let stone_delta = stone as i32 - self.last_counts.get(&MaterialId::STONE).copied().unwrap_or(0) as i32;
+
+        // Create sample
+        let stats = MaterialStats {
+            frame,
+            time_seconds: frame as f32 / 60.0,
+            wood,
+            air,
+            ash,
+            stone,
+            fire,
+            smoke,
+            lava,
+            wood_delta,
+            air_delta,
+            ash_delta,
+            stone_delta,
+        };
+
+        self.samples.push(stats);
+        self.last_counts = counts;
+    }
+
+    /// Write all samples to JSON file
+    pub fn write_to_file(&self, path: &Path) -> anyhow::Result<()> {
+        let file = std::fs::File::create(path)?;
+        serde_json::to_writer_pretty(file, &self.samples)?;
+        Ok(())
+    }
+
+    /// Print summary table to stdout
+    pub fn print_summary(&self) {
+        println!("\n=== Material Statistics Summary ===\n");
+        println!("{:>6} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+                 "Frame", "Time", "Wood", "Air", "Ash", "Stone", "Fire", "Smoke", "Lava");
+        println!("{}", "-".repeat(80));
+
+        for sample in &self.samples {
+            println!("{:>6} {:>6.2}s {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+                     sample.frame,
+                     sample.time_seconds,
+                     sample.wood,
+                     sample.air,
+                     sample.ash,
+                     sample.stone,
+                     sample.fire,
+                     sample.smoke,
+                     sample.lava);
+        }
+
+        println!("\n=== Deltas (Last Sample) ===\n");
+        if let Some(last) = self.samples.last() {
+            println!("Wood: {:+} | Air: {:+} | Ash: {:+} | Stone: {:+}",
+                     last.wood_delta, last.air_delta, last.ash_delta, last.stone_delta);
+        }
+    }
+}
 
 /// Screenshot configuration
 pub struct ScreenshotConfig {
@@ -882,6 +1015,7 @@ fn resolve_camera_spec(
 pub fn capture_video_scenario(
     scenario: &VideoScenario,
     output_path: impl AsRef<Path>,
+    debug_stats: bool,
 ) -> Result<()> {
     log::info!("Capturing video scenario: {}", scenario.name);
     log::info!("  Description: {}", scenario.description);
@@ -960,6 +1094,13 @@ pub fn capture_video_scenario(
     let mut stats = NoopStats;
     let mut rng = thread_rng();
 
+    // Create stats collector if debug mode enabled
+    let mut stats_collector = if debug_stats {
+        Some(MaterialStatsCollector::new(30)) // Sample every 30 frames (0.5s @ 60fps)
+    } else {
+        None
+    };
+
     log::info!(
         "Simulating {} frames ({} captures)...",
         total_frames,
@@ -989,6 +1130,11 @@ pub fn capture_video_scenario(
         // Update world physics
         world.update(dt, &mut stats, &mut rng, false);
 
+        // Collect material statistics (if enabled)
+        if let Some(ref mut collector) = stats_collector {
+            collector.collect(&world, &materials, frame);
+        }
+
         // Capture frame at intervals using dynamic camera
         if frame % capture_interval == 0 {
             renderer.render(
@@ -1016,6 +1162,20 @@ pub fn capture_video_scenario(
     video.encode_to_mp4(&output_path)?;
 
     log::info!("Video saved successfully: {:?}", output_path.as_ref());
+
+    // Write debug statistics if enabled
+    if let Some(collector) = stats_collector {
+        let output_path_ref = output_path.as_ref();
+        let stats_path = output_path_ref.with_extension("json");
+        collector.write_to_file(&stats_path)
+            .context("Failed to write statistics file")?;
+
+        // Print summary to stdout
+        collector.print_summary();
+
+        println!("\nStatistics written to: {}", stats_path.display());
+    }
+
     Ok(())
 }
 

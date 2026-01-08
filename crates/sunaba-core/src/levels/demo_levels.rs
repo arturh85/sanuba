@@ -393,34 +393,34 @@ pub fn generate_level_9_bridge(world: &mut World) {
                 // Left STONE pillar (x: 2-10, 9px wide, 38px tall)
                 for x in 2..=10 {
                     for y in 10..48 {
-                        chunk.set_material(x, y, MaterialId::STONE);
+                        chunk.set_material_player_placed(x, y, MaterialId::STONE);
                     }
                 }
 
                 // Center WOODEN support column (x: 28-36, 9px wide, 38px tall) - BURN TARGET
                 for x in 28..=36 {
                     for y in 10..48 {
-                        chunk.set_material(x, y, MaterialId::WOOD);
+                        chunk.set_material_player_placed(x, y, MaterialId::WOOD);
                     }
                 }
 
                 // Right STONE pillar (x: 54-62, 9px wide, 38px tall)
                 for x in 54..=62 {
                     for y in 10..48 {
-                        chunk.set_material(x, y, MaterialId::STONE);
+                        chunk.set_material_player_placed(x, y, MaterialId::STONE);
                     }
                 }
 
                 // Heavy STONE bridge deck (x: 2-62, 61px wide, 8px thick)
                 for x in 2..=62 {
                     for y in 48..=55 {
-                        chunk.set_material(x, y, MaterialId::STONE);
+                        chunk.set_material_player_placed(x, y, MaterialId::STONE);
                     }
                 }
 
-                // Fire at base of wooden center column (5×4 area)
+                // Fire inside wooden center column (5×8 area, overlapping with wood for better heat transfer)
                 for x in 30..=34 {
-                    for y in 11..=14 {
+                    for y in 15..=22 {
                         chunk.set_material(x, y, MaterialId::FIRE);
                     }
                 }

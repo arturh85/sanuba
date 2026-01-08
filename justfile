@@ -226,6 +226,23 @@ video scenario:
     cargo run -p sunaba --bin sunaba --release --features headless -- --video-scenario {{scenario}} --video-output-dir videos
     @Write-Host "Video generated successfully!"
 
+# Generate video with debug statistics (prints material counts per frame)
+[unix]
+video-debug scenario:
+    @mkdir -p videos
+    @echo "Generating video with debug statistics: {{scenario}}"
+    cargo run -p sunaba --bin sunaba --release --features headless -- --video-scenario {{scenario}} --video-output-dir videos --debug-stats
+    @echo "Video saved to videos/{{scenario}}.mp4"
+    @echo "Statistics saved to videos/{{scenario}}.json"
+
+[windows]
+video-debug scenario:
+    @if (-not (Test-Path videos)) { New-Item -ItemType Directory -Path videos | Out-Null }
+    @Write-Host "Generating video with debug statistics: {{scenario}}"
+    cargo run -p sunaba --bin sunaba --release --features headless -- --video-scenario {{scenario}} --video-output-dir videos --debug-stats
+    @Write-Host "Video saved to videos/{{scenario}}.mp4"
+    @Write-Host "Statistics saved to videos/{{scenario}}.json"
+
 # Generate all video scenarios
 [unix]
 videos-all:

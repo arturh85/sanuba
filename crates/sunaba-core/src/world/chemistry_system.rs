@@ -60,7 +60,7 @@ impl ChemistrySystem {
     ) {
         // 1. Add heat to temperature field
         if let Some(chunk) = chunks.get_mut(&chunk_pos) {
-            add_heat_at_pixel(chunk, x, y, 10.0); // Fire adds heat (reduced from 50.0 to prevent extreme temperatures)
+            add_heat_at_pixel(chunk, x, y, 50.0); // Fire adds heat (back to original 50.0 for reliable ignition)
         }
 
         // 2. Fire behaves like gas (rises)
@@ -109,6 +109,7 @@ impl ChemistrySystem {
         if let Some(ignition_temp) = material.ignition_temp
             && temp >= ignition_temp
         {
+
             // Mark pixel as burning
             let chunk = chunks.get_mut(&chunk_pos).unwrap();
             let mut new_pixel = pixel;
@@ -149,27 +150,41 @@ impl ChemistrySystem {
         }
     }
 
+    /// Add heat at world coordinates
+    ///
+    /// Helper function to add heat using World reference instead of direct chunk access
+    fn add_heat_at_pixel_world(world: &mut super::World, world_x: i32, world_y: i32, heat: f32) {
+        let chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);
+        let chunk_y = world_y.div_euclid(CHUNK_SIZE as i32);
+        let chunk_pos = IVec2::new(chunk_x, chunk_y);
+
+        if let Some(chunk) = world.chunks_mut().get_mut(&chunk_pos) {
+            let local_x = world_x.rem_euclid(CHUNK_SIZE as i32) as usize;
+            let local_y = world_y.rem_euclid(CHUNK_SIZE as i32) as usize;
+            add_heat_at_pixel(chunk, local_x, local_y, heat);
+        }
+    }
+
     /// Update burning material (gradual consumption)
     pub fn update_burning_material<R: WorldRng>(
-        chunks: &mut HashMap<IVec2, Chunk>,
+        world: &mut super::World,
         chunk_pos: IVec2,
         x: usize,
         y: usize,
-        materials: &Materials,
         rng: &mut R,
     ) {
-        let chunk = match chunks.get(&chunk_pos) {
-            Some(c) => c,
+        let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+        let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
+
+        // Get pixel and material
+        let pixel = match world.get_pixel(world_x, world_y) {
+            Some(p) => p,
             None => return,
         };
-
-        let pixel = chunk.get_pixel(x, y);
-        let material = materials.get(pixel.material_id);
+        let material = world.materials().get(pixel.material_id);
 
         // Probability check - material burns gradually
         if rng.check_probability(material.burn_rate) {
-            let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-            let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
 
             // Transform to burns_to material with 80/20 probability split
             // 80% chance of AIR (triggers structural checks for collapse)
@@ -184,21 +199,13 @@ impl ChemistrySystem {
                 MaterialId::AIR
             };
 
-            // Set pixel directly in chunks
-            let target_chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);
-            let target_chunk_y = world_y.div_euclid(CHUNK_SIZE as i32);
-            let target_chunk_pos = IVec2::new(target_chunk_x, target_chunk_y);
+            log::trace!("BURNING: Changing material from {} to {}", pixel.material_id, new_material);
 
-            if let Some(target_chunk) = chunks.get_mut(&target_chunk_pos) {
-                let local_x = world_x.rem_euclid(CHUNK_SIZE as i32) as usize;
-                let local_y = world_y.rem_euclid(CHUNK_SIZE as i32) as usize;
-                target_chunk.set_pixel(local_x, local_y, super::Pixel::new(new_material));
-            }
+            // Use World API to trigger structural checks
+            world.set_pixel_full(world_x, world_y, super::Pixel::new(new_material));
 
             // Add heat from burning
-            if let Some(chunk) = chunks.get_mut(&chunk_pos) {
-                add_heat_at_pixel(chunk, x, y, 20.0);
-            }
+            Self::add_heat_at_pixel_world(world, world_x, world_y, 20.0);
         }
     }
 
