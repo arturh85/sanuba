@@ -41,7 +41,9 @@ use offscreen_renderer::OffscreenRenderer;
 // Imports for UI screenshot capture
 #[cfg(not(target_arch = "wasm32"))]
 use crate::config::GameConfig;
-use crate::entity::{crafting::RecipeRegistry, player::Player, tools::ToolRegistry};
+use crate::entity::{
+    crafting::RecipeRegistry, inventory::ItemStack, player::Player, tools::ToolRegistry,
+};
 use crate::ui::{dock::DockTab, ui_state::UiState};
 
 pub use scenario::{ScreenshotScenario, list_all_scenarios};
