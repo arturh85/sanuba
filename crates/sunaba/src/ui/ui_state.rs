@@ -231,8 +231,12 @@ impl UiState {
             &self.theme.game,
         );
         self.toasts.render(ctx);
-        self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
-        self.tooltip.render(ctx, cursor_screen_pos);
+
+        // Only show tooltips if mouse is not over UI (use current frame's state)
+        if !ctx.wants_pointer_input() {
+            self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
+            self.tooltip.render(ctx, cursor_screen_pos);
+        }
 
         // Render worldgen editor (F7)
         self.worldgen_editor.render(ctx, materials);
@@ -303,8 +307,12 @@ impl UiState {
             &self.theme.game,
         );
         self.toasts.render(ctx);
-        self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
-        self.tooltip.render(ctx, cursor_screen_pos);
+
+        // Only show tooltips if mouse is not over UI (use current frame's state)
+        if !ctx.wants_pointer_input() {
+            self.tooltip.render_creature(ctx, Some(cursor_screen_pos));
+            self.tooltip.render(ctx, cursor_screen_pos);
+        }
 
         // Render worldgen editor (F7)
         self.worldgen_editor.render(ctx, materials);
