@@ -2,6 +2,7 @@
 
 use crate::simulation::MaterialId;
 use serde::{Deserialize, Serialize};
+use web_time::{Duration, Instant};
 
 /// Tracks current input state for player control
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +25,21 @@ pub struct InputState {
 
     // Zoom control
     pub zoom_delta: f32, // Zoom change this frame (1.0 = no change)
+
+    // Dash mechanics
+    pub shift_pressed: bool, // For Shift+A/D instant dash
+
+    // Double-tap timing (expires after 300ms)
+    #[serde(skip)]
+    pub a_last_tap: Option<Instant>,
+    #[serde(skip)]
+    pub d_last_tap: Option<Instant>,
+
+    // Double-tap flags (set when detected, cleared each frame)
+    #[serde(skip)]
+    pub a_double_tap: bool,
+    #[serde(skip)]
+    pub d_double_tap: bool,
 }
 
 impl InputState {
@@ -40,7 +56,68 @@ impl InputState {
             right_mouse_pressed: false,
             prev_right_mouse_pressed: false,
             zoom_delta: 1.0, // No change by default
+            shift_pressed: false,
+            a_last_tap: None,
+            d_last_tap: None,
+            a_double_tap: false,
+            d_double_tap: false,
         }
+    }
+
+    /// Detect double-tap for a key
+    ///
+    /// Returns true if the key was pressed within 200ms of the last tap.
+    /// Updates the last_tap timestamp and consumes it on double-tap.
+    pub fn detect_double_tap(
+        last_tap: &mut Option<Instant>,
+        pressed: bool,
+        prev_pressed: bool,
+    ) -> bool {
+        // Key just pressed (rising edge)
+        if pressed && !prev_pressed {
+            let now = Instant::now();
+
+            // Check if within 200ms window
+            if let Some(last) = *last_tap
+                && now.duration_since(last) < Duration::from_millis(200)
+            {
+                *last_tap = None; // Consume tap
+                return true; // Double-tap detected!
+            }
+
+            // Single tap - record timestamp
+            *last_tap = Some(now);
+        }
+
+        false
+    }
+
+    /// Expire old tap timestamps (call at end of frame)
+    ///
+    /// Taps older than 300ms are cleared to prevent stale double-taps.
+    pub fn expire_taps(&mut self) {
+        let now = Instant::now();
+        let expire_window = Duration::from_millis(300);
+
+        if let Some(last) = self.a_last_tap
+            && now.duration_since(last) > expire_window
+        {
+            self.a_last_tap = None;
+        }
+
+        if let Some(last) = self.d_last_tap
+            && now.duration_since(last) > expire_window
+        {
+            self.d_last_tap = None;
+        }
+    }
+
+    /// Clear per-frame flags (call at end of frame)
+    ///
+    /// Double-tap flags are only valid for one frame.
+    pub fn clear_frame_flags(&mut self) {
+        self.a_double_tap = false;
+        self.d_double_tap = false;
     }
 }
 

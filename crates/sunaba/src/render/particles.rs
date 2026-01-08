@@ -262,6 +262,35 @@ impl ParticleSystem {
         }
     }
 
+    /// Spawn dash trail particles (speed lines behind player)
+    pub fn spawn_dash_trail(&mut self, position: Vec2, dash_direction: Vec2) {
+        let mut rng = rand::thread_rng();
+
+        // Spawn 2-3 particles behind player each frame
+        let count = rng.gen_range(2..=3);
+        for _ in 0..count {
+            // Offset behind player (opposite dash direction)
+            let behind_offset = -dash_direction * rng.gen_range(5.0..15.0);
+            let lateral_offset = Vec2::new(rng.gen_range(-3.0..3.0), rng.gen_range(-3.0..3.0));
+            let pos = position + behind_offset + lateral_offset;
+
+            // Velocity: mostly stationary (player is moving, not particles)
+            let velocity = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
+
+            // Light blue/white color
+            let colors = [
+                [200, 220, 255, 255], // Light blue
+                [220, 240, 255, 255], // Very light blue
+                [255, 255, 255, 255], // White
+            ];
+            let color = colors[rng.gen_range(0..colors.len())];
+
+            // Short lifetime (motion blur effect)
+            let lifetime = rng.gen_range(0.1..0.2);
+            self.spawn(pos, velocity, color, lifetime);
+        }
+    }
+
     /// Iterate over all active particles
     pub fn iter(&self) -> impl Iterator<Item = &Particle> {
         self.particles.iter()

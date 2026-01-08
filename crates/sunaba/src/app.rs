@@ -131,6 +131,10 @@ pub struct App {
     /// Track previous grounded state for landing detection
     was_grounded: bool,
 
+    /// Track previous key states for double-tap detection
+    prev_a_pressed: bool,
+    prev_d_pressed: bool,
+
     /// Multiplayer connection manager (handles state, client, reconnection)
     #[cfg(feature = "multiplayer")]
     multiplayer_manager: Option<crate::multiplayer::MultiplayerManager>,
@@ -330,6 +334,8 @@ impl App {
             config,
             hot_reload: crate::hot_reload::HotReloadManager::new(),
             was_grounded: false,
+            prev_a_pressed: false,
+            prev_d_pressed: false,
             #[cfg(feature = "multiplayer")]
             multiplayer_manager,
             #[cfg(feature = "multiplayer")]
@@ -931,6 +937,58 @@ impl App {
 
             // Normal game loop - update player from input
             self.world.update_player(&self.input_state, 1.0 / 60.0);
+
+            // Dash mechanic - detect double-tap or Shift+direction input
+            {
+                // Determine dash direction from input
+                let mut dash_dir = Vec2::ZERO;
+                if self.input_state.a_pressed {
+                    dash_dir.x -= 1.0;
+                }
+                if self.input_state.d_pressed {
+                    dash_dir.x += 1.0;
+                }
+                if self.input_state.w_pressed {
+                    dash_dir.y += 1.0;
+                }
+                if self.input_state.s_pressed {
+                    dash_dir.y -= 1.0;
+                }
+
+                // Check for dash triggers
+                let dash_triggered =
+                    // Double-tap A/D
+                    (self.input_state.a_double_tap && self.input_state.a_pressed) ||
+                    (self.input_state.d_double_tap && self.input_state.d_pressed) ||
+                    // Shift+A/D
+                    (self.input_state.shift_pressed && dash_dir.x.abs() > 0.0);
+
+                if dash_triggered {
+                    let was_dashing = self.world.player.is_dashing();
+
+                    self.world
+                        .player
+                        .start_dash(dash_dir, self.world.player.grounded);
+
+                    // Trigger visual effects if dash started
+                    if !was_dashing && self.world.player.is_dashing() {
+                        // Screen shake
+                        self.renderer.add_camera_shake(1.0, 0.1);
+
+                        // Impact burst particles
+                        let player_pos = self.world.player.position;
+                        self.particle_system
+                            .spawn_impact_burst(player_pos, [200, 220, 255, 255]);
+                    }
+                }
+
+                // Spawn dash trail particles while dashing
+                if self.world.player.is_dashing() {
+                    let player_pos = self.world.player.position;
+                    let dash_dir = self.world.player.dash_direction;
+                    self.particle_system.spawn_dash_trail(player_pos, dash_dir);
+                }
+            }
 
             // Detect hard landings and add camera shake
             let is_grounded = self.world.player.grounded;
@@ -1714,6 +1772,14 @@ impl App {
         // Reset per-frame input state
         self.input_state.zoom_delta = 1.0;
         self.input_state.prev_right_mouse_pressed = self.input_state.right_mouse_pressed;
+
+        // Save current key states for next frame (double-tap detection)
+        self.prev_a_pressed = self.input_state.a_pressed;
+        self.prev_d_pressed = self.input_state.d_pressed;
+
+        // Clear per-frame double-tap flags and expire old taps
+        self.input_state.clear_frame_flags();
+        self.input_state.expire_taps();
     }
 
     /// Collect remote player data from SpacetimeDB subscription (multiplayer only)
@@ -2023,10 +2089,35 @@ impl ApplicationHandler for App {
                     match code {
                         // Movement keys
                         KeyCode::KeyW => self.input_state.w_pressed = pressed,
-                        KeyCode::KeyA => self.input_state.a_pressed = pressed,
+                        KeyCode::KeyA => {
+                            self.input_state.a_pressed = pressed;
+
+                            // Detect double-tap
+                            if InputState::detect_double_tap(
+                                &mut self.input_state.a_last_tap,
+                                pressed,
+                                self.prev_a_pressed,
+                            ) {
+                                self.input_state.a_double_tap = true;
+                            }
+                        }
                         KeyCode::KeyS => self.input_state.s_pressed = pressed,
-                        KeyCode::KeyD => self.input_state.d_pressed = pressed,
+                        KeyCode::KeyD => {
+                            self.input_state.d_pressed = pressed;
+
+                            // Detect double-tap
+                            if InputState::detect_double_tap(
+                                &mut self.input_state.d_last_tap,
+                                pressed,
+                                self.prev_d_pressed,
+                            ) {
+                                self.input_state.d_double_tap = true;
+                            }
+                        }
                         KeyCode::Space => self.input_state.jump_pressed = pressed,
+                        KeyCode::ShiftLeft | KeyCode::ShiftRight => {
+                            self.input_state.shift_pressed = pressed;
+                        }
 
                         // Material/hotbar selection (0-9)
                         // In debug mode: select materials directly (AIR, STONE, SAND, etc.)

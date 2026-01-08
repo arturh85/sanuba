@@ -30,6 +30,19 @@ pub struct Player {
     /// This allows multiple sources to add knockback (mining, explosions, etc.)
     #[serde(skip)]
     pub pending_knockback: Vec2,
+
+    /// Dash mechanics
+    #[serde(skip)]
+    pub dash_direction: Vec2, // Direction of active dash (unit vector)
+
+    #[serde(skip)]
+    pub dash_timer: f32, // Remaining dash duration (0.15s → 0.0)
+
+    #[serde(skip)]
+    pub dash_cooldown: f32, // Cooldown until next dash allowed (0.5s → 0.0)
+
+    #[serde(skip)]
+    pub air_dash_used: bool, // Has air dash been used this jump?
 }
 
 impl Player {
@@ -43,6 +56,11 @@ impl Player {
     pub const COYOTE_TIME: f32 = 0.1; // Jump grace period (seconds)
     pub const JUMP_BUFFER: f32 = 0.1; // Jump input buffer (seconds)
     pub const FLIGHT_THRUST: f32 = 1200.0; // px/s² (upward, Noita-style levitation)
+
+    // Dash mechanics
+    pub const DASH_SPEED: f32 = 400.0; // px/s (2x walk speed)
+    pub const DASH_DURATION: f32 = 0.15; // 0.15s = 9 frames at 60fps
+    pub const DASH_COOLDOWN: f32 = 0.5; // 0.5s between dashes
 
     /// Create a new player at the specified position
     pub fn new(position: Vec2) -> Self {
@@ -61,6 +79,10 @@ impl Player {
             mining_progress: MiningProgress::new(),
             is_dead: false,
             pending_knockback: Vec2::ZERO,
+            dash_direction: Vec2::ZERO,
+            dash_timer: 0.0,
+            dash_cooldown: 0.0,
+            air_dash_used: false,
         };
 
         // Give player some starting materials for testing
@@ -101,6 +123,10 @@ impl Player {
             mining_progress,
             is_dead,
             pending_knockback: Vec2::ZERO, // Runtime physics state
+            dash_direction: Vec2::ZERO,    // Runtime dash state
+            dash_timer: 0.0,               // Runtime dash state
+            dash_cooldown: 0.0,            // Runtime dash state
+            air_dash_used: false,          // Runtime dash state
         }
     }
 
@@ -238,6 +264,73 @@ impl Player {
         self.hunger = Hunger::new(100.0, 0.1, 1.0);
         self.is_dead = false; // Clear death flag
         // Keep inventory on respawn (optional: can clear if you want)
+    }
+
+    /// Check if player can initiate dash
+    pub fn can_dash(&self, grounded: bool) -> bool {
+        // Cooldown must be expired
+        if self.dash_cooldown > 0.0 {
+            return false;
+        }
+
+        // Can always dash on ground
+        if grounded {
+            return true;
+        }
+
+        // Can dash once in air per jump
+        !self.air_dash_used
+    }
+
+    /// Start a dash in the given direction
+    pub fn start_dash(&mut self, direction: Vec2, grounded: bool) {
+        if !self.can_dash(grounded) {
+            return;
+        }
+
+        // Normalize direction (ensure unit vector)
+        let dir = if direction.length() > 0.0 {
+            direction.normalize()
+        } else {
+            Vec2::X // Default to right if no direction
+        };
+
+        self.dash_direction = dir;
+        self.dash_timer = Self::DASH_DURATION;
+        self.dash_cooldown = Self::DASH_COOLDOWN;
+
+        // Mark air dash as used
+        if !grounded {
+            self.air_dash_used = true;
+        }
+    }
+
+    /// Update dash timers (call every frame)
+    pub fn update_dash(&mut self, dt: f32) {
+        // Decrement dash timer
+        self.dash_timer = (self.dash_timer - dt).max(0.0);
+
+        // Decrement cooldown timer
+        self.dash_cooldown = (self.dash_cooldown - dt).max(0.0);
+    }
+
+    /// Check if currently dashing
+    pub fn is_dashing(&self) -> bool {
+        self.dash_timer > 0.0
+    }
+
+    /// Get current dash velocity
+    pub fn dash_velocity(&self) -> Vec2 {
+        if self.is_dashing() {
+            self.dash_direction * Self::DASH_SPEED
+        } else {
+            Vec2::ZERO
+        }
+    }
+
+    /// Reset air dash on landing
+    pub fn reset_air_dash(&mut self) {
+        self.air_dash_used = false;
     }
 }
 
@@ -383,5 +476,47 @@ mod tests {
         // Select slot 1 (empty)
         player.select_next_slot();
         assert_eq!(player.get_selected_material(), None);
+    }
+
+    #[test]
+    fn test_dash_cooldown() {
+        let mut player = Player::new(Vec2::ZERO);
+
+        // Can dash initially
+        assert!(player.can_dash(true));
+
+        // Start dash
+        player.start_dash(Vec2::X, true);
+        assert!(player.is_dashing());
+        assert_eq!(player.dash_timer, Player::DASH_DURATION);
+
+        // Cannot dash again (cooldown)
+        assert!(!player.can_dash(true));
+
+        // Update until cooldown expires
+        player.update_dash(Player::DASH_COOLDOWN + 0.01);
+        assert!(player.can_dash(true));
+    }
+
+    #[test]
+    fn test_air_dash_limit() {
+        let mut player = Player::new(Vec2::ZERO);
+
+        // Can air dash initially
+        assert!(player.can_dash(false));
+
+        // Use air dash
+        player.start_dash(Vec2::X, false);
+        assert!(player.air_dash_used);
+
+        // Wait for cooldown
+        player.update_dash(Player::DASH_COOLDOWN + 0.01);
+
+        // Still can't dash in air (used air dash)
+        assert!(!player.can_dash(false));
+
+        // Reset on landing
+        player.reset_air_dash();
+        assert!(player.can_dash(false));
     }
 }

@@ -40,48 +40,69 @@ impl PlayerPhysicsSystem {
         }
 
         // 2. Check if grounded
+        let was_grounded = player.grounded;
         player.grounded = is_grounded();
 
-        // 3. Update coyote time (grace period for jumping after leaving ground)
+        // 2.5. Reset air dash on landing
+        if !was_grounded && player.grounded {
+            player.reset_air_dash();
+        }
+
+        // 3. Update dash timers
+        player.update_dash(dt);
+
+        // 4. Update coyote time (grace period for jumping after leaving ground)
         if player.grounded {
             player.coyote_time = Player::COYOTE_TIME;
         } else {
             player.coyote_time = (player.coyote_time - dt).max(0.0);
         }
 
-        // 4. Update jump buffer (allows jump input slightly before landing)
+        // 5. Update jump buffer (allows jump input slightly before landing)
         if input.jump_pressed {
             player.jump_buffer = Player::JUMP_BUFFER;
         } else {
             player.jump_buffer = (player.jump_buffer - dt).max(0.0);
         }
 
-        // 5. Horizontal movement (A/D keys) with friction
-        const PLAYER_DECELERATION: f32 = 800.0; // px/s² (friction when no input)
+        // 6. Horizontal movement - MODIFIED FOR DASH
+        if player.is_dashing() {
+            // Override velocity during dash
+            let dash_vel = player.dash_velocity();
+            player.velocity.x = dash_vel.x;
 
-        let mut horizontal_input = 0.0;
-        if input.a_pressed {
-            horizontal_input -= 1.0;
-        }
-        if input.d_pressed {
-            horizontal_input += 1.0;
-        }
-
-        if horizontal_input != 0.0 {
-            // Apply movement input
-            player.velocity.x = horizontal_input * player_speed;
-        } else if player.grounded {
-            // Apply friction when grounded and no input
-            let friction = PLAYER_DECELERATION * dt;
-            if player.velocity.x.abs() < friction {
-                player.velocity.x = 0.0;
-            } else {
-                player.velocity.x -= player.velocity.x.signum() * friction;
+            // Dash can also affect vertical (for diagonal dashes)
+            if dash_vel.y.abs() > 0.01 {
+                player.velocity.y = dash_vel.y;
             }
-        }
-        // Note: No friction in air - preserve momentum for better jump control
+        } else {
+            // Normal horizontal movement (A/D keys) with friction
+            const PLAYER_DECELERATION: f32 = 800.0; // px/s² (friction when no input)
 
-        // 6. Vertical movement (gravity + jump + flight)
+            let mut horizontal_input = 0.0;
+            if input.a_pressed {
+                horizontal_input -= 1.0;
+            }
+            if input.d_pressed {
+                horizontal_input += 1.0;
+            }
+
+            if horizontal_input != 0.0 {
+                // Apply movement input
+                player.velocity.x = horizontal_input * player_speed;
+            } else if player.grounded {
+                // Apply friction when grounded and no input
+                let friction = PLAYER_DECELERATION * dt;
+                if player.velocity.x.abs() < friction {
+                    player.velocity.x = 0.0;
+                } else {
+                    player.velocity.x -= player.velocity.x.signum() * friction;
+                }
+            }
+            // Note: No friction in air - preserve momentum for better jump control
+        }
+
+        // 7. Vertical movement (gravity + jump + flight)
         if player.jump_buffer > 0.0 && player.coyote_time > 0.0 {
             // Jump!
             player.velocity.y = Player::JUMP_VELOCITY;
@@ -105,7 +126,7 @@ impl PlayerPhysicsSystem {
             player.velocity.y = 0.0;
         }
 
-        // 7. Integrate velocity into position with collision
+        // 8. Integrate velocity into position with collision
         let movement = player.velocity * dt;
 
         // Check collision separately for X and Y
@@ -127,7 +148,7 @@ impl PlayerPhysicsSystem {
             player.velocity.y = 0.0;
         }
 
-        // 8. Automatic unstuck mechanic - nudge player out of tight spaces if completely stuck
+        // 9. Automatic unstuck mechanic - nudge player out of tight spaces if completely stuck
         if !can_move_x
             && !can_move_y
             && (input.a_pressed || input.d_pressed || input.w_pressed || input.s_pressed)
