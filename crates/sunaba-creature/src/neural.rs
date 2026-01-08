@@ -22,6 +22,12 @@ pub struct BodyPartFeatures {
     pub food_direction_x: f32, // -1.0 to 1.0, direction to nearest food
     pub food_direction_y: f32, // -1.0 to 1.0
     pub food_distance: f32,    // 0.0 to 1.0, normalized distance to food
+    // Terrain-aware sensors for adaptive locomotion
+    pub ground_slope: f32,             // -1.0 (downhill) to 1.0 (uphill)
+    pub vertical_clearance: f32,       // 0.0 (blocked) to 1.0 (clear)
+    pub gap_distance: f32,             // 0.0 (immediate) to 1.0 (far/none)
+    pub gap_width: f32,                // 0.0 (no gap) to 1.0 (unjumpable)
+    pub surface_material_encoded: f32, // 0.0-1.0 encoded material ID
 }
 
 impl BodyPartFeatures {
@@ -40,12 +46,20 @@ impl BodyPartFeatures {
         ];
         features.extend(&self.raycast_distances);
         features.extend(&self.contact_materials);
+        // Terrain sensors
+        features.extend(&[
+            self.ground_slope,
+            self.vertical_clearance,
+            self.gap_distance,
+            self.gap_width,
+            self.surface_material_encoded,
+        ]);
         features
     }
 
     /// Get feature dimension
     pub fn feature_dim(num_raycasts: usize, num_materials: usize) -> usize {
-        9 + num_raycasts + num_materials // 6 base + 3 food direction + raycasts + materials
+        9 + num_raycasts + num_materials + 5 // 6 base + 3 food + raycasts + materials + 5 terrain
     }
 }
 
@@ -367,6 +381,7 @@ pub fn extract_body_part_features_simple(
     physics_state: &super::simple_physics::CreaturePhysicsState,
     sensory_input: &super::sensors::SensoryInput,
     world: &impl crate::WorldAccess,
+    sensor_config: &super::sensors::SensorConfig,
 ) -> Vec<BodyPartFeatures> {
     let num_parts = morphology.body_parts.len();
     let mut features = Vec::with_capacity(num_parts);
@@ -429,6 +444,28 @@ pub fn extract_body_part_features_simple(
         // Velocity is not tracked in simple physics - use zero
         let velocity = Vec2::ZERO;
 
+        // Calculate facing direction from orientation (or default to right)
+        let facing_direction = orientation.cos().signum();
+
+        // Compute terrain sensors for adaptive locomotion
+        let ground_slope =
+            super::sensors::sense_ground_slope(world, position, facing_direction, sensor_config);
+
+        let vertical_clearance =
+            super::sensors::sense_vertical_clearance(world, position, sensor_config);
+
+        let (gap_distance, gap_width) =
+            super::sensors::sense_gap_info(world, position, facing_direction, sensor_config);
+
+        let surface_material = super::sensors::sense_surface_material(
+            world,
+            position,
+            morphology.body_parts[i].radius,
+        );
+
+        // Normalize surface material to [0, 1] (simple approach: ID / 50.0, clamped)
+        let surface_material_encoded = (surface_material as f32 / 50.0).min(1.0);
+
         features.push(BodyPartFeatures {
             joint_angle,
             joint_angular_velocity,
@@ -440,6 +477,11 @@ pub fn extract_body_part_features_simple(
             food_direction_x,
             food_direction_y,
             food_distance,
+            ground_slope,
+            vertical_clearance,
+            gap_distance,
+            gap_width,
+            surface_material_encoded,
         });
     }
 
@@ -511,10 +553,15 @@ mod tests {
             food_direction_x: 0.7,
             food_direction_y: 0.3,
             food_distance: 0.5,
+            ground_slope: 0.2,
+            vertical_clearance: 0.8,
+            gap_distance: 0.9,
+            gap_width: 0.1,
+            surface_material_encoded: 0.3,
         };
 
         let vec = features.to_vec();
-        assert_eq!(vec.len(), 13); // 9 base + 2 raycasts + 2 materials
+        assert_eq!(vec.len(), 18); // 9 base + 2 raycasts + 2 materials + 5 terrain
 
         // Check values are in correct order
         assert_eq!(vec[0], 0.5); // joint_angle
@@ -528,7 +575,7 @@ mod tests {
     #[test]
     fn test_feature_dim_calculation() {
         let dim = BodyPartFeatures::feature_dim(8, 5);
-        assert_eq!(dim, 22); // 9 base + 8 raycasts + 5 materials
+        assert_eq!(dim, 27); // 9 base + 8 raycasts + 5 materials + 5 terrain
     }
 
     #[test]

@@ -171,6 +171,10 @@ fn test_sensory_input_raycast_hits_obstacle() {
         food_detection_radius: 50.0,
         threat_detection_radius: 50.0,
         food_compass_radius: 100.0,
+        slope_sense_distance: 5.0,
+        clearance_sense_height: 25.0,
+        gap_sense_distance: 40.0,
+        max_gap_width: 30.0,
     };
 
     let sensory = SensoryInput::gather(&world, Vec2::new(100.0, 100.0), &config);
@@ -201,6 +205,10 @@ fn test_sensory_input_raycast_count_matches_config() {
         food_detection_radius: 30.0,
         threat_detection_radius: 30.0,
         food_compass_radius: 100.0,
+        slope_sense_distance: 5.0,
+        clearance_sense_height: 25.0,
+        gap_sense_distance: 40.0,
+        max_gap_width: 30.0,
     };
 
     let sensory = SensoryInput::gather(&world, Vec2::new(100.0, 100.0), &config);
@@ -251,8 +259,13 @@ fn test_extract_body_part_features() {
     let sensory_input = SensoryInput::gather(&world, Vec2::new(100.0, 50.0), &config);
     let physics_state = CreaturePhysicsState::new(&morphology, Vec2::new(100.0, 50.0));
 
-    let features =
-        extract_body_part_features_simple(&morphology, &physics_state, &sensory_input, &world);
+    let features = extract_body_part_features_simple(
+        &morphology,
+        &physics_state,
+        &sensory_input,
+        &world,
+        &config,
+    );
 
     // Should have features for each body part
     assert_eq!(features.len(), morphology.body_parts.len());

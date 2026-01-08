@@ -23,6 +23,21 @@ pub struct ChemicalGradient {
     pub mate: f32,   // 0.0 - 1.0
 }
 
+/// Terrain-aware sensory input for adaptive locomotion
+#[derive(Debug, Clone)]
+pub struct TerrainSensoryInput {
+    /// Ground slope: -1.0 (steep downhill) to 1.0 (steep uphill)
+    pub ground_slope: f32,
+    /// Vertical clearance: 0.0 (blocked) to 1.0 (fully clear)
+    pub vertical_clearance: f32,
+    /// Gap distance: 0.0 (immediate) to 1.0 (far/none), normalized
+    pub gap_distance: f32,
+    /// Gap width: 0.0 (no gap) to 1.0 (unjumpable), normalized
+    pub gap_width: f32,
+    /// Material ID underfoot (0 = air/no ground)
+    pub surface_material: u16,
+}
+
 /// Complete sensory input
 #[derive(Debug, Clone)]
 pub struct SensoryInput {
@@ -143,6 +158,14 @@ pub struct SensorConfig {
     pub threat_detection_radius: f32,
     /// Long-range food compass radius (for directional sensing)
     pub food_compass_radius: f32,
+    /// Distance ahead to sample for slope detection (pixels)
+    pub slope_sense_distance: f32,
+    /// Maximum height to scan for clearance detection (pixels)
+    pub clearance_sense_height: f32,
+    /// Maximum lookahead distance for gap detection (pixels)
+    pub gap_sense_distance: f32,
+    /// Gap width threshold for unjumpable classification (pixels)
+    pub max_gap_width: f32,
 }
 
 impl Default for SensorConfig {
@@ -153,6 +176,10 @@ impl Default for SensorConfig {
             food_detection_radius: 30.0,
             threat_detection_radius: 40.0,
             food_compass_radius: 150.0, // Reduced from 500 for performance (used as fallback)
+            slope_sense_distance: 5.0,
+            clearance_sense_height: 25.0,
+            gap_sense_distance: 40.0,
+            max_gap_width: 30.0,
         }
     }
 }
@@ -507,6 +534,154 @@ pub fn calculate_gradients(
     }
 }
 
+/// Helper function to find ground below a position
+/// Returns the Y coordinate of the first solid pixel, or None if no ground found
+fn find_ground_below(
+    world: &impl crate::WorldAccess,
+    position: Vec2,
+    max_depth: i32,
+) -> Option<f32> {
+    let px = position.x as i32;
+    let start_y = position.y as i32;
+
+    for dy in 0..max_depth {
+        let check_y = start_y - dy; // Scan downward
+        if let Some(pixel) = world.get_pixel(px, check_y)
+            && pixel.material_id != 0
+        {
+            return Some(check_y as f32);
+        }
+    }
+    None
+}
+
+/// Sense ground slope for gait adaptation
+/// Returns -1.0 (downhill) to 1.0 (uphill), or 0.0 if no ground/flat
+pub fn sense_ground_slope(
+    world: &impl crate::WorldAccess,
+    position: Vec2,
+    facing_direction: f32,
+    config: &SensorConfig,
+) -> f32 {
+    let sense_distance = config.slope_sense_distance;
+
+    // Find ground at current position
+    let height_current = find_ground_below(world, position, 20);
+
+    // Find ground ahead
+    let ahead_pos = position + Vec2::new(facing_direction * sense_distance, 0.0);
+    let height_ahead = find_ground_below(world, ahead_pos, 20);
+
+    match (height_current, height_ahead) {
+        (Some(h_curr), Some(h_ahead)) => {
+            let delta_y = h_ahead - h_curr; // Positive = uphill (ground ahead is higher)
+            (delta_y / sense_distance).clamp(-1.0, 1.0)
+        }
+        _ => 0.0, // No ground = treat as flat
+    }
+}
+
+/// Sense vertical clearance for jump height modulation
+/// Returns 0.0 (blocked) to 1.0 (fully clear)
+pub fn sense_vertical_clearance(
+    world: &impl crate::WorldAccess,
+    position: Vec2,
+    config: &SensorConfig,
+) -> f32 {
+    let max_height = config.clearance_sense_height;
+    let px = position.x as i32;
+    let start_y = position.y as i32;
+
+    let mut air_count = 0.0;
+    for dy in 1..=(max_height as i32) {
+        let check_y = start_y + dy; // Scan upward
+        if let Some(pixel) = world.get_pixel(px, check_y) {
+            if pixel.material_id == 0 {
+                air_count += 1.0;
+            } else {
+                break; // Hit ceiling
+            }
+        } else {
+            // Outside world bounds = open sky
+            air_count = max_height;
+            break;
+        }
+    }
+
+    (air_count / max_height).min(1.0)
+}
+
+/// Sense gap distance and width for navigation
+/// Returns (gap_distance, gap_width), both normalized 0.0-1.0
+/// No gap: (1.0, 0.0), Gap too wide: (distance, 1.0)
+pub fn sense_gap_info(
+    world: &impl crate::WorldAccess,
+    position: Vec2,
+    facing_direction: f32,
+    config: &SensorConfig,
+) -> (f32, f32) {
+    let max_distance = config.gap_sense_distance;
+    let max_width = config.max_gap_width;
+    let px_start = position.x as i32;
+    let py = (position.y - 5.0) as i32; // Scan at foot level
+    let dir = facing_direction.signum() as i32;
+
+    let mut gap_start: Option<i32> = None;
+    let mut on_solid = world.is_solid_at(px_start, py);
+
+    for step in 1..=(max_distance as i32) {
+        let check_x = px_start + (dir * step);
+        let is_solid = world.is_solid_at(check_x, py);
+
+        // Detect gap start (solid → air)
+        if on_solid && !is_solid && gap_start.is_none() {
+            gap_start = Some(step);
+        }
+
+        // Detect gap end (air → solid)
+        if !on_solid && is_solid && gap_start.is_some() {
+            let gap_distance = (gap_start.unwrap() as f32 / max_distance).min(1.0);
+            let gap_width = ((step - gap_start.unwrap()) as f32 / max_width).min(1.0);
+            return (gap_distance, gap_width);
+        }
+
+        on_solid = is_solid;
+    }
+
+    // No gap found, or gap extends beyond range
+    match gap_start {
+        Some(start) => {
+            let gap_distance = (start as f32 / max_distance).min(1.0);
+            (gap_distance, 1.0) // Gap too wide (unjumpable)
+        }
+        None => (1.0, 0.0), // No gap detected
+    }
+}
+
+/// Sense surface material underfoot
+/// Returns material ID (0 = air/no ground)
+pub fn sense_surface_material(
+    world: &impl crate::WorldAccess,
+    position: Vec2,
+    body_part_radius: f32,
+) -> u16 {
+    let px = position.x as i32;
+    let start_y = position.y as i32;
+    let bottom_y = start_y - (body_part_radius as i32);
+
+    // Check downward from bottom of body part
+    for dy in 0..15 {
+        let check_y = bottom_y - dy;
+        if let Some(pixel) = world.get_pixel(px, check_y)
+            && pixel.material_id != 0
+        {
+            return pixel.material_id;
+        }
+    }
+
+    0 // No ground (air)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,6 +694,10 @@ mod tests {
         assert_eq!(config.food_detection_radius, 30.0);
         assert_eq!(config.threat_detection_radius, 40.0);
         assert_eq!(config.food_compass_radius, 150.0);
+        assert_eq!(config.slope_sense_distance, 5.0);
+        assert_eq!(config.clearance_sense_height, 25.0);
+        assert_eq!(config.gap_sense_distance, 40.0);
+        assert_eq!(config.max_gap_width, 30.0);
     }
 
     #[test]

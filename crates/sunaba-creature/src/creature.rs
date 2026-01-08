@@ -276,6 +276,7 @@ impl Creature {
             &self.physics_state,
             sensory_input,
             world,
+            &self.sensor_config,
         );
 
         // Flatten features into input vector for neural network

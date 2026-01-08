@@ -129,7 +129,33 @@ Implemented curriculum learning for progressive difficulty training:
 - `crates/sunaba/src/headless/training_env.rs` (+90 lines) - Curriculum integration, advancement checking
 - `crates/sunaba/src/headless/mod.rs` (+1 line) - Module exports
 
-**Next:** Extended terrain sensors
+**Sprint 4, Week 4: Extended Terrain Sensors - COMPLETE ✅ (January 2026)**
+
+Implemented terrain-aware sensory inputs for adaptive locomotion:
+- **5 Terrain Sensors** - ground_slope, vertical_clearance, gap_distance, gap_width, surface_material
+- **Per-Body-Part Sensing** - Enables limb-specific terrain awareness for sophisticated gaits
+- **Neural Integration** - BodyPartFeatures extended from 22 to 27 dimensions per part
+- **100% Backward Compatible** - Existing creatures automatically get larger input layer via rebuild_brain()
+- **Performance** - ~88 queries per body part (comparable to existing 8×50px raycasts = 400 queries)
+- **Test Coverage** - 14 integration tests, all passing, determinism verified
+
+**Files Created:**
+- `crates/sunaba-core/tests/creature_terrain_sensors_test.rs` (~430 lines) - Comprehensive integration tests
+
+**Files Modified:**
+- `crates/sunaba-creature/src/sensors.rs` (+150 lines) - TerrainSensoryInput struct, 5 sensor functions, SensorConfig extension
+- `crates/sunaba-creature/src/neural.rs` (+70 lines) - BodyPartFeatures extended, feature_dim updated, terrain sensing in extract_body_part_features_simple
+- `crates/sunaba-creature/src/creature.rs` (~5 lines) - Pass sensor_config to extract_body_part_features_simple
+- `crates/sunaba-core/tests/creature_integration_tests.rs` (~10 lines) - Updated SensorConfig usage
+
+**Expected Outcomes:**
+After training, creatures will learn:
+- **Slope-adaptive gaits** - Lean forward uphill, brake downhill
+- **Jump height modulation** - Duck under ceilings, optimize jump power
+- **Gap navigation** - Measure gaps, decide if jumpable
+- **Surface-specific movement** - Different gaits on sand vs stone
+
+**Next:** Phase 5 - Biome Specialists & Training Report Enhancements
 
 ---
 
@@ -502,12 +528,12 @@ pub struct TerrainSensoryInput {
 4. [x] Biome transition system (stability-aware)
 5. [x] Structure template system (bridges, trees, ruins)
 
-### Sprint 4: Training Integration (5-6 days)
+### Sprint 4: Training Integration - COMPLETE ✅ (January 2026)
 1. [x] `TrainingTerrainConfig` + `TrainingWorld`
 2. [x] `EnvironmentDistribution` with seeded sampling
 3. [x] Multi-environment evaluation
 4. [x] Curriculum learning system
-5. [ ] Extended terrain sensors
+5. [x] Extended terrain sensors
 
 ### Sprint 5: Polish & Biome Content (4-5 days)
 1. [x] Biome zone system (underground biomes) - **COMPLETE**
