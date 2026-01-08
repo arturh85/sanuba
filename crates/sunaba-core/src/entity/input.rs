@@ -2,6 +2,8 @@
 
 use crate::simulation::MaterialId;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "client")]
 use web_time::{Duration, Instant};
 
 /// Tracks current input state for player control
@@ -30,14 +32,18 @@ pub struct InputState {
     pub shift_pressed: bool, // For Shift+A/D instant dash
 
     // Double-tap timing (expires after 300ms)
+    #[cfg(feature = "client")]
     #[serde(skip)]
     pub a_last_tap: Option<Instant>,
+    #[cfg(feature = "client")]
     #[serde(skip)]
     pub d_last_tap: Option<Instant>,
 
     // Double-tap flags (set when detected, cleared each frame)
+    #[cfg(feature = "client")]
     #[serde(skip)]
     pub a_double_tap: bool,
+    #[cfg(feature = "client")]
     #[serde(skip)]
     pub d_double_tap: bool,
 }
@@ -57,9 +63,13 @@ impl InputState {
             prev_right_mouse_pressed: false,
             zoom_delta: 1.0, // No change by default
             shift_pressed: false,
+            #[cfg(feature = "client")]
             a_last_tap: None,
+            #[cfg(feature = "client")]
             d_last_tap: None,
+            #[cfg(feature = "client")]
             a_double_tap: false,
+            #[cfg(feature = "client")]
             d_double_tap: false,
         }
     }
@@ -68,6 +78,7 @@ impl InputState {
     ///
     /// Returns true if the key was pressed within 200ms of the last tap.
     /// Updates the last_tap timestamp and consumes it on double-tap.
+    #[cfg(feature = "client")]
     pub fn detect_double_tap(
         last_tap: &mut Option<Instant>,
         pressed: bool,
@@ -95,6 +106,7 @@ impl InputState {
     /// Expire old tap timestamps (call at end of frame)
     ///
     /// Taps older than 300ms are cleared to prevent stale double-taps.
+    #[cfg(feature = "client")]
     pub fn expire_taps(&mut self) {
         let now = Instant::now();
         let expire_window = Duration::from_millis(300);
@@ -115,6 +127,7 @@ impl InputState {
     /// Clear per-frame flags (call at end of frame)
     ///
     /// Double-tap flags are only valid for one frame.
+    #[cfg(feature = "client")]
     pub fn clear_frame_flags(&mut self) {
         self.a_double_tap = false;
         self.d_double_tap = false;

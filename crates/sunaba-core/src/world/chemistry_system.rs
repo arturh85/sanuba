@@ -111,7 +111,6 @@ impl ChemistrySystem {
         if let Some(ignition_temp) = material.ignition_temp
             && temp >= ignition_temp
         {
-
             // Mark pixel as burning
             let chunk = chunks.get_mut(&chunk_pos).unwrap();
             let mut new_pixel = pixel;
@@ -200,7 +199,11 @@ impl ChemistrySystem {
                 MaterialId::AIR
             };
 
-            log::trace!("BURNING: Changing material from {} to {}", pixel.material_id, new_material);
+            log::trace!(
+                "BURNING: Changing material from {} to {}",
+                pixel.material_id,
+                new_material
+            );
 
             // Use World API to trigger structural checks
             world.set_pixel_full(world_x, world_y, super::Pixel::new(new_material));

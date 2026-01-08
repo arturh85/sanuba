@@ -241,7 +241,7 @@ impl WorldGenEditor {
     fn list_saved_presets() -> Vec<String> {
         let mut presets = Vec::new();
 
-        let Ok(Some(window)) = web_sys::window().ok_or(()) else {
+        let Some(window) = web_sys::window() else {
             return presets;
         };
         let Ok(Some(storage)) = window.local_storage() else {

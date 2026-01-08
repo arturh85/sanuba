@@ -1289,13 +1289,7 @@ impl World {
         y: usize,
         rng: &mut R,
     ) {
-        ChemistrySystem::update_burning_material(
-            self,
-            chunk_pos,
-            x,
-            y,
-            rng,
-        );
+        ChemistrySystem::update_burning_material(self, chunk_pos, x, y, rng);
     }
 
     /// Check for chemical reactions with neighboring pixels

@@ -33,13 +33,13 @@ pub use layouts::ScreenshotLayout;
 
 use anyhow::{Context, Result};
 use glam::Vec2;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
-use serde::Serialize;
 
 use crate::headless::PixelRenderer;
 use crate::levels::LevelManager;
-use crate::simulation::{Materials, MaterialId};
+use crate::simulation::{MaterialId, Materials};
 use crate::world::{CHUNK_SIZE, NoopStats, World};
 use rand::thread_rng;
 
@@ -127,10 +127,22 @@ impl MaterialStatsCollector {
         let lava = counts.get(&MaterialId::LAVA).copied().unwrap_or(0);
 
         // Calculate deltas
-        let wood_delta = wood as i32 - self.last_counts.get(&MaterialId::WOOD).copied().unwrap_or(0) as i32;
-        let air_delta = air as i32 - self.last_counts.get(&MaterialId::AIR).copied().unwrap_or(0) as i32;
-        let ash_delta = ash as i32 - self.last_counts.get(&MaterialId::ASH).copied().unwrap_or(0) as i32;
-        let stone_delta = stone as i32 - self.last_counts.get(&MaterialId::STONE).copied().unwrap_or(0) as i32;
+        let wood_delta = wood as i32
+            - self
+                .last_counts
+                .get(&MaterialId::WOOD)
+                .copied()
+                .unwrap_or(0) as i32;
+        let air_delta =
+            air as i32 - self.last_counts.get(&MaterialId::AIR).copied().unwrap_or(0) as i32;
+        let ash_delta =
+            ash as i32 - self.last_counts.get(&MaterialId::ASH).copied().unwrap_or(0) as i32;
+        let stone_delta = stone as i32
+            - self
+                .last_counts
+                .get(&MaterialId::STONE)
+                .copied()
+                .unwrap_or(0) as i32;
 
         // Create sample
         let stats = MaterialStats {
@@ -163,27 +175,33 @@ impl MaterialStatsCollector {
     /// Print summary table to stdout
     pub fn print_summary(&self) {
         println!("\n=== Material Statistics Summary ===\n");
-        println!("{:>6} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
-                 "Frame", "Time", "Wood", "Air", "Ash", "Stone", "Fire", "Smoke", "Lava");
+        println!(
+            "{:>6} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+            "Frame", "Time", "Wood", "Air", "Ash", "Stone", "Fire", "Smoke", "Lava"
+        );
         println!("{}", "-".repeat(80));
 
         for sample in &self.samples {
-            println!("{:>6} {:>6.2}s {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
-                     sample.frame,
-                     sample.time_seconds,
-                     sample.wood,
-                     sample.air,
-                     sample.ash,
-                     sample.stone,
-                     sample.fire,
-                     sample.smoke,
-                     sample.lava);
+            println!(
+                "{:>6} {:>6.2}s {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+                sample.frame,
+                sample.time_seconds,
+                sample.wood,
+                sample.air,
+                sample.ash,
+                sample.stone,
+                sample.fire,
+                sample.smoke,
+                sample.lava
+            );
         }
 
         println!("\n=== Deltas (Last Sample) ===\n");
         if let Some(last) = self.samples.last() {
-            println!("Wood: {:+} | Air: {:+} | Ash: {:+} | Stone: {:+}",
-                     last.wood_delta, last.air_delta, last.ash_delta, last.stone_delta);
+            println!(
+                "Wood: {:+} | Air: {:+} | Ash: {:+} | Stone: {:+}",
+                last.wood_delta, last.air_delta, last.ash_delta, last.stone_delta
+            );
         }
     }
 }
@@ -1167,7 +1185,8 @@ pub fn capture_video_scenario(
     if let Some(collector) = stats_collector {
         let output_path_ref = output_path.as_ref();
         let stats_path = output_path_ref.with_extension("json");
-        collector.write_to_file(&stats_path)
+        collector
+            .write_to_file(&stats_path)
             .context("Failed to write statistics file")?;
 
         // Print summary to stdout
