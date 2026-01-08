@@ -54,6 +54,7 @@ impl ParamsPanel {
             .default_width(300.0)
             .resizable(true)
             .collapsible(true)
+            .frame(egui::Frame::window(&ctx.style()).fill(ctx.style().visuals.window_fill()))
             .show(ctx, |ui| {
                 self.render_contents(ui);
             });

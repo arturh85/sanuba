@@ -73,7 +73,11 @@ pub fn render_debug_panels(
     egui::SidePanel::right("debug_panels")
         .default_width(600.0) // Wider: 160px menu + 440px content
         .resizable(true)
-        .frame(egui::Frame::new())
+        .frame(
+            egui::Frame::NONE
+                .fill(ctx.style().visuals.panel_fill)
+                .inner_margin(4.0),
+        )
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Left: Vertical menu (160px fixed)

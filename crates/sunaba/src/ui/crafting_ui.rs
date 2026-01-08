@@ -38,6 +38,7 @@ impl CraftingUI {
         egui::Window::new("Crafting")
             .default_width(500.0)
             .open(&mut self.visible)
+            .frame(egui::Frame::window(&ctx.style()).fill(ctx.style().visuals.window_fill()))
             .show(ctx, |ui| {
                 ui.heading("Available Recipes");
                 ui.add_space(10.0);

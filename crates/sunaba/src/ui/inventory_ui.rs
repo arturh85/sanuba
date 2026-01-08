@@ -32,6 +32,7 @@ impl InventoryPanel {
         egui::Window::new("Inventory")
             .fixed_size([520.0, 600.0])
             .collapsible(false)
+            .frame(egui::Frame::window(&ctx.style()).fill(ctx.style().visuals.window_fill()))
             .show(ctx, |ui| {
                 ui.heading("Player Inventory");
                 ui.separator();
