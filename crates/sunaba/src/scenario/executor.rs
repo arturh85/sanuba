@@ -213,6 +213,10 @@ impl ScenarioExecutor {
                 material,
                 radius,
             } => {
+                // Ensure chunks exist in the area first
+                let r = *radius as i32;
+                world.ensure_chunks_for_area(x - r, y - r, x + r, y + r);
+
                 world.place_material_debug(*x, *y, *material, *radius);
                 self.log(&format!(
                     "  Placed {:?} at ({}, {}) r={}",
@@ -227,6 +231,9 @@ impl ScenarioExecutor {
                 max_y,
                 material,
             } => {
+                // Ensure chunks exist in the area first
+                world.ensure_chunks_for_area(*min_x, *min_y, *max_x, *max_y);
+
                 // Fill rectangle
                 for y in *min_y..=*max_y {
                     for x in *min_x..=*max_x {

@@ -1,0 +1,19 @@
+(
+    name: "Smoke Test",
+    description: "Fast smoke test to verify scenario system works",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+    ],
+
+    actions: [
+        (type: "Log", message: "Smoke test running"),
+        (type: "WaitFrames", frames: 1),
+    ],
+
+    verify: [
+        (type: "PlayerPosition", x: 0.0, y: 100.0, tolerance: 1.0),
+    ],
+
+    cleanup: [],
+)

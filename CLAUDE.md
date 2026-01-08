@@ -12,12 +12,14 @@ A 2D falling-sand survival game combining Noita's emergent physics simulation wi
 
 **Primary Commands:**
 ```bash
-just check [crate]  # After code changes: clippy + fmt + check (10-50s) - USE THIS FIRST
-just test [crate]   # Before commit: check + tests (1-2min)
-just test-ci        # Before push: full CI validation (10-12min)
+just check [crate]     # After code changes: clippy + fmt + check (10-50s) - USE THIS FIRST
+just test [crate]      # Before commit: check + fast unit tests (1-2min)
+just test-scenarios    # Run slow scenario integration tests (10-15s)
+just test-all [crate]  # Run unit tests + scenario tests (2-3min)
+just test-ci           # Before push: full CI validation (10-12min)
 ```
 
-> **Development Workflow**: Always run `just check` after making code changes. Run `just test` before committing. Run `just test-ci` before pushing to ensure full CI passes.
+> **Development Workflow**: Always run `just check` after making code changes. Run `just test` before committing (fast unit tests only). Run `just test-scenarios` or `just test-all` for comprehensive validation. Run `just test-ci` before pushing to ensure full CI passes.
 
 **Development:**
 ```bash
@@ -151,9 +153,34 @@ cargo run --features headless -- --test-scenario-stdin <<'EOF'
 )
 EOF
 
-# Method 3: Run all scenarios
+# Method 3: Run all scenarios (CLI tool)
 just test-scenario-all
+
+# Method 4: Run as integration tests (Rust test framework)
+cargo test --test scenarios --features headless              # Fast smoke tests only (~2.5s)
+cargo test --test scenarios --features headless -- --ignored # Comprehensive tests (~10s)
+just test-scenarios                                          # Same as above (recommended)
 ```
+
+**Test Integration (Hybrid Approach):**
+
+Scenarios can be run both as CLI tools AND as Rust integration tests:
+
+- **Fast smoke tests** run by default with `cargo test` (~2.5s per test)
+  - `test_basic_scenario_execution()` - validates scenario system works
+  - Runs alongside unit tests for fast feedback
+
+- **Comprehensive tests** are marked `#[ignore]` and run with `--ignored` (~3-5s per scenario)
+  - `test_mining_mechanics()` - validates mining.ron scenario
+  - `test_all_scenario_files()` - runs ALL .ron files in scenarios/
+  - Run with `just test-scenarios` for validation
+
+**When to use each:**
+- `just check` → Fast unit tests only (includes smoke test)
+- `just test` → Fast unit tests (includes smoke test)
+- `just test-scenarios` → Slow comprehensive scenario tests
+- `just test-all` → Both unit tests + scenario tests
+- `just test-scenario <file>` → Run specific scenario as CLI tool (for iteration)
 
 **Available Actions:**
 

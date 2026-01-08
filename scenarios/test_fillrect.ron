@@ -1,0 +1,25 @@
+(
+    name: "FillRect Test",
+    description: "Verify FillRect action works correctly",
+
+    setup: [],
+
+    actions: [
+        (type: "Log", message: "Testing FillRect"),
+        (type: "FillRect", min_x: -10, min_y: -10, max_x: 10, max_y: 10, material: 1),
+        (type: "WaitFrames", frames: 1),
+    ],
+
+    verify: [
+        // Verify materials were placed
+        (
+            type: "MaterialCountRange",
+            material: 1,
+            region: (type: "Rect", min_x: -10, min_y: -10, max_x: 10, max_y: 10),
+            min: 1,
+            max: 1000,
+        ),
+    ],
+
+    cleanup: [],
+)

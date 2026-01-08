@@ -234,6 +234,36 @@ test package="":
     @if ("{{package}}" -eq "") { cargo test --workspace --all-features --quiet } else { cargo test -p {{package}} --all-features --quiet }
     @Write-Host "✅ Fast tests passed"
 
+# Run scenario integration tests (slow, marked with #[ignore])
+[unix]
+test-scenarios:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Running scenario integration tests (slow)..."
+    cargo test --test scenarios --features headless -- --ignored --test-threads=1 --nocapture
+    echo "✅ Scenario tests passed"
+
+[windows]
+test-scenarios:
+    @Write-Host "Running scenario integration tests (slow)..."
+    cargo test --test scenarios --features headless -- --ignored --test-threads=1 --nocapture
+    @Write-Host "✅ Scenario tests passed"
+
+# Run all tests including slow scenario integration tests
+[unix]
+test-all package="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just test {{package}}
+    just test-scenarios
+    echo "✅ All tests passed"
+
+[windows]
+test-all package="":
+    just test {{package}}
+    just test-scenarios
+    @Write-Host "✅ All tests passed"
+
 # CI-equivalent: full validation with all builds
 [unix]
 test-ci:
