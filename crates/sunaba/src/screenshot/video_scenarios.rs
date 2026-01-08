@@ -241,14 +241,17 @@ fn create_fire_spread_scenario() -> VideoScenario {
         level_id: Some(1), // Inferno level (wood columns with fire at base)
         duration_seconds: 5.0,
         fps: 20,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             // Let fire naturally spread for 5 seconds (no additional actions needed)
             // The Inferno level already has fire at the base of wood columns
             ScenarioAction::Wait { frames: 300 }, // 5 seconds @ 60fps physics
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -261,13 +264,16 @@ fn create_water_flow_scenario() -> VideoScenario {
         level_id: Some(5), // Liquid Lab level (water and oil on stepped platforms)
         duration_seconds: 5.0,
         fps: 20,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             // Let water flow naturally for 5 seconds
             ScenarioAction::Wait { frames: 300 }, // 5 seconds @ 60fps physics
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -280,8 +286,8 @@ fn create_bridge_collapse_scenario() -> VideoScenario {
         level_id: Some(8), // Bridge Demolition level
         duration_seconds: 6.0,
         fps: 20,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             ScenarioAction::Wait { frames: 60 }, // Wait 1 second
             ScenarioAction::RemoveSupport {
@@ -292,7 +298,10 @@ fn create_bridge_collapse_scenario() -> VideoScenario {
             }, // Remove pillar
             ScenarioAction::Wait { frames: 300 }, // Watch collapse (5 seconds)
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -305,8 +314,8 @@ fn create_lava_water_reaction_scenario() -> VideoScenario {
         level_id: Some(2), // Lava Meets Water level
         duration_seconds: 5.0,
         fps: 20,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             ScenarioAction::Wait { frames: 30 }, // Wait 0.5 seconds
             ScenarioAction::RemoveSupport {
@@ -317,9 +326,9 @@ fn create_lava_water_reaction_scenario() -> VideoScenario {
             }, // Remove separator wall
             ScenarioAction::Wait { frames: 270 }, // Watch reaction (4.5 seconds)
         ],
-        camera: Some(CameraSpec::AutoDetect {
-            filter: MaterialFilter::ExcludeTypes(vec![MaterialType::Gas]),
-            padding: 20,
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
         }),
     }
 }
@@ -333,8 +342,8 @@ fn create_player_mining_scenario() -> VideoScenario {
         level_id: Some(16), // Survival Tutorial level
         duration_seconds: 8.0,
         fps: 20,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             ScenarioAction::TeleportPlayer { x: 0.0, y: 100.0 },
             ScenarioAction::Wait { frames: 30 }, // Brief pause
@@ -345,7 +354,10 @@ fn create_player_mining_scenario() -> VideoScenario {
             }, // Mine for 3 seconds
             ScenarioAction::Wait { frames: 270 }, // Show result (4.5 seconds)
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -358,13 +370,16 @@ fn create_smelting_demo_scenario() -> VideoScenario {
         level_id: Some(18), // Alchemy Lab level
         duration_seconds: 10.0,
         fps: 15,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             // Let the existing smelting chambers demonstrate the process
             ScenarioAction::Wait { frames: 600 }, // 10 seconds to show reactions
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -377,13 +392,16 @@ fn create_plant_growth_scenario() -> VideoScenario {
         level_id: Some(20), // Day/Night Cycle level
         duration_seconds: 8.0,
         fps: 15,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             // Show plant growth over time
             ScenarioAction::Wait { frames: 480 }, // 8 seconds for growth
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
@@ -396,8 +414,8 @@ fn create_material_reactions_scenario() -> VideoScenario {
         level_id: Some(18), // Alchemy Lab level
         duration_seconds: 10.0,
         fps: 15,
-        width: 1280,
-        height: 720,
+        width: 340,
+        height: 192,
         actions: vec![
             ScenarioAction::Wait { frames: 120 }, // Let initial reactions settle
             // Trigger gunpowder explosion (if present in level)
@@ -415,7 +433,10 @@ fn create_material_reactions_scenario() -> VideoScenario {
             }, // Fire on top
             ScenarioAction::Wait { frames: 480 }, // Watch reactions (8 seconds)
         ],
-        camera: None, // Use default AutoDetect
+        camera: Some(CameraSpec::Manual {
+            center: Vec2::new(32.0, 26.0),
+            zoom: 1.0,
+        }),
     }
 }
 
