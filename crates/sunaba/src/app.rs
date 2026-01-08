@@ -597,10 +597,13 @@ impl App {
                 center_y,
                 radius,
             } => {
-                self.world.debug_mine_circle(*center_x, *center_y, *radius);
+                self.world
+                    .debug_mine_circle(*center_x, *center_y, radius.get() as i32);
                 Ok(format!(
                     "Mined circle at ({}, {}) r={}",
-                    center_x, center_y, radius
+                    center_x,
+                    center_y,
+                    radius.get()
                 ))
             }
             ScenarioAction::PlaceMaterial {
@@ -609,13 +612,17 @@ impl App {
                 material,
                 radius,
             } => {
-                let r = *radius as i32;
+                let r = radius.get() as i32;
                 self.world
                     .ensure_chunks_for_area(x - r, y - r, x + r, y + r);
-                self.world.place_material_debug(*x, *y, *material, *radius);
+                self.world
+                    .place_material_debug(*x, *y, material.get(), radius.get());
                 Ok(format!(
                     "Placed material {} at ({}, {}) r={}",
-                    material, x, y, radius
+                    material.get(),
+                    x,
+                    y,
+                    radius.get()
                 ))
             }
             _ => Err(format!("Command not yet implemented: {:?}", action)),

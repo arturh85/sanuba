@@ -180,10 +180,11 @@ impl ScenarioExecutor {
                 center_y,
                 radius,
             } => {
-                world.debug_mine_circle(*center_x, *center_y, *radius);
+                let radius_val = radius.get() as i32;
+                world.debug_mine_circle(*center_x, *center_y, radius_val);
                 self.log(&format!(
                     "  Mined circle at ({}, {}) r={}",
-                    center_x, center_y, radius
+                    center_x, center_y, radius_val
                 ));
             }
 
@@ -214,13 +215,17 @@ impl ScenarioExecutor {
                 radius,
             } => {
                 // Ensure chunks exist in the area first
-                let r = *radius as i32;
+                let r = radius.get() as i32;
+                let material_id = material.get();
                 world.ensure_chunks_for_area(x - r, y - r, x + r, y + r);
 
-                world.place_material_debug(*x, *y, *material, *radius);
+                world.place_material_debug(*x, *y, material_id, radius.get());
                 self.log(&format!(
-                    "  Placed {:?} at ({}, {}) r={}",
-                    material, x, y, radius
+                    "  Placed material {} at ({}, {}) r={}",
+                    material_id,
+                    x,
+                    y,
+                    radius.get()
                 ));
             }
 
@@ -234,26 +239,26 @@ impl ScenarioExecutor {
                 // Ensure chunks exist in the area first
                 world.ensure_chunks_for_area(*min_x, *min_y, *max_x, *max_y);
 
+                let material_id = material.get();
                 // Fill rectangle
                 for y in *min_y..=*max_y {
                     for x in *min_x..=*max_x {
-                        world.set_pixel(x, y, *material);
+                        world.set_pixel(x, y, material_id);
                     }
                 }
                 self.log(&format!(
-                    "  Filled rect ({},{}) to ({},{}) with {:?}",
-                    min_x, min_y, max_x, max_y, material
+                    "  Filled rect ({},{}) to ({},{}) with material {}",
+                    min_x, min_y, max_x, max_y, material_id
                 ));
             }
 
             ScenarioAction::GiveItem { item, slot } => {
-                if let Some(slot_idx) = slot {
-                    if let Some(slot_ref) = world.player.inventory.get_slot_mut(*slot_idx) {
-                        *slot_ref = Some(item.clone());
-                        self.log(&format!("  Gave {:?} to slot {}", item, slot_idx));
-                    } else {
-                        bail!("Invalid slot index: {}", slot_idx);
-                    }
+                if let Some(validated_slot) = slot {
+                    let slot_idx = validated_slot.get();
+                    // Validation already done at parse time, safe to unwrap
+                    let slot_ref = world.player.inventory.get_slot_mut(slot_idx).unwrap();
+                    *slot_ref = Some(item.clone());
+                    self.log(&format!("  Gave {:?} to slot {}", item, slot_idx));
                 } else {
                     // Add item based on type
                     match item {
@@ -276,22 +281,21 @@ impl ScenarioExecutor {
             }
 
             ScenarioAction::RemoveItem { slot } => {
-                if let Some(slot_ref) = world.player.inventory.get_slot_mut(*slot) {
-                    *slot_ref = None;
-                    self.log(&format!("  Removed item from slot {}", slot));
-                } else {
-                    bail!("Invalid slot index: {}", slot);
-                }
+                let slot_idx = slot.get();
+                // Validation already done at parse time, safe to unwrap
+                let slot_ref = world.player.inventory.get_slot_mut(slot_idx).unwrap();
+                *slot_ref = None;
+                self.log(&format!("  Removed item from slot {}", slot_idx));
             }
 
             ScenarioAction::SetPlayerHealth { health } => {
-                world.player.health.current = *health;
-                self.log(&format!("  Set player health to {}", health));
+                world.player.health.current = health.get();
+                self.log(&format!("  Set player health to {}", health.get()));
             }
 
             ScenarioAction::SetPlayerHunger { hunger } => {
-                world.player.hunger.current = *hunger;
-                self.log(&format!("  Set player hunger to {}", hunger));
+                world.player.hunger.current = hunger.get();
+                self.log(&format!("  Set player hunger to {}", hunger.get()));
             }
 
             ScenarioAction::LoadLevel { level_id } => {
@@ -358,29 +362,23 @@ impl ScenarioExecutor {
 
             // Creature management
             ScenarioAction::SpawnCreature { genome_type, x, y } => {
-                use sunaba_core::creature::{CreatureArchetype, CreatureGenome};
+                use sunaba_core::creature::{CreatureArchetype as CoreArchetype, CreatureGenome};
 
-                // Parse archetype from string
-                let archetype = match genome_type.to_lowercase().as_str() {
-                    "spider" => CreatureArchetype::Spider,
-                    "snake" => CreatureArchetype::Snake,
-                    "worm" => CreatureArchetype::Worm,
-                    "flyer" => CreatureArchetype::Flyer,
-                    "evolved" => CreatureArchetype::Evolved,
-                    _ => bail!("Unknown creature archetype: {}", genome_type),
+                // Map validated archetype to core archetype
+                let archetype = match genome_type {
+                    super::validated_types::CreatureArchetype::Spider => CoreArchetype::Spider,
+                    super::validated_types::CreatureArchetype::Snake => CoreArchetype::Snake,
+                    super::validated_types::CreatureArchetype::Worm => CoreArchetype::Worm,
+                    super::validated_types::CreatureArchetype::Flyer => CoreArchetype::Flyer,
                 };
 
-                // Create genome for this archetype
+                // Create genome for this archetype (validation already done at parse time)
                 let genome = match archetype {
-                    CreatureArchetype::Spider => CreatureGenome::archetype_spider(),
-                    CreatureArchetype::Snake => CreatureGenome::archetype_snake(),
-                    CreatureArchetype::Worm => CreatureGenome::archetype_worm(),
-                    CreatureArchetype::Flyer => CreatureGenome::archetype_flyer(),
-                    CreatureArchetype::Evolved => {
-                        bail!(
-                            "Evolved archetype not supported in scenarios - use specific archetype"
-                        )
-                    }
+                    CoreArchetype::Spider => CreatureGenome::archetype_spider(),
+                    CoreArchetype::Snake => CreatureGenome::archetype_snake(),
+                    CoreArchetype::Worm => CreatureGenome::archetype_worm(),
+                    CoreArchetype::Flyer => CreatureGenome::archetype_flyer(),
+                    CoreArchetype::Evolved => unreachable!("Evolved type rejected at parse time"),
                 };
 
                 // Spawn creature
@@ -395,7 +393,12 @@ impl ScenarioExecutor {
                         archetype,
                     );
 
-                self.log(&format!("  Spawned {} at ({}, {})", genome_type, x, y));
+                self.log(&format!(
+                    "  Spawned {} at ({}, {})",
+                    genome_type.as_str(),
+                    x,
+                    y
+                ));
             }
 
             ScenarioAction::ClearCreatures => {
@@ -459,18 +462,23 @@ impl ScenarioExecutor {
     }
 
     /// Simulate key input for N frames
-    fn simulate_key_input(&mut self, world: &mut World, key: &str, frames: usize) -> Result<()> {
+    fn simulate_key_input(
+        &mut self,
+        world: &mut World,
+        key: &super::validated_types::SimulatedKey,
+        frames: usize,
+    ) -> Result<()> {
         // Reset input state
         self.input_state = InputState::default();
 
-        // Map key string to input state
-        match key.to_lowercase().as_str() {
-            "w" => self.input_state.w_pressed = true,
-            "a" => self.input_state.a_pressed = true,
-            "s" => self.input_state.s_pressed = true,
-            "d" => self.input_state.d_pressed = true,
-            "space" => self.input_state.jump_pressed = true,
-            _ => bail!("Unknown key: {}", key),
+        // Map validated key to input state (validation already done at parse time)
+        use super::validated_types::SimulatedKey;
+        match key {
+            SimulatedKey::W => self.input_state.w_pressed = true,
+            SimulatedKey::A => self.input_state.a_pressed = true,
+            SimulatedKey::S => self.input_state.s_pressed = true,
+            SimulatedKey::D => self.input_state.d_pressed = true,
+            SimulatedKey::Space => self.input_state.jump_pressed = true,
         }
 
         for _ in 0..frames {
@@ -478,7 +486,11 @@ impl ScenarioExecutor {
             self.frame_count += 1;
         }
 
-        self.log(&format!("  Simulated key '{}' for {} frames", key, frames));
+        self.log(&format!(
+            "  Simulated key '{}' for {} frames",
+            key.as_str(),
+            frames
+        ));
 
         // Reset input
         self.input_state = InputState::default();

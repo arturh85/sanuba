@@ -6,45 +6,28 @@ use crate::world::{CHUNK_SIZE, Chunk, World};
 /// Level 1: Basic Physics Playground
 /// Sand pile (left), water pool (right), stone platforms
 pub fn generate_level_1_basic_physics(world: &mut World) {
-    world.clear_all_chunks();
+    use super::builder::LevelBuilder;
 
-    for cy in -2..=2 {
-        for cx in -2..=2 {
-            let mut chunk = Chunk::new(cx, cy);
-
-            // Stone ground (bottom 16 pixels)
-            for y in 0..16 {
-                for x in 0..CHUNK_SIZE {
-                    chunk.set_material(x, y, MaterialId::STONE);
-                }
-            }
-
-            // Sand pile (left side, pyramid shape)
-            if cx == -1 && cy == 0 {
-                for base_y in 16..48 {
-                    let height = 48 - base_y;
-                    let width = height / 2;
-                    for dx in 0..width {
-                        if 20 + dx < CHUNK_SIZE && 20 + height - dx < CHUNK_SIZE {
-                            chunk.set_material(20 + dx, base_y, MaterialId::SAND);
-                            chunk.set_material(20 + height - dx, base_y, MaterialId::SAND);
-                        }
+    LevelBuilder::new()
+        .chunk_grid(-2..=2, -2..=2)
+        .fill_layer(0..16, MaterialId::STONE)
+        .in_chunk(-1, 0, |chunk| {
+            // Sand pile (pyramid shape)
+            for base_y in 16..48 {
+                let height = 48 - base_y;
+                let width = height / 2;
+                for dx in 0..width {
+                    if 20 + dx < CHUNK_SIZE && 20 + height - dx < CHUNK_SIZE {
+                        chunk.set_material(20 + dx, base_y, MaterialId::SAND);
+                        chunk.set_material(20 + height - dx, base_y, MaterialId::SAND);
                     }
                 }
             }
-
-            // Water pool (right side)
-            if cx == 1 && cy == 0 {
-                for x in 10..54 {
-                    for y in 16..40 {
-                        chunk.set_material(x, y, MaterialId::WATER);
-                    }
-                }
-            }
-
-            world.add_chunk(chunk);
-        }
-    }
+        })
+        .in_chunk(1, 0, |chunk| {
+            chunk.fill_rect(10..54, 16..40, MaterialId::WATER);
+        })
+        .build(world);
 }
 
 /// Level 2: Inferno
@@ -88,67 +71,23 @@ pub fn generate_level_2_inferno(world: &mut World) {
 /// Level 3: Lava Meets Water
 /// Stone basin with lava (left) and water (right) separated by wall
 pub fn generate_level_3_lava_water(world: &mut World) {
-    world.clear_all_chunks();
+    use super::builder::LevelBuilder;
 
-    for cy in -2..=2 {
-        for cx in -2..=2 {
-            let mut chunk = Chunk::new(cx, cy);
+    LevelBuilder::new()
+        .chunk_grid(-2..=2, -2..=2)
+        .fill_layer(0..8, MaterialId::STONE)
+        .in_chunk(0, 0, |chunk| {
+            // Stone basin structure
+            chunk.fill_rect(0..CHUNK_SIZE, 0..4, MaterialId::STONE); // Bottom
+            chunk.fill_rect(0..4, 4..40, MaterialId::STONE); // Left wall
+            chunk.fill_rect(60..CHUNK_SIZE, 4..40, MaterialId::STONE); // Right wall
+            chunk.fill_rect(30..34, 4..36, MaterialId::STONE); // Center divider
 
-            if cx == 0 && cy == 0 {
-                // Create stone basin
-                // Bottom
-                for x in 0..CHUNK_SIZE {
-                    for y in 0..4 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Left wall
-                for y in 4..40 {
-                    for x in 0..4 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Right wall
-                for y in 4..40 {
-                    for x in 60..CHUNK_SIZE {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Center divider (removable)
-                for y in 4..36 {
-                    for x in 30..34 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Lava (left chamber)
-                for x in 4..30 {
-                    for y in 4..32 {
-                        chunk.set_material(x, y, MaterialId::LAVA);
-                    }
-                }
-
-                // Water (right chamber)
-                for x in 34..60 {
-                    for y in 4..32 {
-                        chunk.set_material(x, y, MaterialId::WATER);
-                    }
-                }
-            } else {
-                // Ground for other chunks
-                for y in 0..8 {
-                    for x in 0..CHUNK_SIZE {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-            }
-
-            world.add_chunk(chunk);
-        }
-    }
+            // Fill chambers
+            chunk.fill_rect(4..30, 4..32, MaterialId::LAVA); // Left chamber
+            chunk.fill_rect(34..60, 4..32, MaterialId::WATER); // Right chamber
+        })
+        .build(world);
 }
 
 /// Level 4: Material Showcase
@@ -917,131 +856,54 @@ pub fn generate_level_16_stress(world: &mut World) {
 /// Level 17: Survival Tutorial
 /// Beginner-friendly environment demonstrating mining, inventory, and placement mechanics
 pub fn generate_level_17_survival(world: &mut World) {
-    world.clear_all_chunks();
+    use super::builder::LevelBuilder;
 
-    for cy in -2..=2 {
-        for cx in -2..=2 {
-            let mut chunk = Chunk::new(cx, cy);
+    LevelBuilder::new()
+        .chunk_grid(-2..=2, -2..=2)
+        .bedrock_foundation()
+        .in_chunk(0, 0, |chunk| {
+            // Main survival area
+            chunk.fill_rect(0..CHUNK_SIZE, 0..8, MaterialId::STONE); // Ground
 
-            // BEDROCK FOUNDATION (required for structural integrity)
-            if cy == -2 {
-                for y in 0..CHUNK_SIZE {
-                    for x in 0..CHUNK_SIZE {
-                        chunk.set_material(x, y, MaterialId::BEDROCK);
-                    }
-                }
-            } else if cy == -1 {
-                for y in 0..8 {
-                    for x in 0..CHUNK_SIZE {
-                        chunk.set_material(x, y, MaterialId::BEDROCK);
-                    }
+            // Left side: Resource deposits
+            for x in 4..16 {
+                for y in 8..(8 + (x - 4) / 2).min(20) {
+                    chunk.set_material(x, y, MaterialId::SAND); // Sand pile
                 }
             }
+            chunk.fill_rect(18..24, 8..28, MaterialId::STONE); // Stone wall
+            chunk.fill_rect(26..38, 8..10, MaterialId::STONE); // Building platform
 
-            // CENTER CHUNK - Main survival area
-            if cx == 0 && cy == 0 {
-                // Stone ground layer (easily mineable)
-                for x in 0..CHUNK_SIZE {
-                    for y in 0..8 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
+            // Right side: More resources
+            chunk.fill_rect(40..52, 8..14, MaterialId::WATER); // Water pool
+            chunk.fill_rect(54..60, 8..24, MaterialId::WOOD); // Wood deposit
+        })
+        .in_chunk(-1, 0, |chunk| {
+            // Additional mining area
+            chunk.fill_rect(0..CHUNK_SIZE, 0..6, MaterialId::STONE); // Ground
 
-                // Left side: Resource deposits
-                // Sand pile (easy powder mining practice)
-                for x in 4..16 {
-                    for y in 8..(8 + (x - 4) / 2).min(20) {
-                        chunk.set_material(x, y, MaterialId::SAND);
-                    }
+            // Mixed material wall (sand/stone/wood layers)
+            chunk.fill_pattern(48..CHUNK_SIZE, 6..32, |_x, y| {
+                if y < 12 {
+                    MaterialId::SAND
+                } else if y < 20 {
+                    MaterialId::STONE
+                } else {
+                    MaterialId::WOOD
                 }
+            });
+        })
+        .in_chunk(1, 0, |chunk| {
+            // Extra building space
+            chunk.fill_rect(0..CHUNK_SIZE, 0..6, MaterialId::STONE); // Ground
 
-                // Stone wall (solid mining practice)
-                for x in 18..24 {
-                    for y in 8..28 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Center: Open building area (flat platform)
-                for x in 26..38 {
-                    for y in 8..10 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Right side: More resources
-                // Small water pool (liquid practice, future water source)
-                for x in 40..52 {
-                    for y in 8..14 {
-                        chunk.set_material(x, y, MaterialId::WATER);
-                    }
-                }
-
-                // Wood deposit (future crafting material)
-                for x in 54..60 {
-                    for y in 8..24 {
-                        chunk.set_material(x, y, MaterialId::WOOD);
-                    }
-                }
-            }
-
-            // LEFT CHUNK - Additional mining area
-            if cx == -1 && cy == 0 {
-                // Ground
-                for x in 0..CHUNK_SIZE {
-                    for y in 0..6 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Mixed material wall (variety practice)
-                for y in 6..32 {
-                    for x in 48..CHUNK_SIZE {
-                        if y < 12 {
-                            chunk.set_material(x, y, MaterialId::SAND);
-                        } else if y < 20 {
-                            chunk.set_material(x, y, MaterialId::STONE);
-                        } else {
-                            chunk.set_material(x, y, MaterialId::WOOD);
-                        }
-                    }
-                }
-            }
-
-            // RIGHT CHUNK - Extra building space
-            if cx == 1 && cy == 0 {
-                // Ground
-                for x in 0..CHUNK_SIZE {
-                    for y in 0..6 {
-                        chunk.set_material(x, y, MaterialId::STONE);
-                    }
-                }
-
-                // Simple shelter outline (can be modified)
-                // Floor
-                for x in 8..24 {
-                    chunk.set_material(x, 6, MaterialId::STONE);
-                }
-                // Left wall
-                for y in 7..16 {
-                    chunk.set_material(8, y, MaterialId::STONE);
-                }
-                // Right wall
-                for y in 7..16 {
-                    chunk.set_material(23, y, MaterialId::STONE);
-                }
-                // Roof
-                for x in 8..24 {
-                    chunk.set_material(x, 16, MaterialId::STONE);
-                }
-            }
-
-            // UPPER CHUNKS - Sky area for building upward
-            // (mostly empty, allowing player to build towers)
-
-            world.add_chunk(chunk);
-        }
-    }
+            // Simple shelter outline
+            chunk.fill_rect(8..24, 6..7, MaterialId::STONE); // Floor
+            chunk.fill_rect(8..9, 7..16, MaterialId::STONE); // Left wall
+            chunk.fill_rect(23..24, 7..16, MaterialId::STONE); // Right wall
+            chunk.fill_rect(8..24, 16..17, MaterialId::STONE); // Roof
+        })
+        .build(world);
 }
 
 /// Level 18: Phase 5 Material Showcase

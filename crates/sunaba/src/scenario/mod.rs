@@ -33,10 +33,15 @@ pub mod actions;
 pub mod definition;
 pub mod executor;
 pub mod results;
+pub mod validated_types;
 pub mod verification;
 
 pub use actions::{MouseButton, ScenarioAction};
 pub use definition::ScenarioDefinition;
 pub use executor::{ScenarioExecutor, ScenarioExecutorConfig};
 pub use results::ExecutionReport;
+pub use validated_types::{
+    CreatureArchetype, SimulatedKey, ValidatedHealth, ValidatedHunger, ValidatedMaterialId,
+    ValidatedRadius, ValidatedSlotIndex,
+};
 pub use verification::{Region, VerificationCondition, VerificationResult};

@@ -1,0 +1,24 @@
+(
+    name: "Composition Example",
+    description: "Demonstrates composition helpers - created with builder pattern",
+    setup: [
+        (type: "FillRect", min_x: -30, max_x: 30, min_y: 20, max_y: 25, material: 1),
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "FillRect", min_x: -50, max_x: 50, min_y: 0, max_y: 4, material: 1),
+        (type: "FillRect", min_x: -50, max_x: -46, min_y: 0, max_y: 60, material: 1),
+        (type: "FillRect", min_x: 46, max_x: 50, min_y: 0, max_y: 60, material: 1),
+        (type: "FillRect", min_x: -50, max_x: 50, min_y: 56, max_y: 60, material: 1),
+    ],
+    actions: [
+        (type: "WaitFrames", frames: 60),
+        (type: "MineCircle", center_x: 0, center_y: 30, radius: 10),
+        (type: "WaitFrames", frames: 120),
+    ],
+    verify: [
+        (type: "PlayerPosition", x: 0.0, y: 100.0, tolerance: 50.0),
+        (type: "RegionEmpty", region: (type: "Circle", center_x: 0, center_y: 30, radius: 8)),
+    ],
+    cleanup: [
+        (type: "Log", message: "Scenario complete"),
+    ],
+)

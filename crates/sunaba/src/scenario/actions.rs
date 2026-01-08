@@ -3,6 +3,10 @@
 use serde::{Deserialize, Serialize};
 use sunaba_core::entity::inventory::ItemStack;
 
+use super::validated_types::{
+    CreatureArchetype, SimulatedKey, ValidatedHealth, ValidatedHunger, ValidatedMaterialId,
+    ValidatedRadius, ValidatedSlotIndex,
+};
 use super::verification::VerificationCondition;
 
 /// Actions that can be performed in a scenario
@@ -25,7 +29,7 @@ pub enum ScenarioAction {
     MineCircle {
         center_x: i32,
         center_y: i32,
-        radius: i32,
+        radius: ValidatedRadius,
     },
 
     /// Mine a rectangular area
@@ -40,8 +44,8 @@ pub enum ScenarioAction {
     PlaceMaterial {
         x: i32,
         y: i32,
-        material: u16,
-        radius: u32,
+        material: ValidatedMaterialId,
+        radius: ValidatedRadius,
     },
 
     /// Place material in rectangular area
@@ -50,27 +54,27 @@ pub enum ScenarioAction {
         min_y: i32,
         max_x: i32,
         max_y: i32,
-        material: u16,
+        material: ValidatedMaterialId,
     },
 
     /// Give item to player inventory
     GiveItem {
         item: ItemStack,
-        slot: Option<usize>,
+        slot: Option<ValidatedSlotIndex>,
     },
 
     /// Remove item from player inventory
-    RemoveItem { slot: usize },
+    RemoveItem { slot: ValidatedSlotIndex },
 
     /// Set player health directly
-    SetPlayerHealth { health: f32 },
+    SetPlayerHealth { health: ValidatedHealth },
 
     /// Set player hunger directly
-    SetPlayerHunger { hunger: f32 },
+    SetPlayerHunger { hunger: ValidatedHunger },
 
     /// Spawn creature at position
     SpawnCreature {
-        genome_type: String, // "biped", "quadruped", "worm", or path to .genome file
+        genome_type: CreatureArchetype,
         x: f32,
         y: f32,
     },
@@ -88,8 +92,8 @@ pub enum ScenarioAction {
     SetWorldSeed { seed: u64 },
 
     // === LOW-LEVEL INPUT SIMULATION ===
-    /// Simulate key press for N frames (w, a, s, d, space, etc.)
-    SimulateKey { key: String, frames: usize },
+    /// Simulate key press for N frames (w, a, s, d, space)
+    SimulateKey { key: SimulatedKey, frames: usize },
 
     /// Simulate mouse click at world coordinates
     SimulateMouseClick {
