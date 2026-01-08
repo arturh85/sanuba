@@ -1,0 +1,20 @@
+(
+    name: "Starvation Damage Test",
+    description: "Validates hunger drains and starvation damage applies",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "SetPlayerHealth", health: 100.0),
+        (type: "SetPlayerHunger", hunger: 0.0),
+    ],
+
+    actions: [
+        (type: "WaitFrames", frames: 120), // 2 seconds
+    ],
+
+    verify: [
+        (type: "PlayerHealth", expected: 90.0, tolerance: Some(15.0)),
+    ],
+
+    cleanup: [],
+)

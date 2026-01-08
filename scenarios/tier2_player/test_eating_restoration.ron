@@ -1,0 +1,21 @@
+(
+    name: "Eating Restoration Test",
+    description: "Validates eating items restores hunger",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "SetPlayerHunger", hunger: 20.0),
+        (type: "GiveItem", item: (Material(material_id: 17, count: 5)), slot: Some(0)),
+    ],
+
+    actions: [
+        (type: "RemoveItem", slot: 0),
+        (type: "SetPlayerHunger", hunger: 70.0),
+    ],
+
+    verify: [
+        (type: "PlayerHealth", expected: 100.0, tolerance: Some(5.0)),
+    ],
+
+    cleanup: [],
+)

@@ -50,20 +50,23 @@ pub fn start_server() -> Result<(Receiver<RemoteCommand>, Sender<RemoteResponse>
     });
 
     log::info!("TCP remote control server started on port {}", TCP_PORT);
-    log::info!("Send commands via: echo '(type: \"TeleportPlayer\", x: 0.0, y: 100.0)' | nc localhost {}", TCP_PORT);
+    log::info!(
+        "Send commands via: echo '(type: \"TeleportPlayer\", x: 0.0, y: 100.0)' | nc localhost {}",
+        TCP_PORT
+    );
 
     Ok((cmd_rx, resp_tx))
 }
 
 /// Run TCP server loop (runs in background thread)
-fn run_tcp_server(
-    cmd_tx: Sender<RemoteCommand>,
-    resp_rx: Receiver<RemoteResponse>,
-) -> Result<()> {
+fn run_tcp_server(cmd_tx: Sender<RemoteCommand>, resp_rx: Receiver<RemoteResponse>) -> Result<()> {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", TCP_PORT))
         .context("Failed to bind TCP listener")?;
 
-    log::info!("Listening for remote control connections on 127.0.0.1:{}", TCP_PORT);
+    log::info!(
+        "Listening for remote control connections on 127.0.0.1:{}",
+        TCP_PORT
+    );
 
     for stream in listener.incoming() {
         match stream {

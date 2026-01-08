@@ -1,0 +1,23 @@
+(
+    name: "Crafting Recipe Test",
+    description: "Validates recipe input consumption and output creation",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "GiveItem", item: (Material(material_id: 4, count: 5)), slot: Some(0)), // 5 wood
+    ],
+
+    actions: [
+        (type: "Log", message: "Crafting wood pickaxe"),
+        (type: "RemoveItem", slot: 0),
+        (type: "GiveItem",
+            item: (Tool(tool_id: 1000, durability: 50)),
+            slot: Some(0)),
+    ],
+
+    verify: [
+        (type: "InventorySlot", slot: 0, expected: Some((Tool(tool_id: 1000, durability: 50)))),
+    ],
+
+    cleanup: [],
+)

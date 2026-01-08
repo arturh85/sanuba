@@ -1,0 +1,23 @@
+(
+    name: "Tool Durability Test",
+    description: "Validates tools lose durability and break when depleted",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "FillRect", min_x: -20, min_y: 50, max_x: 20, max_y: 60, material: 1),
+        (type: "GiveItem",
+            item: (Tool(tool_id: 1000, durability: 10)), // Weak pickaxe
+            slot: Some(0)),
+    ],
+
+    actions: [
+        (type: "SimulateMouseClick", world_x: 0, world_y: 55, button: "Left", frames: 300),
+        (type: "WaitFrames", frames: 10),
+    ],
+
+    verify: [
+        (type: "InventorySlot", slot: 0, expected: None),
+    ],
+
+    cleanup: [],
+)

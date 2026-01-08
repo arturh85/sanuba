@@ -32,7 +32,14 @@ fn run_scenario_test(path: &str) -> Result<()> {
     // Tests run from workspace root when using workspace setup
     // But when running from crate, we need to go up to workspace
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| std::path::PathBuf::from(p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            std::path::PathBuf::from(p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap_or_else(|_| std::path::PathBuf::from("."));
 
     let full_path = workspace_root.join(path);
@@ -81,7 +88,14 @@ fn test_all_scenario_files() -> Result<()> {
     use std::fs;
 
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| std::path::PathBuf::from(p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            std::path::PathBuf::from(p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap_or_else(|_| std::path::PathBuf::from("."));
 
     let scenario_dir = workspace_root.join("scenarios");
@@ -117,7 +131,11 @@ fn test_all_scenario_files() -> Result<()> {
         for (path, err) in &failures {
             eprintln!("  - {}: {}", path, err);
         }
-        panic!("{}/{} scenarios failed", failures.len(), tested + failures.len());
+        panic!(
+            "{}/{} scenarios failed",
+            failures.len(),
+            tested + failures.len()
+        );
     }
 
     println!("\n✓ All {} scenario files passed", tested);

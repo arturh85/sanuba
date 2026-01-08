@@ -273,6 +273,17 @@ impl CreatureManager {
         self.creatures.len()
     }
 
+    /// Clear all creatures
+    pub fn clear(&mut self) {
+        let count = self.creatures.len();
+        self.creatures.clear();
+        log::info!(
+            "Cleared {} creatures. Population: 0/{}",
+            count,
+            self.max_creatures
+        );
+    }
+
     /// Check if can spawn more creatures
     pub fn can_spawn(&self) -> bool {
         self.creatures.len() < self.max_creatures

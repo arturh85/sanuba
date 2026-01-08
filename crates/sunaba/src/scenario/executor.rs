@@ -356,6 +356,54 @@ impl ScenarioExecutor {
                 }
             }
 
+            // Creature management
+            ScenarioAction::SpawnCreature { genome_type, x, y } => {
+                use sunaba_core::creature::{CreatureArchetype, CreatureGenome};
+
+                // Parse archetype from string
+                let archetype = match genome_type.to_lowercase().as_str() {
+                    "spider" => CreatureArchetype::Spider,
+                    "snake" => CreatureArchetype::Snake,
+                    "worm" => CreatureArchetype::Worm,
+                    "flyer" => CreatureArchetype::Flyer,
+                    "evolved" => CreatureArchetype::Evolved,
+                    _ => bail!("Unknown creature archetype: {}", genome_type),
+                };
+
+                // Create genome for this archetype
+                let genome = match archetype {
+                    CreatureArchetype::Spider => CreatureGenome::archetype_spider(),
+                    CreatureArchetype::Snake => CreatureGenome::archetype_snake(),
+                    CreatureArchetype::Worm => CreatureGenome::archetype_worm(),
+                    CreatureArchetype::Flyer => CreatureGenome::archetype_flyer(),
+                    CreatureArchetype::Evolved => {
+                        bail!(
+                            "Evolved archetype not supported in scenarios - use specific archetype"
+                        )
+                    }
+                };
+
+                // Spawn creature
+                let position = Vec2::new(*x, *y);
+                let _creature_id = world
+                    .creature_manager
+                    .spawn_creature_with_archetype_and_hunger(
+                        genome,
+                        position,
+                        1.0, // Full hunger
+                        &sunaba_core::creature::MorphologyConfig::default(),
+                        archetype,
+                    );
+
+                self.log(&format!("  Spawned {} at ({}, {})", genome_type, x, y));
+            }
+
+            ScenarioAction::ClearCreatures => {
+                let count = world.creature_manager.count();
+                world.creature_manager.clear();
+                self.log(&format!("  Cleared {} creatures", count));
+            }
+
             // Unimplemented actions
             _ => {
                 bail!("Action not implemented: {:?}", action);

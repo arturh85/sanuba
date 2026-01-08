@@ -1,0 +1,25 @@
+(
+    name: "Food Seeking Test",
+    description: "Validates food compass sensor and eating mechanics",
+
+    setup: [
+        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: 1),
+        (type: "PlaceMaterial", x: 50, y: 30, material: 17, radius: 3), // Fruit
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "worm", x: -50.0, y: 30.0),
+        (type: "WaitFrames", frames: 600), // 10 seconds
+        (type: "CaptureScreenshot", filename: "food_seeking.png"),
+    ],
+
+    verify: [
+        (type: "MaterialCountRange",
+            material: 17,
+            region: (type: "Whole"),
+            min: 0,
+            max: 50), // Some fruit consumed
+    ],
+
+    cleanup: [],
+)

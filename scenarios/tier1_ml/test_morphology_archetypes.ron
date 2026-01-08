@@ -1,0 +1,22 @@
+(
+    name: "Morphology Archetypes",
+    description: "Validates CPPN generates viable body structures",
+
+    setup: [
+        (type: "FillRect", min_x: -200, min_y: 0, max_x: 200, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "spider", x: -100.0, y: 50.0),
+        (type: "SpawnCreature", genome_type: "worm", x: 0.0, y: 50.0),
+        (type: "SpawnCreature", genome_type: "snake", x: 100.0, y: 50.0),
+        (type: "WaitFrames", frames: 60),
+        (type: "CaptureScreenshot", filename: "morphology_test.png"),
+    ],
+
+    verify: [
+        (type: "CreatureCount", expected: 3, tolerance: Some(0)),
+    ],
+
+    cleanup: [],
+)

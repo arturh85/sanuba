@@ -1,0 +1,21 @@
+(
+    name: "Player Movement Test",
+    description: "Validates WASD movement and grounded detection",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "SimulateKey", key: "d", frames: 60), // Move right for 1 second
+        (type: "WaitFrames", frames: 10),
+    ],
+
+    verify: [
+        (type: "PlayerPosition", x: 150.0, y: 100.0, tolerance: 100.0),
+        (type: "PlayerGrounded", expected: true),
+    ],
+
+    cleanup: [],
+)

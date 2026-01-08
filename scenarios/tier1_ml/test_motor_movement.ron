@@ -1,0 +1,23 @@
+(
+    name: "Motor Movement Test",
+    description: "Validates neural motor outputs produce actual locomotion",
+
+    setup: [
+        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "spider", x: 0.0, y: 50.0),
+        (type: "WaitFrames", frames: 300), // 5 seconds
+        (type: "CaptureScreenshot", filename: "motor_movement.png"),
+    ],
+
+    verify: [
+        (type: "Not", condition: (
+            type: "CreatureInRegion",
+            region: (type: "Circle", center_x: 0, center_y: 50, radius: 5),
+        )),
+    ],
+
+    cleanup: [],
+)

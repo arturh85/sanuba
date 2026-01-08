@@ -1,0 +1,19 @@
+(
+    name: "Neural Control Integrity",
+    description: "Validates brain doesn't crash or produce invalid outputs",
+
+    setup: [
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "spider", x: 0.0, y: 50.0),
+        (type: "WaitFrames", frames: 120), // 2 seconds
+    ],
+
+    verify: [
+        (type: "CreatureCount", expected: 1, tolerance: Some(0)),
+    ],
+
+    cleanup: [],
+)

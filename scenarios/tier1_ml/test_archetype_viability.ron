@@ -1,0 +1,23 @@
+(
+    name: "Archetype Viability Test",
+    description: "Validates all 4 fixed archetypes produce viable creatures",
+
+    setup: [
+        (type: "FillRect", min_x: -200, min_y: 0, max_x: 200, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "spider", x: -120.0, y: 50.0),
+        (type: "SpawnCreature", genome_type: "snake", x: -40.0, y: 50.0),
+        (type: "SpawnCreature", genome_type: "worm", x: 40.0, y: 50.0),
+        (type: "SpawnCreature", genome_type: "flyer", x: 120.0, y: 100.0),
+        (type: "WaitFrames", frames: 300),
+        (type: "CaptureScreenshot", filename: "archetype_viability.png"),
+    ],
+
+    verify: [
+        (type: "CreatureCount", expected: 4, tolerance: Some(0)),
+    ],
+
+    cleanup: [],
+)

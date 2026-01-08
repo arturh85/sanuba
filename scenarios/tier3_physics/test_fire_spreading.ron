@@ -1,0 +1,24 @@
+(
+    name: "Fire Spreading Test",
+    description: "Validates fire spreads to flammable materials",
+
+    setup: [
+        (type: "FillRect", min_x: -10, min_y: 50, max_x: 10, max_y: 60, material: 4), // Wood
+        (type: "PlaceMaterial", x: 0, y: 55, material: 5, radius: 1), // Fire
+    ],
+
+    actions: [
+        (type: "WaitFrames", frames: 120),
+        (type: "CaptureScreenshot", filename: "fire_spread.png"),
+    ],
+
+    verify: [
+        (type: "MaterialCountRange",
+            material: 5, // Fire
+            region: (type: "Rect", min_x: -10, min_y: 50, max_x: 10, max_y: 60),
+            min: 5,
+            max: 500),
+    ],
+
+    cleanup: [],
+)

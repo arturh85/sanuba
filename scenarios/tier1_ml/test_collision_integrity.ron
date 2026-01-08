@@ -1,0 +1,21 @@
+(
+    name: "Collision Integrity Test",
+    description: "Validates creatures can't wall-clip or fall through world",
+
+    setup: [
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 10, material: 1), // Ground
+        (type: "FillRect", min_x: -60, min_y: 10, max_x: -50, max_y: 100, material: 1), // Wall
+    ],
+
+    actions: [
+        (type: "SpawnCreature", genome_type: "spider", x: -40.0, y: 50.0),
+        (type: "WaitFrames", frames: 300), // 5 seconds
+    ],
+
+    verify: [
+        (type: "CreatureInRegion",
+            region: (type: "Rect", min_x: -50, min_y: 10, max_x: 100, max_y: 200)),
+    ],
+
+    cleanup: [],
+)

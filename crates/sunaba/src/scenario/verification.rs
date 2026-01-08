@@ -369,6 +369,115 @@ impl VerificationCondition {
                 }
             }
 
+            VerificationCondition::InventorySlot { slot, expected } => {
+                // get_slot returns Option<&Option<ItemStack>>, flatten to Option<ItemStack>
+                let actual = world.player.inventory.get_slot(*slot).and_then(|opt| opt.clone());
+
+                // Compare Option<ItemStack>
+                let passed = actual == *expected;
+
+                VerificationResult {
+                    passed,
+                    message: format!(
+                        "Inventory slot {}: expected {:?}, got {:?}",
+                        slot, expected, actual
+                    ),
+                    actual_value: actual.as_ref().map(|item| format!("{:?}", item)),
+                }
+            }
+
+            VerificationCondition::HasItem {
+                material,
+                tool,
+                min_count,
+            } => {
+                let count = if let Some(mat_id) = material {
+                    world.player.inventory.count_item(*mat_id) as usize
+                } else if let Some(tool_id) = tool {
+                    if world
+                        .player
+                        .inventory
+                        .get_tool_durability(*tool_id)
+                        .is_some()
+                    {
+                        1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+
+                let passed = count >= *min_count;
+
+                VerificationResult {
+                    passed,
+                    message: format!(
+                        "Has item (material: {:?}, tool: {:?}): expected {}, got {}",
+                        material, tool, min_count, count
+                    ),
+                    actual_value: Some(count.to_string()),
+                }
+            }
+
+            VerificationCondition::CreatureCount {
+                expected,
+                tolerance,
+            } => {
+                let actual = world.creature_manager.count();
+                let tol = tolerance.unwrap_or(0);
+                let passed = actual >= expected.saturating_sub(tol) && actual <= expected + tol;
+
+                VerificationResult {
+                    passed,
+                    message: format!(
+                        "Creature count: expected {}±{}, got {}",
+                        expected, tol, actual
+                    ),
+                    actual_value: Some(actual.to_string()),
+                }
+            }
+
+            VerificationCondition::CreatureInRegion { region } => {
+                // Get all creature positions
+                let positions = world.creature_manager.get_positions();
+
+                // Check if any creature is in region
+                let in_region = positions.iter().any(|pos| match region {
+                    Region::Rect {
+                        min_x,
+                        min_y,
+                        max_x,
+                        max_y,
+                    } => {
+                        pos.x >= *min_x as f32
+                            && pos.x <= *max_x as f32
+                            && pos.y >= *min_y as f32
+                            && pos.y <= *max_y as f32
+                    }
+                    Region::Circle {
+                        center_x,
+                        center_y,
+                        radius,
+                    } => {
+                        let dx = pos.x - *center_x as f32;
+                        let dy = pos.y - *center_y as f32;
+                        (dx * dx + dy * dy).sqrt() <= *radius as f32
+                    }
+                    Region::Whole | Region::ActiveChunks => true,
+                });
+
+                VerificationResult {
+                    passed: in_region,
+                    message: format!(
+                        "Creature in region {:?}: {} found",
+                        region,
+                        if in_region { "creature" } else { "no creature" }
+                    ),
+                    actual_value: Some(format!("{} creatures total", positions.len())),
+                }
+            }
+
             // Stub implementations for less critical verifications
             _ => VerificationResult {
                 passed: false,

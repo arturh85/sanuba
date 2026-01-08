@@ -1,0 +1,20 @@
+(
+    name: "Inventory Stacking Test",
+    description: "Validates add_item stacking to 999 and overflow handling",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+    ],
+
+    actions: [
+        (type: "GiveItem", item: (Material(material_id: 4, count: 500)), slot: None),
+        (type: "GiveItem", item: (Material(material_id: 4, count: 600)), slot: None),
+    ],
+
+    verify: [
+        (type: "InventorySlot", slot: 0, expected: Some((Material(material_id: 4, count: 999)))),
+        (type: "InventorySlot", slot: 1, expected: Some((Material(material_id: 4, count: 101)))),
+    ],
+
+    cleanup: [],
+)

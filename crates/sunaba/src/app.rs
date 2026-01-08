@@ -583,9 +583,13 @@ impl App {
                 radius,
             } => {
                 let r = *radius as i32;
-                self.world.ensure_chunks_for_area(x - r, y - r, x + r, y + r);
+                self.world
+                    .ensure_chunks_for_area(x - r, y - r, x + r, y + r);
                 self.world.place_material_debug(*x, *y, *material, *radius);
-                Ok(format!("Placed material {} at ({}, {}) r={}", material, x, y, radius))
+                Ok(format!(
+                    "Placed material {} at ({}, {}) r={}",
+                    material, x, y, radius
+                ))
             }
             _ => Err(format!("Command not yet implemented: {:?}", action)),
         };

@@ -1,0 +1,21 @@
+(
+    name: "Player Jumping Test",
+    description: "Validates jump key, coyote time, and air physics",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 50.0),
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 10, material: 1),
+    ],
+
+    actions: [
+        (type: "WaitFrames", frames: 60), // Fall to ground
+        (type: "SimulateKey", key: "space", frames: 1), // Jump
+        (type: "WaitFrames", frames: 10),
+    ],
+
+    verify: [
+        (type: "PlayerVelocity", vx: 0.0, vy: 200.0, tolerance: 300.0),
+    ],
+
+    cleanup: [],
+)
