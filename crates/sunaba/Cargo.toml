@@ -15,7 +15,7 @@ required-features = ["native"]
 [features]
 default = ["native", "profiling"]
 native = []
-headless = []
+headless = ["serde_json"]
 multiplayer = []                                    # Parent feature for all multiplayer functionality
 multiplayer_native = [
     "multiplayer",

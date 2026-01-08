@@ -111,6 +111,244 @@ just screenshot-all          # Capture all demo levels at once
 
 > **Note:** All commands support optional `<crate>` parameter for targeted operations.
 
+## Scenario Testing & Remote Control
+
+Sunaba provides two approaches for testing and controlling the game:
+
+### 1. Scenario Testing (Automated, Headless)
+
+**Use for:**
+- ✅ Automated regression testing
+- ✅ Verifying game mechanics (mining, crafting, physics)
+- ✅ Reproducible test cases for CI/CD
+- ✅ Quick iteration on game logic without UI
+- ✅ Testing that doesn't require visual inspection
+
+**Quick Start:**
+```bash
+# Method 1: File-based scenario
+just test-scenario scenarios/test_mining.ron
+
+# Method 2: Inline scenario (best for Claude)
+cargo run --features headless -- --test-scenario-stdin <<'EOF'
+(
+    name: "Quick Test",
+    description: "Test player mechanics",
+
+    setup: [
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+    ],
+
+    actions: [
+        (type: "MineCircle", center_x: 0, center_y: 50, radius: 10),
+        (type: "WaitFrames", frames: 60),
+        (type: "CaptureScreenshot", filename: "test.png"),
+    ],
+
+    verify: [
+        (type: "RegionEmpty", region: (type: "Circle", center_x: 0, center_y: 50, radius: 8)),
+    ],
+)
+EOF
+
+# Method 3: Run all scenarios
+just test-scenario-all
+```
+
+**Available Actions:**
+
+*High-level game commands:*
+- `TeleportPlayer { x, y }` - Instant teleport
+- `MovePlayerTo { x, y, timeout }` - Smooth movement (simulates input)
+- `MineCircle { center_x, center_y, radius }` - Mine circular area
+- `MineRect { min_x, min_y, max_x, max_y }` - Mine rectangular area
+- `PlaceMaterial { x, y, material, radius }` - Place material (u16 material ID)
+- `FillRect { min_x, min_y, max_x, max_y, material }` - Fill rectangle
+- `GiveItem { item, slot }` - Add to inventory (ItemStack)
+- `SetPlayerHealth { health }` - Set health directly
+- `LoadLevel { level_id }` - Load demo level (0-20)
+
+*Low-level input simulation:*
+- `SimulateKey { key, frames }` - Press W/A/S/D/Space for N frames
+- `SimulateMouseClick { world_x, world_y, button, frames }` - Click at world coords
+- `SimulateMouseMove { world_x, world_y }` - Move mouse
+
+*Control flow:*
+- `WaitFrames { frames }` - Advance simulation (60 frames = 1 second)
+- `WaitUntil { condition, timeout_frames }` - Wait for condition
+- `CaptureScreenshot { filename, width, height }` - Save PNG
+- `Log { message }` - Output message
+- `Sequence { actions }` - Run nested actions
+
+**Available Verifications:**
+
+*Material checks:*
+- `MaterialCount { material, region, expected, tolerance }` - Exact count ±tolerance
+- `MaterialCountRange { material, region, min, max }` - Count in range
+- `MaterialAt { x, y, expected }` - Material at specific pixel
+- `RegionEmpty { region }` - All air in region
+- `RegionFilled { region }` - No air in region
+
+*Player state:*
+- `PlayerPosition { x, y, tolerance }` - Position check
+- `PlayerInRegion { region }` - Player within region
+- `PlayerHealth { expected, tolerance }` - Health check
+- `PlayerGrounded { expected }` - On ground check
+- `InventorySlot { slot, expected }` - Specific slot contents
+
+*Regions (for verifications):*
+- `Rect { min_x, min_y, max_x, max_y }` - Rectangular region
+- `Circle { center_x, center_y, radius }` - Circular region
+- `Whole` - Entire loaded world
+- `ActiveChunks` - Only active chunks
+
+**Workflow for Claude:**
+
+1. **Write scenario inline** (no file needed):
+```bash
+cargo run --features headless -- --test-scenario-stdin <<'EOF'
+(
+    name: "Mining Verification",
+    description: "Verify mining removes materials",
+
+    setup: [
+        (type: "FillRect", min_x: -10, min_y: 0, max_x: 10, max_y: 50, material: 1),
+    ],
+
+    actions: [
+        (type: "MineCircle", center_x: 0, center_y: 25, radius: 5),
+        (type: "WaitFrames", frames: 60),
+    ],
+
+    verify: [
+        (type: "RegionEmpty", region: (type: "Circle", center_x: 0, center_y: 25, radius: 4)),
+    ],
+)
+EOF
+```
+
+2. **User executes** the heredoc command
+
+3. **Claude reads results:**
+   - JSON results: `scenario_results/<scenario_name>_result.json`
+   - Screenshots: `screenshots/<filename>.png`
+
+4. **Iterate** based on results
+
+**Example Scenarios:**
+
+*Test material placement:*
+```ron
+(
+    name: "Material Placement",
+    actions: [
+        (type: "PlaceMaterial", x: 0, y: 50, material: 2, radius: 5),
+        (type: "WaitFrames", frames: 60),
+    ],
+    verify: [
+        (type: "MaterialCountRange", material: 2, region: (type: "Circle", center_x: 0, center_y: 50, radius: 5), min: 50, max: 100),
+    ],
+)
+```
+
+*Test player movement:*
+```ron
+(
+    name: "Movement Test",
+    setup: [(type: "TeleportPlayer", x: 0.0, y: 100.0)],
+    actions: [
+        (type: "SimulateKey", key: "d", frames: 120),
+        (type: "WaitFrames", frames: 60),
+    ],
+    verify: [
+        (type: "PlayerPosition", x: 300.0, y: 100.0, tolerance: 50.0),
+    ],
+)
+```
+
+### 2. Manual Game Control (Interactive, Visual)
+
+**Use for:**
+- ✅ UI development and testing
+- ✅ Visual debugging and inspection
+- ✅ Manual gameplay testing
+- ✅ Screenshot capture of UI panels
+- ✅ Tasks requiring human judgment
+
+**Start the game:**
+```bash
+just start      # New world (--regenerate)
+just load       # Load existing world
+just run        # Instant launch (use with `just watch` for hot reload)
+```
+
+**Request screenshots from user:**
+When you need to see UI or visual state:
+
+1. **Ask user to capture screenshot:**
+   - "Please capture a screenshot of the Parameters panel (press P to open)"
+   - "Please take a screenshot showing the crafting UI"
+
+2. **User captures** (OS tool: Shift+Cmd+5 on Mac, PrintScreen on Windows)
+
+3. **User saves** to `screenshots/ui_<panel_name>.png`
+
+4. **Claude reads** screenshot with Read tool
+
+**UI Panel Keybindings:**
+- **P** - Parameters/settings
+- **I** - Inventory
+- **C** - Crafting
+- **L** - Logger
+- **Tab** - Dock (worldgen editor, level selector)
+- **Esc** - Close panel
+
+### When to Use Which Approach
+
+| Task | Use Scenario Testing | Use Manual Control |
+|------|---------------------|-------------------|
+| Verify mining removes materials | ✅ Automated, fast | ❌ Tedious, manual |
+| Test crafting recipe logic | ✅ Reproducible | ❌ Slow to verify |
+| Check physics simulation | ✅ Headless, quick | ❌ Requires visual |
+| Debug UI layout issues | ❌ No UI in headless | ✅ Visual inspection |
+| Verify button placement | ❌ No UI rendering | ✅ Screenshot needed |
+| Test player movement speed | ✅ Precise verification | ⚠️ Visual estimate |
+| Regression testing | ✅ CI/CD ready | ❌ Manual effort |
+| Screenshot UI panels | ❌ Headless limitation | ✅ Full rendering |
+| Test 1000 iterations | ✅ Automated | ❌ Impossible manually |
+
+**Best Practices:**
+
+1. **Default to scenarios** for game logic testing
+2. **Request manual screenshots** only for UI/visual work
+3. **Use scenarios first**, then manual if verification fails
+4. **Combine approaches**: Scenario for setup, screenshot for visual confirmation
+5. **Batch scenarios** with `just test-scenario-all` for comprehensive testing
+
+**Example Combined Workflow:**
+
+```bash
+# 1. Claude writes automated test
+cargo run --features headless -- --test-scenario-stdin <<'EOF'
+(
+    name: "Crafting System",
+    setup: [
+        (type: "GiveItem", item: (Material(material_id: 4, count: 10)), slot: Some(0)),
+    ],
+    actions: [
+        (type: "WaitFrames", frames: 10),
+        (type: "CaptureScreenshot", filename: "inventory_state.png"),
+    ],
+    verify: [
+        (type: "InventorySlot", slot: 0, expected: Some((Material(material_id: 4, count: 10)))),
+    ],
+)
+EOF
+
+# 2. If verification passes but visual check needed:
+# "Please launch the game and capture a screenshot of the inventory UI"
+```
+
 ## Architecture
 
 ### Workspace Structure

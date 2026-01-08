@@ -18,6 +18,10 @@ pub mod headless;
 #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
 pub mod screenshot;
 
+// Scenario testing module (native only, requires headless for execution)
+#[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+pub mod scenario;
+
 // Multiplayer module (native: Rust SDK, WASM: TypeScript SDK via JS)
 #[cfg(feature = "multiplayer")]
 pub mod multiplayer;

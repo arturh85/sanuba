@@ -91,6 +91,26 @@ struct Args {
     #[arg(long)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     list_ui_panels: bool,
+
+    /// Run test scenario from RON file (headless)
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    test_scenario: Option<String>,
+
+    /// Output directory for scenario results
+    #[arg(long, default_value = "scenario_results")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    scenario_output: String,
+
+    /// Capture screenshots during scenario execution
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    scenario_screenshots: bool,
+
+    /// Read test scenario from stdin (RON format)
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    test_scenario_stdin: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -171,6 +191,155 @@ fn main() -> anyhow::Result<()> {
         eprintln!();
         eprintln!("For headless screenshots without UI, use: --screenshot <level_id>");
         std::process::exit(1);
+    }
+
+    // Handle --test-scenario-stdin flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    if args.test_scenario_stdin {
+        use anyhow::Context;
+        use sunaba::scenario::{ScenarioDefinition, ScenarioExecutor, ScenarioExecutorConfig};
+        use sunaba_core::world::World;
+        use std::io::Read;
+
+        log::info!("Reading scenario from stdin...");
+
+        // Read scenario from stdin
+        let mut stdin_content = String::new();
+        std::io::stdin().read_to_string(&mut stdin_content)?;
+
+        // Parse RON from stdin
+        let scenario: ScenarioDefinition = ron::from_str(&stdin_content)
+            .context("Failed to parse RON scenario from stdin")?;
+
+        log::info!("Loaded scenario: {}", scenario.name);
+
+        // Create executor with config
+        let config = ScenarioExecutorConfig {
+            capture_screenshots: args.scenario_screenshots,
+            screenshot_dir: "screenshots".to_string(),
+            verbose: false,
+        };
+        let mut executor = ScenarioExecutor::with_config(config);
+
+        // Create world
+        let mut world = World::new(false);
+
+        // Execute scenario
+        let report = executor.execute_scenario(&scenario, &mut world)?;
+
+        // Save JSON results
+        std::fs::create_dir_all(&args.scenario_output)?;
+        let sanitized_name = scenario
+            .name
+            .replace(' ', "_")
+            .replace('/', "_")
+            .replace('\\', "_");
+        let output_file = format!("{}/{}_result.json", args.scenario_output, sanitized_name);
+        report.save_json(&output_file)?;
+
+        // Print results
+        println!("═══════════════════════════════════════════════════");
+        println!("Scenario: {}", scenario.name);
+        println!("═══════════════════════════════════════════════════");
+        println!(
+            "Result: {}",
+            if report.passed {
+                "✓ PASSED"
+            } else {
+                "✗ FAILED"
+            }
+        );
+        println!("Frames executed: {}", report.frames_executed);
+        println!("Actions executed: {}", report.actions_executed);
+
+        if !report.verification_failures.is_empty() {
+            println!("\nVerification failures:");
+            for failure in &report.verification_failures {
+                println!("  ✗ {}", failure.message);
+            }
+        }
+
+        if !report.screenshots.is_empty() {
+            println!("\nScreenshots:");
+            for screenshot in &report.screenshots {
+                println!("  - {}", screenshot);
+            }
+        }
+
+        println!("\nResults saved to: {}", output_file);
+        println!("═══════════════════════════════════════════════════");
+
+        std::process::exit(if report.passed { 0 } else { 1 });
+    }
+
+    // Handle --test-scenario flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    if let Some(scenario_path) = args.test_scenario {
+        use sunaba::scenario::{ScenarioDefinition, ScenarioExecutor, ScenarioExecutorConfig};
+        use sunaba_core::world::World;
+
+        log::info!("Loading scenario from: {}", scenario_path);
+
+        // Load scenario from file
+        let scenario = ScenarioDefinition::from_file(&scenario_path)?;
+
+        // Create executor with config
+        let config = ScenarioExecutorConfig {
+            capture_screenshots: args.scenario_screenshots,
+            screenshot_dir: "screenshots".to_string(),
+            verbose: false,
+        };
+        let mut executor = ScenarioExecutor::with_config(config);
+
+        // Create world
+        let mut world = World::new(false);
+
+        // Execute scenario
+        let report = executor.execute_scenario(&scenario, &mut world)?;
+
+        // Save JSON results
+        std::fs::create_dir_all(&args.scenario_output)?;
+        let sanitized_name = scenario
+            .name
+            .replace(' ', "_")
+            .replace('/', "_")
+            .replace('\\', "_");
+        let output_file = format!("{}/{}_result.json", args.scenario_output, sanitized_name);
+        report.save_json(&output_file)?;
+
+        // Print results
+        println!("═══════════════════════════════════════════════════");
+        println!("Scenario: {}", scenario.name);
+        println!("═══════════════════════════════════════════════════");
+        println!(
+            "Result: {}",
+            if report.passed {
+                "✓ PASSED"
+            } else {
+                "✗ FAILED"
+            }
+        );
+        println!("Frames executed: {}", report.frames_executed);
+        println!("Actions executed: {}", report.actions_executed);
+
+        if !report.verification_failures.is_empty() {
+            println!("\nVerification failures:");
+            for failure in &report.verification_failures {
+                println!("  ✗ {}", failure.message);
+            }
+        }
+
+        if !report.screenshots.is_empty() {
+            println!("\nScreenshots:");
+            for screenshot in &report.screenshots {
+                println!("  - {}", screenshot);
+            }
+        }
+
+        println!("\nResults saved to: {}", output_file);
+        println!("═══════════════════════════════════════════════════");
+
+        std::process::exit(if report.passed { 0 } else { 1 });
     }
 
     // Validate flag combinations

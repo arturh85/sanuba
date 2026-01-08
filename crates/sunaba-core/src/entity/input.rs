@@ -1,9 +1,10 @@
 //! Player input state
 
 use crate::simulation::MaterialId;
+use serde::{Deserialize, Serialize};
 
 /// Tracks current input state for player control
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InputState {
     // Movement keys
     pub w_pressed: bool,

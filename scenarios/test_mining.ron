@@ -1,0 +1,44 @@
+(
+    name: "Mining Test",
+    description: "Verify player can mine stone and materials are removed correctly",
+
+    setup: [
+        // Teleport player to starting position
+        (type: "TeleportPlayer", x: 0.0, y: 100.0),
+
+        // Create a stone platform below player
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 50, material: 1),
+    ],
+
+    actions: [
+        (type: "Log", message: "Starting mining test"),
+
+        // Mine a circle in the center of the platform
+        (type: "MineCircle", center_x: 0, center_y: 25, radius: 10),
+
+        // Wait for physics to settle (60 frames = 1 second)
+        (type: "WaitFrames", frames: 60),
+
+        // Capture screenshot for visual verification
+        (type: "CaptureScreenshot", filename: "mining_test.png"),
+
+        (type: "Log", message: "Mining test complete"),
+    ],
+
+    verify: [
+        // Verify the mined area is actually empty
+        (
+            type: "RegionEmpty",
+            region: (type: "Circle", center_x: 0, center_y: 25, radius: 8),
+        ),
+
+        // Verify some stone remains around the edges
+        (
+            type: "MaterialCountRange",
+            material: 1,
+            region: (type: "Circle", center_x: 0, center_y: 25, radius: 12),
+            min: 100,
+            max: 400,
+        ),
+    ],
+)

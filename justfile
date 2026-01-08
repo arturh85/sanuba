@@ -117,6 +117,84 @@ screenshot-all width="1920" height="1080":
 # End Screenshot Commands
 # ============================================================================
 
+# ============================================================================
+# Scenario Testing Commands
+# ============================================================================
+
+# Run a single test scenario from RON file
+# Usage: just test-scenario <file.ron>
+# Example: just test-scenario scenarios/test_mining.ron
+test-scenario scenario_file:
+    cargo run -p sunaba --bin sunaba --release --features headless -- --test-scenario {{scenario_file}} --scenario-screenshots
+
+# Run a test scenario from stdin (RON format)
+# Usage: echo '(name: "Test", ...)' | just test-scenario-stdin
+# Example: cat scenarios/test.ron | just test-scenario-stdin
+test-scenario-stdin:
+    cargo run -p sunaba --bin sunaba --release --features headless -- --test-scenario-stdin --scenario-screenshots
+
+# Run all scenario tests in scenarios/ directory
+[unix]
+test-scenario-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -d "scenarios" ]; then
+        echo "⚠️  No scenarios/ directory found"
+        exit 0
+    fi
+    shopt -s nullglob
+    scenarios=(scenarios/*.ron)
+    if [ ${#scenarios[@]} -eq 0 ]; then
+        echo "⚠️  No .ron scenario files found in scenarios/"
+        exit 0
+    fi
+    echo "Running ${#scenarios[@]} scenarios..."
+    passed=0
+    failed=0
+    for scenario in "${scenarios[@]}"; do
+        echo ""
+        echo "═══════════════════════════════════════════════════"
+        echo "Running: $scenario"
+        echo "═══════════════════════════════════════════════════"
+        if just test-scenario "$scenario"; then
+            ((passed++))
+        else
+            ((failed++))
+        fi
+    done
+    echo ""
+    echo "═══════════════════════════════════════════════════"
+    echo "Results: $passed passed, $failed failed"
+    echo "═══════════════════════════════════════════════════"
+    if [ $failed -gt 0 ]; then
+        exit 1
+    fi
+
+[windows]
+test-scenario-all:
+    @if (-not (Test-Path scenarios)) { Write-Host "⚠️  No scenarios/ directory found"; exit 0 }
+    @$scenarios = Get-ChildItem -Path scenarios -Filter *.ron -File
+    @if ($scenarios.Count -eq 0) { Write-Host "⚠️  No .ron scenario files found in scenarios/"; exit 0 }
+    @Write-Host "Running $($scenarios.Count) scenarios..."
+    @$passed = 0
+    @$failed = 0
+    @foreach ($scenario in $scenarios) { \
+        Write-Host ""; \
+        Write-Host "═══════════════════════════════════════════════════"; \
+        Write-Host "Running: $($scenario.FullName)"; \
+        Write-Host "═══════════════════════════════════════════════════"; \
+        if (just test-scenario $scenario.FullName) { $passed++ } else { $failed++ } \
+    }
+    @Write-Host ""
+    @Write-Host "═══════════════════════════════════════════════════"
+    @Write-Host "Results: $passed passed, $failed failed"
+    @Write-Host "═══════════════════════════════════════════════════"
+    @if ($failed -gt 0) { exit 1 }
+
+# ============================================================================
+# End Scenario Testing Commands
+# ============================================================================
+
 # Run multiplayer client (connects to specified SpacetimeDB server)
 start-multiplayer server="http://localhost:3000":
     @echo "Starting multiplayer client (connecting to {{server}})..."
