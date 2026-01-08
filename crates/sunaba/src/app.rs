@@ -142,6 +142,14 @@ pub struct App {
     /// Track when chunk loading started (for timeout detection)
     #[cfg(feature = "multiplayer")]
     chunk_loading_started_at: Option<Instant>,
+
+    /// Remote control command receiver (TCP server -> game loop)
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    remote_cmd_rx: Option<std::sync::mpsc::Receiver<crate::remote_control::RemoteCommand>>,
+
+    /// Remote control response sender (game loop -> TCP server)
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    remote_resp_tx: Option<std::sync::mpsc::Sender<crate::remote_control::RemoteResponse>>,
 }
 
 impl App {
@@ -301,6 +309,10 @@ impl App {
             last_chunk_wait_log: None,
             #[cfg(feature = "multiplayer")]
             chunk_loading_started_at: None,
+            #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+            remote_cmd_rx: None,
+            #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+            remote_resp_tx: None,
         };
 
         Ok((app, event_loop))
@@ -517,6 +529,75 @@ impl App {
         };
         self.input_state.selected_material = material_id;
         log::debug!("Selected debug material: {} (id={})", key, material_id);
+    }
+
+    /// Enable remote control via TCP socket
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    pub fn enable_remote_control(
+        &mut self,
+        cmd_rx: std::sync::mpsc::Receiver<crate::remote_control::RemoteCommand>,
+        resp_tx: std::sync::mpsc::Sender<crate::remote_control::RemoteResponse>,
+    ) {
+        self.remote_cmd_rx = Some(cmd_rx);
+        self.remote_resp_tx = Some(resp_tx);
+        log::info!("Remote control enabled - listening for commands on port 7453");
+    }
+
+    /// Execute a remote control command
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    fn execute_remote_command(
+        &mut self,
+        action: crate::scenario::ScenarioAction,
+    ) -> crate::remote_control::RemoteResponse {
+        use crate::scenario::ScenarioAction;
+
+        let result = match &action {
+            ScenarioAction::TeleportPlayer { x, y } => {
+                self.world.player.position = glam::Vec2::new(*x, *y);
+                self.world.player.velocity = glam::Vec2::ZERO;
+                Ok(format!("Teleported player to ({}, {})", x, y))
+            }
+            ScenarioAction::MineCircle {
+                center_x,
+                center_y,
+                radius,
+            } => {
+                self.world.debug_mine_circle(*center_x, *center_y, *radius);
+                Ok(format!(
+                    "Mined circle at ({}, {}) r={}",
+                    center_x, center_y, radius
+                ))
+            }
+            ScenarioAction::PlaceMaterial {
+                x,
+                y,
+                material,
+                radius,
+            } => {
+                let r = *radius as i32;
+                self.world.ensure_chunks_for_area(x - r, y - r, x + r, y + r);
+                self.world.place_material_debug(*x, *y, *material, *radius);
+                Ok(format!("Placed material {} at ({}, {}) r={}", material, x, y, radius))
+            }
+            _ => Err(format!("Command not yet implemented: {:?}", action)),
+        };
+
+        match result {
+            Ok(message) => {
+                log::debug!("Remote command executed: {}", message);
+                crate::remote_control::RemoteResponse {
+                    success: true,
+                    message,
+                }
+            }
+            Err(message) => {
+                log::warn!("Remote command failed: {}", message);
+                crate::remote_control::RemoteResponse {
+                    success: false,
+                    message,
+                }
+            }
+        }
     }
 
     pub fn run(event_loop: EventLoop<()>, mut app: Self) -> Result<()> {
@@ -795,6 +876,17 @@ impl App {
             // Skip player update, world update, input processing
             // Jump directly to rendering (after world update section)
         } else {
+            // Process remote control commands (non-blocking)
+            #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+            if let Some(cmd_rx) = &self.remote_cmd_rx {
+                if let Ok(cmd) = cmd_rx.try_recv() {
+                    let response = self.execute_remote_command(cmd.action);
+                    if let Some(resp_tx) = &self.remote_resp_tx {
+                        let _ = resp_tx.send(response);
+                    }
+                }
+            }
+
             // Normal game loop - update player from input
             self.world.update_player(&self.input_state, 1.0 / 60.0);
 

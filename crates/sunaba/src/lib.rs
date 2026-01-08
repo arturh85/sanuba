@@ -22,6 +22,10 @@ pub mod screenshot;
 #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
 pub mod scenario;
 
+// Remote control module (native only, requires scenario actions)
+#[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+pub mod remote_control;
+
 // Multiplayer module (native: Rust SDK, WASM: TypeScript SDK via JS)
 #[cfg(feature = "multiplayer")]
 pub mod multiplayer;

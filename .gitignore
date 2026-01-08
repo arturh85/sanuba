@@ -19,3 +19,4 @@ web/src/generated/
 /.mcp.json
 /.lsmcp/
 scenario_results/
+test_remote_control.sh

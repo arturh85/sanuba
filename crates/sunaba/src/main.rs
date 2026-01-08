@@ -111,6 +111,11 @@ struct Args {
     #[arg(long)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     test_scenario_stdin: bool,
+
+    /// Enable TCP remote control server on port 7453
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    remote_control: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -381,7 +386,14 @@ fn main() -> anyhow::Result<()> {
     #[cfg(not(feature = "multiplayer"))]
     let server_url: Option<String> = None;
 
-    pollster::block_on(run(server_url))
+    // Extract remote control flag
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    let remote_control = args.remote_control;
+
+    #[cfg(not(all(not(target_arch = "wasm32"), feature = "headless")))]
+    let remote_control = false;
+
+    pollster::block_on(run(server_url, remote_control))
 }
 
 #[cfg(feature = "headless")]
@@ -445,7 +457,7 @@ fn run_training(args: &Args) -> anyhow::Result<()> {
 }
 
 #[cfg_attr(not(feature = "multiplayer"), allow(unused_variables, unused_mut))]
-async fn run(server_url: Option<String>) -> anyhow::Result<()> {
+async fn run(server_url: Option<String>, enable_remote_control: bool) -> anyhow::Result<()> {
     let (mut app, event_loop) = App::new().await?;
 
     // If server URL provided, connect to multiplayer server before starting game loop
@@ -456,6 +468,13 @@ async fn run(server_url: Option<String>) -> anyhow::Result<()> {
             log::error!("Failed to connect to server: {}", e);
             log::info!("Continuing in singleplayer mode");
         }
+    }
+
+    // Start TCP remote control server if requested
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    if enable_remote_control {
+        let (cmd_rx, resp_tx) = sunaba::remote_control::start_server()?;
+        app.enable_remote_control(cmd_rx, resp_tx);
     }
 
     App::run(event_loop, app)

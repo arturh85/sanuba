@@ -293,7 +293,59 @@ EOF
 )
 ```
 
-### 2. Manual Game Control (Interactive, Visual)
+### 2. Real-Time Remote Control (Live Game Control)
+
+**Use for:**
+- ✅ Controlling a running game instance via commands
+- ✅ Live debugging and testing while watching the game
+- ✅ Interactive exploration and experimentation
+- ✅ Quick iteration on game mechanics
+- ✅ Demonstrating features or reproducing bugs
+
+**Quick Start:**
+```bash
+# Terminal 1: Start game with remote control enabled
+cargo run --release --features headless -- --remote-control
+
+# Terminal 2: Send commands via netcat
+echo '(type: "TeleportPlayer", x: 100.0, y: 200.0)' | nc localhost 7453
+echo '(type: "MineCircle", center_x: 50, center_y: 50, radius: 10)' | nc localhost 7453
+echo '(type: "PlaceMaterial", x: 0, y: 0, material: 1, radius: 5)' | nc localhost 7453
+```
+
+**How it works:**
+- Game opens TCP socket on `localhost:7453`
+- Send RON commands (newline-terminated)
+- Receive JSON responses with success/failure
+
+**Example workflow (Claude controlling game):**
+```bash
+# 1. User starts game:
+cargo run --release --features headless -- --remote-control
+
+# 2. Claude sends commands:
+echo '(type: "TeleportPlayer", x: 0.0, y: 100.0)' | nc localhost 7453
+# Response: {"success":true,"message":"Teleported player to (0, 100)"}
+
+# 3. Claude mines and watches result:
+echo '(type: "MineCircle", center_x: 0, center_y: 50, radius: 15)' | nc localhost 7453
+# Response: {"success":true,"message":"Mined circle at (0, 50) r=15"}
+```
+
+**Currently Supported Commands:**
+- `TeleportPlayer { x, y }` - Instantly teleport player
+- `MineCircle { center_x, center_y, radius }` - Mine circular area
+- `PlaceMaterial { x, y, material, radius }` - Place material (u16 material ID)
+
+**More commands coming soon** - this is a new feature! Additional ScenarioActions will be implemented as needed.
+
+**Test script:**
+```bash
+# Quick test of all commands
+./test_remote_control.sh
+```
+
+### 3. Manual Game Control (Interactive, Visual)
 
 **Use for:**
 - ✅ UI development and testing
@@ -332,24 +384,29 @@ When you need to see UI or visual state:
 
 ### When to Use Which Approach
 
-| Task | Use Scenario Testing | Use Manual Control |
-|------|---------------------|-------------------|
-| Verify mining removes materials | ✅ Automated, fast | ❌ Tedious, manual |
-| Test crafting recipe logic | ✅ Reproducible | ❌ Slow to verify |
-| Check physics simulation | ✅ Headless, quick | ❌ Requires visual |
-| Debug UI layout issues | ❌ No UI in headless | ✅ Visual inspection |
-| Verify button placement | ❌ No UI rendering | ✅ Screenshot needed |
-| Test player movement speed | ✅ Precise verification | ⚠️ Visual estimate |
-| Regression testing | ✅ CI/CD ready | ❌ Manual effort |
-| Screenshot UI panels | ❌ Headless limitation | ✅ Full rendering |
-| Test 1000 iterations | ✅ Automated | ❌ Impossible manually |
+| Task | Scenario Testing | Remote Control | Manual Control |
+|------|-----------------|----------------|----------------|
+| Verify mining removes materials | ✅ Automated, fast | ✅ Live feedback | ❌ Tedious |
+| Test crafting recipe logic | ✅ Reproducible | ⚠️ Manual verify | ❌ Slow |
+| Check physics simulation | ✅ Headless, quick | ✅ Watch live | ⚠️ Visual only |
+| Debug UI layout issues | ❌ No UI | ❌ No UI | ✅ Visual inspection |
+| Verify button placement | ❌ No rendering | ❌ No rendering | ✅ Screenshots |
+| Test player movement speed | ✅ Precise data | ✅ Interactive | ⚠️ Visual estimate |
+| Regression testing | ✅ CI/CD ready | ❌ Manual | ❌ Manual effort |
+| Screenshot UI panels | ❌ Limitation | ❌ Limitation | ✅ Full rendering |
+| Test 1000 iterations | ✅ Automated | ❌ Too slow | ❌ Impossible |
+| Quick experimentation | ⚠️ Edit scenario | ✅ Instant | ⚠️ Slow setup |
+| Reproduce specific bug | ✅ Exact repro | ✅ Interactive | ⚠️ Hard to reproduce |
 
 **Best Practices:**
 
-1. **Default to scenarios** for game logic testing
-2. **Request manual screenshots** only for UI/visual work
-3. **Use scenarios first**, then manual if verification fails
-4. **Combine approaches**: Scenario for setup, screenshot for visual confirmation
+1. **Default to scenarios** for automated game logic testing (CI/CD, regression)
+2. **Use remote control** for interactive debugging and quick experimentation
+3. **Request manual screenshots** only for UI/visual work
+4. **Combine approaches**:
+   - Scenarios → precise automated tests
+   - Remote control → live exploration and debugging
+   - Manual → UI verification and screenshots
 5. **Batch scenarios** with `just test-scenario-all` for comprehensive testing
 
 **Example Combined Workflow:**
