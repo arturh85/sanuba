@@ -60,7 +60,7 @@ impl ChemistrySystem {
     ) {
         // 1. Add heat to temperature field
         if let Some(chunk) = chunks.get_mut(&chunk_pos) {
-            add_heat_at_pixel(chunk, x, y, 50.0); // Fire adds significant heat
+            add_heat_at_pixel(chunk, x, y, 10.0); // Fire adds heat (reduced from 50.0 to prevent extreme temperatures)
         }
 
         // 2. Fire behaves like gas (rises)
@@ -171,8 +171,18 @@ impl ChemistrySystem {
             let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
             let world_y = chunk_pos.y * CHUNK_SIZE as i32 + y as i32;
 
-            // Transform to burns_to material (or air if not specified)
-            let new_material = material.burns_to.unwrap_or(MaterialId::AIR);
+            // Transform to burns_to material with 80/20 probability split
+            // 80% chance of AIR (triggers structural checks for collapse)
+            // 20% chance of burn product (preserves ash visual effect)
+            let new_material = if let Some(burn_product) = material.burns_to {
+                if rng.check_probability(0.8) {
+                    MaterialId::AIR
+                } else {
+                    burn_product
+                }
+            } else {
+                MaterialId::AIR
+            };
 
             // Set pixel directly in chunks
             let target_chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);

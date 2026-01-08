@@ -93,10 +93,10 @@ impl Default for TrainingConfig {
             use_simple_morphology: false,
             min_viability: 0.3,
             archetype: CreatureArchetype::default(),
-            archetypes: Vec::new(),      // Empty = use single archetype field
-            multi_env: None,             // None = single environment (backward compatible)
-            curriculum: None,            // None = no curriculum (backward compatible)
-            biome_specialist: None,      // None = archetype-based grids (backward compatible)
+            archetypes: Vec::new(), // Empty = use single archetype field
+            multi_env: None,        // None = single environment (backward compatible)
+            curriculum: None,       // None = no curriculum (backward compatible)
+            biome_specialist: None, // None = archetype-based grids (backward compatible)
         }
     }
 }
@@ -171,9 +171,9 @@ pub struct EnvTypeStats {
 #[derive(Debug, Clone)]
 pub struct FitnessDistribution {
     pub min: f32,
-    pub q25: f32,     // 25th percentile
+    pub q25: f32, // 25th percentile
     pub median: f32,
-    pub q75: f32,     // 75th percentile
+    pub q75: f32, // 75th percentile
     pub max: f32,
     pub mean: f32,
     pub std_dev: f32,
@@ -359,6 +359,7 @@ impl TrainingEnv {
     ///
     /// Returns a mutable reference to the appropriate grid based on biome specialist mode.
     /// If biome is Some, returns the biome-specific grid. Otherwise, returns the archetype grid.
+    #[allow(dead_code)]
     fn get_active_grid_mut(
         &mut self,
         archetype: &CreatureArchetype,
@@ -375,7 +376,9 @@ impl TrainingEnv {
     ///
     /// Returns the champion creature with the highest fitness regardless of whether it's
     /// from an archetype grid or a biome grid. Useful for checkpointing and visualization.
-    pub fn best_elite_overall(&self) -> Option<(CreatureArchetype, BiomeType, &super::map_elites::Elite)> {
+    pub fn best_elite_overall(
+        &self,
+    ) -> Option<(CreatureArchetype, BiomeType, &super::map_elites::Elite)> {
         // Check archetype grids
         let best_archetype = self
             .grids
@@ -383,16 +386,13 @@ impl TrainingEnv {
             .filter_map(|(arch, grid)| grid.best_elite().map(|e| (*arch, None, e)));
 
         // Check biome grids
-        let best_biome = self
-            .biome_grids
-            .iter()
-            .filter_map(|(biome, grid)| {
-                grid.best_elite().map(|e| {
-                    // Get archetype from elite or use default
-                    let archetype = e.archetype;
-                    (archetype, Some(*biome), e)
-                })
-            });
+        let best_biome = self.biome_grids.iter().filter_map(|(biome, grid)| {
+            grid.best_elite().map(|e| {
+                // Get archetype from elite or use default
+                let archetype = e.archetype;
+                (archetype, Some(*biome), e)
+            })
+        });
 
         // Combine and find max
         best_archetype
@@ -970,7 +970,13 @@ impl TrainingEnv {
         // Check if multi-environment evaluation is enabled
         if let Some(ref multi_env) = self.config.multi_env {
             // target_biome will be set by caller after evaluation
-            return self.evaluate_single_multi_env(genome, archetype, creature_idx, multi_env, None);
+            return self.evaluate_single_multi_env(
+                genome,
+                archetype,
+                creature_idx,
+                multi_env,
+                None,
+            );
         }
 
         // Legacy single-environment evaluation
@@ -1058,7 +1064,7 @@ impl TrainingEnv {
             fitness,
             behavior,
             displacement,
-            target_biome: None, // Legacy single-env evaluation
+            target_biome: None,     // Legacy single-env evaluation
             multi_env_scores: None, // Single environment
         }
     }
@@ -1219,7 +1225,7 @@ impl TrainingEnv {
             fitness,
             behavior,
             displacement,
-            target_biome: None, // Single terrain evaluation
+            target_biome: None,     // Single terrain evaluation
             multi_env_scores: None, // Single terrain, no multi-env tracking
         }
     }
@@ -1402,7 +1408,8 @@ impl TrainingEnv {
                 // Calculate overall fitness distribution (across all environment types)
                 let all_fitnesses: Vec<f32> = all_env_scores.iter().map(|(_, f)| *f).collect();
                 let mut sorted_fitnesses = all_fitnesses.clone();
-                sorted_fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                sorted_fitnesses
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
                 let min = sorted_fitnesses[0];
                 let max = sorted_fitnesses[sorted_fitnesses.len() - 1];
@@ -1789,8 +1796,8 @@ mod tests {
 
     #[test]
     fn test_multi_env_configuration() {
-        use crate::headless::multi_env_eval::{FitnessAggregation, MultiEnvironmentEvaluator};
         use crate::headless::env_distribution::EnvironmentDistribution;
+        use crate::headless::multi_env_eval::{FitnessAggregation, MultiEnvironmentEvaluator};
 
         let config = TrainingConfig {
             generations: 2,
@@ -1875,8 +1882,8 @@ mod tests {
 
     #[test]
     fn test_biome_specialist_with_multi_env() {
-        use crate::headless::multi_env_eval::{FitnessAggregation, MultiEnvironmentEvaluator};
         use crate::headless::env_distribution::EnvironmentDistribution;
+        use crate::headless::multi_env_eval::{FitnessAggregation, MultiEnvironmentEvaluator};
 
         let config = TrainingConfig {
             generations: 2,

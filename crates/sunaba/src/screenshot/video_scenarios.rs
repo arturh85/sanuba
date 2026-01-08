@@ -277,30 +277,24 @@ fn create_water_flow_scenario() -> VideoScenario {
     }
 }
 
-/// Bridge collapse with cascade failure (Structural Integrity)
+/// Bridge collapse with fire burning through wooden support (Structural Integrity + Fire)
 fn create_bridge_collapse_scenario() -> VideoScenario {
     VideoScenario {
         id: "bridge_collapse",
         name: "Bridge Collapse",
-        description: "Bridge collapses after pillar removal, demonstrating structural dependency and debris physics",
+        description: "Fire burns wooden center support, causing stone bridge to collapse dramatically",
         level_id: Some(8), // Bridge Demolition level
-        duration_seconds: 6.0,
+        duration_seconds: 10.0,
         fps: 20,
         width: 340,
         height: 192,
-        actions: vec![
-            ScenarioAction::Wait { frames: 60 }, // Wait 1 second
-            ScenarioAction::RemoveSupport {
-                x: -5,
-                y: 40,
-                width: 10,
-                height: 50,
-            }, // Remove pillar
-            ScenarioAction::Wait { frames: 300 }, // Watch collapse (5 seconds)
-        ],
-        camera: Some(CameraSpec::Manual {
-            center: Vec2::new(32.0, 26.0),
-            zoom: 1.0,
+        actions: vec![], // No actions needed - fire is placed in level, physics handles everything
+        camera: Some(CameraSpec::Bounds {
+            min_x: 0,
+            max_x: 64,
+            min_y: 8,
+            max_y: 58,
+            padding: 10,
         }),
     }
 }
@@ -457,8 +451,8 @@ mod tests {
         assert_eq!(fire_spread.name, "Fire Spreading");
         assert_eq!(fire_spread.level_id, Some(1));
         assert_eq!(fire_spread.fps, 20);
-        assert_eq!(fire_spread.width, 1280);
-        assert_eq!(fire_spread.height, 720);
+        assert_eq!(fire_spread.width, 340);
+        assert_eq!(fire_spread.height, 192);
     }
 
     #[test]

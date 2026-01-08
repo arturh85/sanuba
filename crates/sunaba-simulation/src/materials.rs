@@ -227,7 +227,7 @@ impl Materials {
             density: 2.5,
             hardness: Some(5),
             structural: true,
-            melting_point: Some(1200.0),
+            melting_point: Some(5000.0), // Increased from 1200.0 to prevent fire from melting stone
             melts_to: Some(MaterialId::LAVA),
             ..Default::default()
         });

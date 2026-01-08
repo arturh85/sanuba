@@ -424,7 +424,7 @@ pub fn generate_level_8_volcano(world: &mut World) {
 }
 
 /// Level 9: Bridge Demolition
-/// Stone bridge supported by pillars - remove pillars to collapse bridge
+/// Stone bridge with wooden center support - fire causes structural collapse
 pub fn generate_level_9_bridge(world: &mut World) {
     world.clear_all_chunks();
 
@@ -451,24 +451,38 @@ pub fn generate_level_9_bridge(world: &mut World) {
 
             // CENTER CHUNK - Bridge structure
             if cx == 0 && cy == 0 {
-                // Left pillar (x: 10-13, height: 20)
-                for x in 10..=13 {
-                    for y in 0..20 {
+                // Left STONE pillar (x: 2-10, 9px wide, 38px tall)
+                for x in 2..=10 {
+                    for y in 10..48 {
                         chunk.set_material(x, y, MaterialId::STONE);
                     }
                 }
 
-                // Right pillar (x: 50-53, height: 20)
-                for x in 50..=53 {
-                    for y in 0..20 {
+                // Center WOODEN support column (x: 28-36, 9px wide, 38px tall) - BURN TARGET
+                for x in 28..=36 {
+                    for y in 10..48 {
+                        chunk.set_material(x, y, MaterialId::WOOD);
+                    }
+                }
+
+                // Right STONE pillar (x: 54-62, 9px wide, 38px tall)
+                for x in 54..=62 {
+                    for y in 10..48 {
                         chunk.set_material(x, y, MaterialId::STONE);
                     }
                 }
 
-                // Bridge span (connecting the two pillars at height 20-23)
-                for x in 10..=53 {
-                    for y in 20..=23 {
+                // Heavy STONE bridge deck (x: 2-62, 61px wide, 8px thick)
+                for x in 2..=62 {
+                    for y in 48..=55 {
                         chunk.set_material(x, y, MaterialId::STONE);
+                    }
+                }
+
+                // Fire at base of wooden center column (5×4 area)
+                for x in 30..=34 {
+                    for y in 11..=14 {
+                        chunk.set_material(x, y, MaterialId::FIRE);
                     }
                 }
             }

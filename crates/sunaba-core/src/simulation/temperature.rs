@@ -8,6 +8,9 @@ use crate::world::Chunk;
 use glam::IVec2;
 use std::collections::HashMap;
 
+/// Maximum temperature cap to prevent runaway heat accumulation
+const MAX_TEMPERATURE: f32 = 3000.0;
+
 /// Temperature simulator with 30fps throttling
 pub struct TemperatureSimulator {
     /// Counter for throttling updates to 30fps (every 2 frames at 60fps)
@@ -100,7 +103,7 @@ pub fn temp_to_index(cx: usize, cy: usize) -> usize {
 pub fn add_heat_at_pixel(chunk: &mut Chunk, x: usize, y: usize, heat: f32) {
     let (cx, cy) = pixel_to_temp_coords(x, y);
     let idx = temp_to_index(cx, cy);
-    chunk.temperature[idx] += heat;
+    chunk.temperature[idx] = (chunk.temperature[idx] + heat).min(MAX_TEMPERATURE);
 }
 
 /// Get temperature at the cell containing the given pixel

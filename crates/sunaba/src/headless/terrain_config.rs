@@ -461,5 +461,4 @@ mod tests {
         };
         assert_eq!(custom.classify_type(), "mixed");
     }
-
 }

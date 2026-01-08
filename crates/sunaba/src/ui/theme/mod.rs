@@ -15,6 +15,7 @@ pub use fonts::FontSystem;
 pub use sizing::{GridSpacing, ResponsiveSizing};
 
 use egui::{Context, Shadow, Stroke};
+use std::str::FromStr;
 
 /// Theme variant identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -37,14 +38,17 @@ impl ThemeVariant {
             Self::PixelAdventure => "pixel_adventure",
         }
     }
+}
 
-    /// Parse a variant from a string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for ThemeVariant {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "cozy_alchemist" => Some(Self::CozyAlchemist),
-            "dark_cavern" => Some(Self::DarkCavern),
-            "pixel_adventure" => Some(Self::PixelAdventure),
-            _ => None,
+            "cozy_alchemist" => Ok(Self::CozyAlchemist),
+            "dark_cavern" => Ok(Self::DarkCavern),
+            "pixel_adventure" => Ok(Self::PixelAdventure),
+            _ => Err(format!("Unknown theme variant: {}", s)),
         }
     }
 }
@@ -245,9 +249,9 @@ mod tests {
         assert_eq!(ThemeVariant::CozyAlchemist.as_str(), "cozy_alchemist");
         assert_eq!(
             ThemeVariant::from_str("cozy_alchemist"),
-            Some(ThemeVariant::CozyAlchemist)
+            Ok(ThemeVariant::CozyAlchemist)
         );
-        assert_eq!(ThemeVariant::from_str("invalid"), None);
+        assert!(ThemeVariant::from_str("invalid").is_err());
     }
 
     #[test]

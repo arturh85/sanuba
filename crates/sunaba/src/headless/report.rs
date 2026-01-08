@@ -105,18 +105,10 @@ impl ReportGenerator {
         let mut csv = String::new();
 
         // Determine which columns to include based on available data
-        let has_multi_env = stats_history
-            .iter()
-            .any(|s| s.multi_env_stats.is_some());
-        let has_curriculum = stats_history
-            .iter()
-            .any(|s| s.curriculum_stage.is_some());
-        let has_diversity = stats_history
-            .iter()
-            .any(|s| s.behavior_diversity.is_some());
-        let has_biome = stats_history
-            .iter()
-            .any(|s| s.best_per_biome.is_some());
+        let has_multi_env = stats_history.iter().any(|s| s.multi_env_stats.is_some());
+        let has_curriculum = stats_history.iter().any(|s| s.curriculum_stage.is_some());
+        let has_diversity = stats_history.iter().any(|s| s.behavior_diversity.is_some());
+        let has_biome = stats_history.iter().any(|s| s.best_per_biome.is_some());
 
         // Build CSV header
         csv.push_str("generation,best_fitness,avg_fitness,grid_coverage,new_elites,max_displacement,avg_displacement");
@@ -974,7 +966,14 @@ impl ReportGenerator {
             "std_dev": {:.2}
         }}
     }}"#,
-                        env_perf, dist.min, dist.q25, dist.median, dist.q75, dist.max, dist.mean, dist.std_dev
+                        env_perf,
+                        dist.min,
+                        dist.q25,
+                        dist.median,
+                        dist.q75,
+                        dist.max,
+                        dist.mean,
+                        dist.std_dev
                     )
                 } else {
                     String::new()

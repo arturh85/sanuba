@@ -38,7 +38,7 @@ use std::path::Path;
 use crate::headless::PixelRenderer;
 use crate::levels::LevelManager;
 use crate::simulation::Materials;
-use crate::world::{NoopStats, World, CHUNK_SIZE};
+use crate::world::{CHUNK_SIZE, NoopStats, World};
 use rand::thread_rng;
 
 use offscreen_renderer::OffscreenRenderer;
@@ -1440,8 +1440,16 @@ mod tests {
         assert!(!pixel_matches_filter(MaterialId::AIR, &materials, &filter));
         assert!(pixel_matches_filter(MaterialId::STONE, &materials, &filter)); // Solid
         assert!(pixel_matches_filter(MaterialId::SAND, &materials, &filter)); // Powder
-        assert!(!pixel_matches_filter(MaterialId::WATER, &materials, &filter)); // Liquid
-        assert!(!pixel_matches_filter(MaterialId::STEAM, &materials, &filter)); // Gas
+        assert!(!pixel_matches_filter(
+            MaterialId::WATER,
+            &materials,
+            &filter
+        )); // Liquid
+        assert!(!pixel_matches_filter(
+            MaterialId::STEAM,
+            &materials,
+            &filter
+        )); // Gas
     }
 
     /// Test pixel_matches_filter with ExcludeTypes filter (exclude gases)
@@ -1454,7 +1462,11 @@ mod tests {
         assert!(pixel_matches_filter(MaterialId::STONE, &materials, &filter));
         assert!(pixel_matches_filter(MaterialId::SAND, &materials, &filter));
         assert!(pixel_matches_filter(MaterialId::WATER, &materials, &filter));
-        assert!(!pixel_matches_filter(MaterialId::STEAM, &materials, &filter)); // Gas - excluded
+        assert!(!pixel_matches_filter(
+            MaterialId::STEAM,
+            &materials,
+            &filter
+        )); // Gas - excluded
     }
 
     /// Test pixel_matches_filter with Ids filter (specific material IDs)
@@ -1467,7 +1479,11 @@ mod tests {
         assert!(pixel_matches_filter(MaterialId::STONE, &materials, &filter)); // In list
         assert!(!pixel_matches_filter(MaterialId::SAND, &materials, &filter));
         assert!(pixel_matches_filter(MaterialId::WATER, &materials, &filter)); // In list
-        assert!(!pixel_matches_filter(MaterialId::STEAM, &materials, &filter));
+        assert!(!pixel_matches_filter(
+            MaterialId::STEAM,
+            &materials,
+            &filter
+        ));
     }
 
     /// Test pixel_matches_filter with ExcludeIds filter
@@ -1480,7 +1496,11 @@ mod tests {
         assert!(pixel_matches_filter(MaterialId::STONE, &materials, &filter));
         assert!(!pixel_matches_filter(MaterialId::SAND, &materials, &filter)); // Excluded
         assert!(pixel_matches_filter(MaterialId::WATER, &materials, &filter));
-        assert!(!pixel_matches_filter(MaterialId::STEAM, &materials, &filter)); // Excluded
+        assert!(!pixel_matches_filter(
+            MaterialId::STEAM,
+            &materials,
+            &filter
+        )); // Excluded
     }
 
     /// Test CameraSpec serialization/deserialization (Bounds variant)
@@ -1498,7 +1518,13 @@ mod tests {
         let deserialized: CameraSpec = ron::from_str(&ron_str).unwrap();
 
         match deserialized {
-            CameraSpec::Bounds { min_x, min_y, max_x, max_y, padding } => {
+            CameraSpec::Bounds {
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+                padding,
+            } => {
                 assert_eq!(min_x, -50);
                 assert_eq!(min_y, -30);
                 assert_eq!(max_x, 100);
