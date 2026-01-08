@@ -143,7 +143,7 @@ pub fn capture_level_screenshot(
     // Render to pixel buffer
     log::info!("Rendering scene...");
     let mut renderer = PixelRenderer::new(config.width, config.height);
-    renderer.render(&world, &materials, camera_center, &[]);
+    renderer.render(&world, &materials, camera_center, &[], 1.0); // 1x zoom (1:1 pixel mapping)
 
     // Save to PNG
     log::info!("Saving to {:?}...", output_path.as_ref());
@@ -272,7 +272,7 @@ fn capture_composite_screenshot(
     // Render world to pixel buffer
     let camera_center = Vec2::new(0.0, 32.0);
     let mut pixel_renderer = PixelRenderer::new(width, height);
-    pixel_renderer.render(&world, &materials, camera_center, &[]);
+    pixel_renderer.render(&world, &materials, camera_center, &[], 1.0); // 1x zoom
     let world_pixels = &pixel_renderer.buffer;
 
     // 2. Create sample data for UI
@@ -723,8 +723,8 @@ pub fn capture_video_scenario(
     // Initialize video capture
     let mut video = VideoCapture::new(scenario.width, scenario.height, scenario.fps)?;
 
-    // Initialize world (skip initial creatures for clean video)
-    let mut world = World::new(true);
+    // Initialize world without random generation (skip initial creatures for clean video)
+    let mut world = World::new(false);
     let materials = Materials::new();
 
     // Load level if specified
@@ -738,14 +738,30 @@ pub fn capture_video_scenario(
             );
         }
         level_manager.load_level(level_id, &mut world);
+
+        // CRITICAL: Disable persistence to prevent procedural chunk generation
+        // This ensures only the demo level chunks are present (no random terrain)
+        world.disable_persistence();
+
         let level_name = level_manager.levels()[level_id].name;
         log::info!("  Level: {}", level_name);
     } else {
         log::info!("  Level: (empty world)");
     }
 
-    // Determine camera center (default to world origin)
-    let camera_center = Vec2::new(0.0, 32.0);
+    // Determine camera center based on actual content bounds (not chunk coordinates)
+    // Each level places content at different world coordinates within the 5x5 chunk grid
+    let camera_center = match scenario.level_id {
+        Some(1) => Vec2::new(32.0, 32.0), // Fire spread - full 5x5 grid centered at (32, 32)
+        Some(2) => Vec2::new(32.0, 14.0), // Lava/water - content peaks at Y=28, center at Y=14
+        Some(5) => Vec2::new(31.0, 14.0), // Liquid lab - water/oil at Y [0-28], X [0-62]
+        Some(8) => Vec2::new(32.0, -52.0), // Bridge - bedrock down to Y=-128, bridge at Y=24
+        Some(16) => Vec2::new(32.0, 35.0), // Stress test - platform at Y [15-54]
+        Some(18) => Vec2::new(32.0, 28.0), // Alchemy - chambers at Y [0-56]
+        Some(19) => Vec2::new(32.0, 32.0), // Plant growth - typical 5x5 distribution
+        Some(20) => Vec2::new(32.0, 32.0), // Day/night - farm/plants distributed
+        _ => Vec2::new(32.0, 32.0),       // Default: center of 5x5 chunk grid
+    };
 
     // Create renderer
     let mut renderer = PixelRenderer::new(scenario.width as usize, scenario.height as usize);
@@ -781,7 +797,19 @@ pub fn capture_video_scenario(
 
         // Capture frame at intervals
         if frame % capture_interval == 0 {
-            renderer.render(&world, &materials, camera_center, &[]);
+            // Use per-level zoom to properly frame content (different levels have very different sizes)
+            let zoom = match scenario.level_id {
+                Some(1) => 2.0,  // Fire spread - full 5x5 chunk grid (320x320)
+                Some(2) => 8.0,  // Lava/water - small content area (64x28)
+                Some(5) => 8.0,  // Liquid lab - small platforms (62x28)
+                Some(8) => 4.0,  // Bridge - vertical structure (44x152)
+                Some(16) => 5.0, // Stress test - medium platform
+                Some(18) => 5.0, // Alchemy - chambers
+                Some(19) => 5.0, // Plant growth
+                Some(20) => 5.0, // Day/night - farm area
+                _ => 4.0,        // Default: moderate zoom
+            };
+            renderer.render(&world, &materials, camera_center, &[], zoom);
             video.capture_frame(&renderer)?;
         }
 
