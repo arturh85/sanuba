@@ -8,6 +8,7 @@
 .DS_Store
 training_output/
 screenshots/
+videos/
 /papers/
 /experiments/20*.md
 /reports/

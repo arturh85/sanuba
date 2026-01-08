@@ -95,8 +95,17 @@ impl VideoCapture {
 
         let output_path = output.as_ref();
 
+        // Convert to absolute path before changing directory
+        let absolute_output = if output_path.is_absolute() {
+            output_path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .context("Failed to get current directory")?
+                .join(output_path)
+        };
+
         // Ensure output directory exists
-        if let Some(parent) = output_path.parent() {
+        if let Some(parent) = absolute_output.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create output directory: {:?}", parent))?;
         }
@@ -104,7 +113,7 @@ impl VideoCapture {
         log::info!(
             "Encoding {} frames to MP4: {:?} ({}fps, {}x{})",
             self.frame_count,
-            output_path,
+            absolute_output,
             self.fps,
             self.width,
             self.height
@@ -127,7 +136,7 @@ impl VideoCapture {
                 "-pix_fmt",
                 "yuv420p",
                 "-y", // Overwrite output file
-                output_path.to_str().context("Invalid output path")?,
+                absolute_output.to_str().context("Invalid output path")?,
             ])
             .status()
             .context("Failed to execute ffmpeg (is it installed?)")?;
@@ -139,7 +148,7 @@ impl VideoCapture {
             );
         }
 
-        log::info!("Successfully encoded MP4: {:?}", output_path);
+        log::info!("Successfully encoded MP4: {:?}", absolute_output);
         Ok(())
     }
 }
