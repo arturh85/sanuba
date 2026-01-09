@@ -255,6 +255,12 @@ impl Chunk {
         let (cx, cy) = (x / 8, y / 8); // Convert pixel to coarse grid coords
         self.pressure[cy * 8 + cx]
     }
+
+    /// Get the index for the coarse 8x8 grid from pixel coordinates.
+    #[inline]
+    pub fn get_coarse_grid_index(&self, x: usize, y: usize) -> usize {
+        (y / 8) * 8 + (x / 8)
+    }
 }
 
 impl Default for Chunk {

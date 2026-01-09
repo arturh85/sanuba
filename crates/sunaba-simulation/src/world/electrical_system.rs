@@ -1,10 +1,9 @@
 //! Manages the propagation of electricity through conductive materials.
 // Based on the POWDER_PLAN.md
 
-use crate::simulation::{Materials, pixel_flags};
-use crate::world::{CHUNK_SIZE, Chunk};
+use crate::{CHUNK_SIZE, Chunk, Materials, Pixel, pixel_flags};
 use glam::IVec2;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 const PROPAGATION_QUEUE_MAX: usize = 256;
 
@@ -24,12 +23,12 @@ impl ElectricalSystem {
     /// Updates the electrical state for all active chunks.
     pub fn update(
         &mut self,
-        chunks: &mut HashMap<IVec2, Chunk>,
+        chunks: &mut std::collections::HashMap<IVec2, Chunk>,
         active_chunks: &[IVec2],
         materials: &Materials,
     ) {
         // 1. Deplete power sources and discharge powered pixels
-        self.discharge_and_deplete(chunks, active_chunks);
+        self.discharge_and_deplete(chunks, active_chunks, materials);
 
         // 2. Add power from active sources to the grid
         self.add_power_from_sources(chunks, active_chunks, materials);
@@ -42,40 +41,25 @@ impl ElectricalSystem {
     }
 
     /// Reduces power level of powered pixels and batteries.
-    fn discharge_and_deplete(&self, chunks: &mut HashMap<IVec2, Chunk>, active_chunks: &[IVec2]) {
+    fn discharge_and_deplete(
+        &self,
+        chunks: &mut std::collections::HashMap<IVec2, Chunk>,
+        active_chunks: &[IVec2],
+        materials: &Materials,
+    ) {
         for &chunk_pos in active_chunks {
             if let Some(chunk) = chunks.get_mut(&chunk_pos) {
                 let mut needs_update = false;
                 for i in 0..chunk.electrical_potential.len() {
                     if chunk.electrical_potential[i] > 0.0 {
-                        let (cy, cx) = (i / 8, i % 8);
-                        let mut is_battery_cell = false;
-                        'outer: for y in (cy * 8)..(cy * 8 + 8) {
-                            for x in (cx * 8)..(cx * 8 + 8) {
-                                if chunk.get_pixel(x, y).flags & pixel_flags::SPARK_SOURCE != 0 {
-                                    is_battery_cell = true;
-                                    break 'outer;
-                                }
-                            }
-                        }
-
-                        if !is_battery_cell {
-                            chunk.electrical_potential[i] =
-                                (chunk.electrical_potential[i] - 0.1).max(0.0);
-                            needs_update = true;
-                        }
-
+                        let material_def = materials.get(chunk.pixels[i].material_id);
+                        let decay = material_def.power_decay_rate.max(0.01);
+                        chunk.electrical_potential[i] =
+                            (chunk.electrical_potential[i] - decay).max(0.0);
                         if chunk.electrical_potential[i] == 0.0 {
-                            for y in (cy * 8)..(cy * 8 + 8) {
-                                for x in (cx * 8)..(cx * 8 + 8) {
-                                    let mut pixel = chunk.get_pixel(x, y);
-                                    if pixel.flags & pixel_flags::POWERED != 0 {
-                                        pixel.flags &= !pixel_flags::POWERED;
-                                        chunk.set_pixel(x, y, pixel);
-                                    }
-                                }
-                            }
+                            chunk.pixels[i].flags &= !pixel_flags::POWERED;
                         }
+                        needs_update = true;
                     }
                 }
                 if needs_update {
@@ -88,7 +72,7 @@ impl ElectricalSystem {
     /// Adds power from batteries and other sources.
     fn add_power_from_sources(
         &mut self,
-        chunks: &mut HashMap<IVec2, Chunk>,
+        chunks: &mut std::collections::HashMap<IVec2, Chunk>,
         active_chunks: &[IVec2],
         materials: &Materials,
     ) {
@@ -96,7 +80,8 @@ impl ElectricalSystem {
             if let Some(chunk) = chunks.get_mut(&chunk_pos) {
                 for y in 0..CHUNK_SIZE {
                     for x in 0..CHUNK_SIZE {
-                        let pixel = chunk.get_pixel(x, y);
+                        let pixel_index = y * CHUNK_SIZE + x;
+                        let pixel = &chunk.pixels[pixel_index];
                         if pixel.flags & pixel_flags::SPARK_SOURCE != 0 {
                             let material_def = materials.get(pixel.material_id);
                             if material_def.power_generation > 0.0 {
@@ -105,10 +90,7 @@ impl ElectricalSystem {
                                 let new_potential =
                                     (current_potential + material_def.power_generation).min(100.0);
                                 chunk.electrical_potential[coarse_idx] = new_potential;
-
-                                let mut pixel = chunk.get_pixel(x, y);
-                                pixel.flags |= pixel_flags::POWERED;
-                                chunk.set_pixel(x, y, pixel);
+                                chunk.pixels[pixel_index].flags |= pixel_flags::POWERED;
 
                                 if self.propagation_queue.len() < PROPAGATION_QUEUE_MAX {
                                     self.propagation_queue.push_back((chunk_pos, x, y));
@@ -122,7 +104,11 @@ impl ElectricalSystem {
     }
 
     /// Propagates electricity through the grid.
-    fn propagate_power(&mut self, chunks: &mut HashMap<IVec2, Chunk>, materials: &Materials) {
+    fn propagate_power(
+        &mut self,
+        chunks: &mut std::collections::HashMap<IVec2, Chunk>,
+        materials: &Materials,
+    ) {
         let mut depth = 0;
         const MAX_DEPTH_PER_FRAME: usize = 128;
 
@@ -133,12 +119,9 @@ impl ElectricalSystem {
             depth += 1;
 
             let source_potential = {
-                if let Some(chunk) = chunks.get(&chunk_pos) {
-                    let coarse_idx = chunk.get_coarse_grid_index(x, y);
-                    chunk.electrical_potential[coarse_idx]
-                } else {
-                    continue;
-                }
+                let chunk = chunks.get(&chunk_pos).unwrap();
+                let coarse_idx = chunk.get_coarse_grid_index(x, y);
+                chunk.electrical_potential[coarse_idx]
             };
 
             if source_potential <= 0.0 {
@@ -153,10 +136,12 @@ impl ElectricalSystem {
 
                     let nx = x as i32 + dx;
                     let ny = y as i32 + dy;
-                    let (next_chunk_pos, next_x, next_y) = self.get_neighbor_pos(chunk_pos, nx, ny);
+                    let (next_chunk_pos, next_x, next_y) =
+                        Self::get_neighbor_pos(chunk_pos, nx, ny);
 
                     if let Some(neighbor_chunk) = chunks.get_mut(&next_chunk_pos) {
-                        let neighbor_pixel = neighbor_chunk.get_pixel(next_x, next_y);
+                        let neighbor_idx = next_y * CHUNK_SIZE + next_x;
+                        let neighbor_pixel = &mut neighbor_chunk.pixels[neighbor_idx];
                         let neighbor_material = materials.get(neighbor_pixel.material_id);
 
                         if neighbor_material.conducts_electricity {
@@ -171,10 +156,8 @@ impl ElectricalSystem {
 
                             if transfer_amount > 0.01 {
                                 *neighbor_potential += transfer_amount;
-
-                                let mut p = neighbor_chunk.get_pixel(next_x, next_y);
-                                p.flags |= pixel_flags::POWERED;
-                                neighbor_chunk.set_pixel(next_x, next_y, p);
+                                neighbor_pixel.flags |= pixel_flags::POWERED;
+                                neighbor_chunk.dirty = true;
 
                                 if self.propagation_queue.len() < PROPAGATION_QUEUE_MAX {
                                     self.propagation_queue.push_back((
@@ -195,7 +178,7 @@ impl ElectricalSystem {
     /// Generates heat and other effects from electricity.
     fn handle_effects(
         &self,
-        chunks: &mut HashMap<IVec2, Chunk>,
+        chunks: &mut std::collections::HashMap<IVec2, Chunk>,
         active_chunks: &[IVec2],
         materials: &Materials,
     ) {
@@ -222,7 +205,7 @@ impl ElectricalSystem {
     }
 
     /// Helper to get neighbor position, handling chunk boundaries.
-    fn get_neighbor_pos(&self, chunk_pos: IVec2, x: i32, y: i32) -> (IVec2, usize, usize) {
+    fn get_neighbor_pos(chunk_pos: IVec2, x: i32, y: i32) -> (IVec2, usize, usize) {
         let mut next_chunk_pos = chunk_pos;
         let mut next_x = x;
         let mut next_y = y;

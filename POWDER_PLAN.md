@@ -94,7 +94,7 @@
 
 **Files to modify:**
 - `sunaba-simulation/src/pixel.rs` - Add electrical flags
-- `sunaba-simulation/src/world/electrical_system.rs` - **NEW** module
+- `sunaba-core/src/world/electrical_system.rs` - **NEW** module
 - `sunaba-simulation/src/materials.rs` - Add `electrical_conductivity` property
 - `sunaba-core/src/world/world.rs` - Integrate electrical update step
 
@@ -680,7 +680,10 @@ just web-powder  # New justfile command
      - Added 3 pixel flags (CONDUCTIVE, POWERED, SPARK_SOURCE)
      - Added electrical_potential[64] grid to Chunk (8×8 coarse, mirrors temperature/pressure)
      - All code compiles, `just check` passes
-   - ✅ **Phase 1.2**: Create ElectricalSystem module (~300 lines)
+   - ✅ **Phase 1.2**: Create ElectricalSystem module (~300 lines) (2024-01-09)
+     - Implemented a more advanced electrical simulation in `sunaba-core` with potential grid, propagation, and heat generation.
+     - The initial idea to place this in `sunaba-simulation` was flawed due to crate dependencies (`Chunk` is in `sunaba-core`).
+     - The system is now correctly located in `sunaba-core/src/world/electrical_system.rs` and integrated into the main world update loop.
    - ⏳ **Phase 1.3**: Add 5 electrical materials
    - ⏳ **Phase 1.4**: Add electrical reactions
    - ⏳ **Phase 1.5**: Implement special behaviors (Spark/Thunder)

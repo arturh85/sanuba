@@ -713,11 +713,11 @@ impl World {
         {
             #[cfg(feature = "profiling")]
             puffin::profile_scope!("electrical");
-            for pos in &chunks_to_update {
-                if let Some(chunk) = self.chunk_manager.chunks.get_mut(pos) {
-                    self.electrical_system.update(chunk);
-                }
-            }
+            self.electrical_system.update(
+                &mut self.chunk_manager.chunks,
+                &chunks_to_update,
+                &self.materials,
+            );
         }
 
         // 3. Temperature diffusion (30fps throttled) - active chunks only
