@@ -686,7 +686,7 @@ just web-powder  # New justfile command
      - The system is now correctly located in `sunaba-core/src/world/electrical_system.rs` and integrated into the main world update loop.
    - ✅ **Phase 1.3**: Add 5 electrical materials (2024-01-09)
    - ✅ **Phase 1.4**: Add electrical reactions (2026-01-09)
-   - ✅ **Phase 1.5**: Implement special behaviors (Spark/Thunder)
+   - ✅ **Phase 1.5**: Implement special behaviors (Spark/Thunder) (2026-01-09)
    - 🚧 **Phase 1.6**: Testing & validation
 3. ⏳ **Week 2**: Implement pressure system
 4. ⏳ **Week 3**: Add special behaviors

@@ -505,6 +505,9 @@ impl ReactionRegistry {
 
         // === ELECTRICAL REACTIONS ===
 
+        // === ELECTRICAL REACTIONS ===
+
+        // Spark + Flammable Material -> Fire
         for mat_def in materials.all_materials() {
             if mat_def.flammable
                 && mat_def.id != MaterialId::FIRE
@@ -547,6 +550,7 @@ impl ReactionRegistry {
 
         // Thunder + Non-Conductor -> Air
         for mat_def in materials.all_materials() {
+            // Thunder does not destroy itself, air, or laser (which has special handling)
             if !mat_def.conducts_electricity
                 && mat_def.id != MaterialId::AIR
                 && mat_def.id != MaterialId::THUNDER
