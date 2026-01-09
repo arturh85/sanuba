@@ -680,7 +680,7 @@ just web-powder  # New justfile command
      - Added 3 pixel flags (CONDUCTIVE, POWERED, SPARK_SOURCE)
      - Added electrical_potential[64] grid to Chunk (8×8 coarse, mirrors temperature/pressure)
      - All code compiles, `just check` passes
-   - ⏳ **Phase 1.2**: Create ElectricalSystem module (~300 lines)
+   - ✅ **Phase 1.2**: Create ElectricalSystem module (~300 lines)
    - ⏳ **Phase 1.3**: Add 5 electrical materials
    - ⏳ **Phase 1.4**: Add electrical reactions
    - ⏳ **Phase 1.5**: Implement special behaviors (Spark/Thunder)

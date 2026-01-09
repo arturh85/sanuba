@@ -11,6 +11,7 @@ mod chunk_status;
 mod collision;
 pub mod context_scanner;
 mod debris_system;
+pub mod electrical_system;
 pub mod features;
 pub mod generation;
 mod light_system;
@@ -42,6 +43,7 @@ pub use context_scanner::{
     ContextScanner, MAX_SCAN_DISTANCE, PlacementContext, PlacementPredicate,
 };
 pub use debris_system::DebrisSystem;
+pub use electrical_system::ElectricalSystem;
 pub use generation::WorldGenerator;
 pub use light_system::LightSystem;
 pub use mining_system::MiningSystem;

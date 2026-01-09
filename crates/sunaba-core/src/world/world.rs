@@ -14,6 +14,7 @@ use super::chunk_manager::ChunkManager;
 use super::chunk_status::ChunkStatus;
 use super::collision::CollisionDetector;
 use super::debris_system::DebrisSystem;
+use super::electrical_system::ElectricalSystem;
 use super::light_system::LightSystem;
 use super::mining_system::MiningSystem;
 use super::persistence_system::PersistenceSystem;
@@ -65,6 +66,9 @@ pub struct World {
     /// Debris system (kinematic falling chunks, simple debris physics, WASM-compatible)
     debris_system: DebrisSystem,
 
+    /// Electrical system (power propagation for Powder Game)
+    electrical_system: ElectricalSystem,
+
     /// Creature manager (spawning, AI, behavior)
     pub creature_manager: crate::creature::spawning::CreatureManager,
 
@@ -99,6 +103,7 @@ impl World {
                 crate::simulation::temporary_light_manager::TemporaryLightManager::new(),
             regeneration_system: RegenerationSystem::new(),
             debris_system: DebrisSystem::new(),
+            electrical_system: ElectricalSystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
@@ -701,6 +706,17 @@ impl World {
             puffin::profile_scope!("ca_updates");
             for pos in &chunks_to_update {
                 self.update_chunk_ca(*pos, stats, rng);
+            }
+        }
+
+        // 2.5. Electrical system update
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("electrical");
+            for pos in &chunks_to_update {
+                if let Some(chunk) = self.chunk_manager.chunks.get_mut(pos) {
+                    self.electrical_system.update(chunk);
+                }
             }
         }
 
