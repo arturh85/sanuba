@@ -1,0 +1,38 @@
+(
+    name: "Electricity Thunder Test",
+    description: "Tests if THUNDER material destroys non-conductors in its radius.",
+
+    setup: [
+        // Place a battery to power the circuit
+        (type: "PlaceMaterial", material: 41, x: 10, y: 10, radius: 1), // BATTERY
+        // Place wire next to battery
+        (type: "PlaceMaterial", material: 42, x: 11, y: 10, radius: 1), // WIRE
+        // Place Thunder next to the wire so it gets powered
+        (type: "PlaceMaterial", material: 39, x: 12, y: 10, radius: 1), // THUNDER
+        // Place non-conductive materials around Thunder
+        (type: "PlaceMaterial", material: 1, x: 11, y: 9, radius: 1), // STONE
+        (type: "PlaceMaterial", material: 4, x: 12, y: 9, radius: 1), // WOOD
+        (type: "PlaceMaterial", material: 1, x: 13, y: 9, radius: 1), // STONE
+        (type: "PlaceMaterial", material: 4, x: 11, y: 11, radius: 1), // WOOD
+        (type: "PlaceMaterial", material: 1, x: 12, y: 11, radius: 1), // STONE
+        (type: "PlaceMaterial", material: 4, x: 13, y: 11, radius: 1), // WOOD
+    ],
+
+    actions: [
+        (type: "WaitFrames", frames: 2), // Allow thunder to activate and destroy
+    ],
+
+    verify: [
+        // Check if non-conductive materials are destroyed (turned to AIR)
+        (type: "MaterialAt", x: 11, y: 9, expected: 0), // STONE -> AIR
+        (type: "MaterialAt", x: 12, y: 9, expected: 0), // WOOD -> AIR
+        (type: "MaterialAt", x: 13, y: 9, expected: 0), // STONE -> AIR
+        (type: "MaterialAt", x: 11, y: 11, expected: 0), // WOOD -> AIR
+        (type: "MaterialAt", x: 12, y: 11, expected: 0), // STONE -> AIR
+        (type: "MaterialAt", x: 13, y: 11, expected: 0), // WOOD -> AIR
+        // Check if Thunder pixel itself is now AIR
+        (type: "MaterialAt", x: 12, y: 10, expected: 0), // THUNDER -> AIR
+    ],
+
+    cleanup: [],
+)

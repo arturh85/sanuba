@@ -2,7 +2,7 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 # Environment variable for RUST_LOG
-export RUST_LOG := "info"
+# export RUST_LOG := "info"
 
 # Internal helper: ensure SpacetimeDB CLI is installed and generated files exist
 [unix]

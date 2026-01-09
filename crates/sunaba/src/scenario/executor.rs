@@ -97,6 +97,8 @@ impl ScenarioExecutor {
                     return Err(anyhow::anyhow!(msg));
                 }
             }
+            // Crucial: Update active chunks after setup to ensure newly placed materials are considered
+            world.update_active_chunks();
         }
 
         // Execute main actions

@@ -1,0 +1,32 @@
+(
+    name: "Electricity Spark Test",
+    description: "Tests if SPARK material can jump small air gaps between conductors.",
+
+    setup: [
+        // Place a battery to power the circuit
+        (type: "FillRect", min_x: 7, max_x: 7, min_y: 7, max_y: 7, material: 41), // BATTERY (coarse cell 0,0)
+        // Place wire next to battery
+        (type: "FillRect", min_x: 8, max_x: 8, min_y: 7, max_y: 7, material: 42), // WIRE (coarse cell 1,0)
+        (type: "FillRect", min_x: 9, max_x: 9, min_y: 7, max_y: 7, material: 42), // WIRE
+        // Create an air gap for the spark to jump over
+        (type: "FillRect", min_x: 10, max_x: 10, min_y: 7, max_y: 7, material: 0),  // AIR (original spark position)
+        (type: "FillRect", min_x: 11, max_x: 11, min_y: 7, max_y: 7, material: 0),  // AIR (target for spark)
+        // Conductor after the air gap to attract the spark
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 7, max_y: 7, material: 42), // WIRE
+        // Place spark in the air gap, adjacent to a powered wire
+        (type: "FillRect", min_x: 10, max_x: 10, min_y: 7, max_y: 7, material: 38), // SPARK
+    ],
+
+    actions: [
+        (type: "WaitFrames", frames: 10), // Allow spark to propagate
+    ],
+
+    verify: [
+        // Check if the SPARK has moved to the target air pixel (11,7)
+        (type: "MaterialAt", x: 11, y: 7, expected: 38), // SPARK should have moved
+        // Check if the original spark location (10,7) is now AIR
+        (type: "MaterialAt", x: 10, y: 7, expected: 0),  // Original spark location is now AIR
+    ],
+
+    cleanup: [],
+)

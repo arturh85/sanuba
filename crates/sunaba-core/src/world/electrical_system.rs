@@ -36,6 +36,7 @@ impl ElectricalSystem {
         // 2. Add power from active sources to the grid
         self.add_power_from_sources(chunks, active_chunks, materials);
 
+        
         // 3. Propagate power through conductors
         self.propagate_power(chunks, materials);
 
@@ -113,9 +114,7 @@ impl ElectricalSystem {
                                 pixel.flags |= pixel_flags::POWERED;
                                 chunk.set_pixel(x, y, pixel);
 
-                                if self.propagation_queue.len() < PROPAGATION_QUEUE_MAX {
-                                    self.propagation_queue.push_back((chunk_pos, x, y));
-                                }
+
                             }
                         }
                     }
@@ -129,8 +128,11 @@ impl ElectricalSystem {
         let mut depth = 0;
         const MAX_DEPTH_PER_FRAME: usize = 128;
 
+
         while let Some((chunk_pos, x, y)) = self.propagation_queue.pop_front() {
+
             if depth > MAX_DEPTH_PER_FRAME {
+
                 break;
             }
             depth += 1;
@@ -166,6 +168,7 @@ impl ElectricalSystem {
                         if neighbor_material.conducts_electricity {
                             let neighbor_coarse_idx =
                                 neighbor_chunk.get_coarse_grid_index(next_x, next_y);
+
                             let neighbor_potential =
                                 &mut neighbor_chunk.electrical_potential[neighbor_coarse_idx];
 
@@ -276,6 +279,10 @@ impl ElectricalSystem {
                                                         air_y as i32 + dy_cond,
                                                     );
 
+// use log::{debug, info}; // Commented out log imports
+
+// ... (rest of the file) ...
+
                                                 if let Some(cond_pixel) = self
                                                     .get_pixel_across_chunks(
                                                         chunks,
@@ -286,10 +293,10 @@ impl ElectricalSystem {
                                                 {
                                                     let cond_material =
                                                         materials.get(cond_pixel.material_id);
-                                                    if cond_pixel.flags & pixel_flags::POWERED != 0
+                                                    // Conductor must be unpowered for spark to jump and power it
+                                                    if cond_pixel.flags & pixel_flags::POWERED == 0
                                                         && cond_material.conducts_electricity
                                                     {
-                                                        // Found a path for the spark to jump
                                                         pixels_to_change.push((
                                                             chunk_pos,
                                                             x,

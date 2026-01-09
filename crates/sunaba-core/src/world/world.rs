@@ -385,7 +385,7 @@ impl World {
     }
 
     /// Update active chunks: remove distant chunks and re-activate nearby loaded chunks
-    fn update_active_chunks(&mut self) {
+    pub fn update_active_chunks(&mut self) {
         ChunkStatus::update_active_chunks(
             &mut self.chunk_manager,
             self.player.position,
@@ -664,6 +664,11 @@ impl World {
         // 0. Update active chunks (remove distant, re-activate nearby)
         self.update_active_chunks();
 
+
+
+
+
+
         // 0.5. Dynamic chunk loading when player enters new chunk
         let current_chunk = IVec2::new(
             (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32),
@@ -685,13 +690,25 @@ impl World {
 
         // 2. CA updates (movement) - only process chunks that need updating
         // A chunk needs updating if it or any of its 8 neighbors had changes last frame
-        let chunk_manager = &self.chunk_manager;
+        let chunk_manager = &self.chunk_manager; // Immutable borrow
+
         let chunks_to_update: Vec<IVec2> = chunk_manager
             .active_chunks
             .iter()
             .copied()
             .filter(|&pos| ChunkStatus::needs_ca_update(chunk_manager, pos))
             .collect();
+        // 2.5. Electrical system update (before CA movement)
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("electrical");
+
+            self.electrical_system.update(
+                &mut self.chunk_manager.chunks,
+                &chunks_to_update,
+                &self.materials,
+            );
+        }
 
         // Note: dirty_rect is cleared by the renderer after rendering
         // This allows proper dirty tracking for render optimization
@@ -710,17 +727,6 @@ impl World {
             for pos in &chunks_to_update {
                 self.update_chunk_ca(*pos, stats, rng);
             }
-        }
-
-        // 2.5. Electrical system update
-        {
-            #[cfg(feature = "profiling")]
-            puffin::profile_scope!("electrical");
-            self.electrical_system.update(
-                &mut self.chunk_manager.chunks,
-                &chunks_to_update,
-                &self.materials,
-            );
         }
 
         // 3. Temperature diffusion (30fps throttled) - active chunks only
@@ -930,7 +936,11 @@ impl World {
     }
 
     /// Set pixel at world coordinates with full Pixel struct (including flags)
-    pub fn set_pixel_full(&mut self, world_x: i32, world_y: i32, pixel: Pixel) {
+    pub fn set_pixel_full(&mut self, world_x: i32, world_y: i32, mut pixel: Pixel) {
+        // If placing a battery, ensure it has the SPARK_SOURCE flag
+        if pixel.material_id == MaterialId::BATTERY {
+            pixel.flags |= pixel_flags::SPARK_SOURCE;
+        }
         // Check if we're removing a player-placed structural material
         let schedule_check = if let Some(old_pixel) = self.get_pixel(world_x, world_y) {
             if !old_pixel.is_empty() {
