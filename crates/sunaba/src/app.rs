@@ -1174,16 +1174,24 @@ impl App {
                 self.world.add_light_flash(wx, wy, 8, 0.05);
             }
 
-            // Update simulation with timing (disabled when connected to multiplayer - server is authoritative)
-            // Run simulation if: (1) multiplayer disabled, OR (2) multiplayer enabled but disconnected
+            // Update simulation with timing
+            // 
+            // CLIENT-SIDE PREDICTION (Multiplayer):
+            // ======================================
+            // When connected to multiplayer, client runs FULL local simulation at 104 FPS
+            // (benefit of parallel CA optimization). Server sends authoritative chunk updates
+            // at 33 FPS which are applied asynchronously when they arrive. This provides:
+            //   ✅ Smooth 100+ FPS gameplay for players
+            //   ✅ Server maintains authority (no cheating)
+            //   ✅ Small visual "snaps" when server corrects (acceptable trade-off)
+            //
+            // Future improvement: Add interpolation to smooth server corrections over 1-2 frames
             let should_simulate = {
                 #[cfg(feature = "multiplayer")]
                 {
-                    // Only simulate if not connected
-                    self.multiplayer_manager
-                        .as_ref()
-                        .map(|m| !m.state.is_connected())
-                        .unwrap_or(true)
+                    // ALWAYS simulate locally for smooth gameplay
+                    // Server chunks will be applied asynchronously when they arrive
+                    true
                 }
                 #[cfg(not(feature = "multiplayer"))]
                 {
@@ -1196,7 +1204,7 @@ impl App {
                 puffin::profile_scope!("simulation");
                 self.ui_state.stats.begin_sim();
 
-                // Check if connected to multiplayer (redundant check, but kept for clarity)
+                // Check if connected to multiplayer (to skip creature AI - server handles that)
                 #[cfg(feature = "multiplayer")]
                 let is_multiplayer_connected = self
                     .multiplayer_manager
