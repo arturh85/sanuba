@@ -661,7 +661,7 @@ impl World {
     fn step_simulation<R: crate::world::WorldRng>(
         &mut self,
         stats: &mut dyn crate::world::SimStats,
-        rng: &mut R,
+        _rng: &mut R,
         is_multiplayer_connected: bool,
     ) {
         #[cfg(feature = "profiling")]
@@ -763,8 +763,67 @@ impl World {
             #[cfg(feature = "detailed_profiling")]
             let _span = tracing::info_span!("ca_updates").entered();
 
-            for pos in &chunks_to_update {
-                self.update_chunk_ca(*pos, stats, rng);
+            // Parallel CA updates using checkerboard pattern (Noita-style)
+            // Split chunks into even/odd groups to avoid race conditions at chunk boundaries
+            // Even chunks (x+y is even) can all update in parallel, then odd chunks
+            #[cfg(all(not(target_arch = "wasm32"), feature = "regeneration"))]
+            {
+                use rand::SeedableRng;
+                use rayon::prelude::*;
+
+                // Phase 1: Process "white squares" of checkerboard in parallel
+                let even_chunks: Vec<_> = chunks_to_update
+                    .iter()
+                    .filter(|pos| (pos.x + pos.y) % 2 == 0)
+                    .copied()
+                    .collect();
+
+                // Phase 2: Process "black squares" of checkerboard in parallel
+                let odd_chunks: Vec<_> = chunks_to_update
+                    .iter()
+                    .filter(|pos| (pos.x + pos.y) % 2 != 0)
+                    .copied()
+                    .collect();
+
+                // Process even chunks in parallel (they don't share edges with each other)
+                even_chunks.par_iter().for_each(|&pos| {
+                    // Create thread-local RNG seeded by chunk position for determinism
+                    let seed = (pos.x as u64).wrapping_mul(2654435761)
+                        ^ (pos.y as u64).wrapping_mul(2654435761);
+                    let mut thread_rng = rand_xoshiro::Xoshiro256StarStar::seed_from_u64(seed);
+                    let mut thread_stats = crate::world::stats::NoopStats;
+
+                    // SAFETY: We're using interior mutability via unsafe pointer cast.
+                    // This is safe because the checkerboard pattern ensures that adjacent
+                    // chunks are never processed simultaneously, preventing data races at
+                    // chunk boundaries. Each thread only modifies its assigned chunk and
+                    // can safely read from neighboring chunks.
+                    unsafe {
+                        let world_ptr = self as *const Self as *mut Self;
+                        (*world_ptr).update_chunk_ca(pos, &mut thread_stats, &mut thread_rng);
+                    }
+                });
+
+                // Process odd chunks in parallel (they don't share edges with each other)
+                odd_chunks.par_iter().for_each(|&pos| {
+                    let seed = (pos.x as u64).wrapping_mul(2654435761)
+                        ^ (pos.y as u64).wrapping_mul(2654435761);
+                    let mut thread_rng = rand_xoshiro::Xoshiro256StarStar::seed_from_u64(seed);
+                    let mut thread_stats = crate::world::stats::NoopStats;
+
+                    unsafe {
+                        let world_ptr = self as *const Self as *mut Self;
+                        (*world_ptr).update_chunk_ca(pos, &mut thread_stats, &mut thread_rng);
+                    }
+                });
+            }
+
+            // Fallback: sequential processing (WASM or without regeneration feature)
+            #[cfg(any(target_arch = "wasm32", not(feature = "regeneration")))]
+            {
+                for pos in &chunks_to_update {
+                    self.update_chunk_ca(*pos, stats, rng);
+                }
             }
         }
 
