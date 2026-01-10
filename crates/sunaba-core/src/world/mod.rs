@@ -21,6 +21,7 @@ pub mod persistence;
 mod persistence_system;
 mod pixel_queries;
 mod player_physics;
+pub mod pressure_system;
 mod raycasting;
 pub mod rng_trait;
 pub mod stats;

@@ -24,6 +24,9 @@ pub struct ScenarioExecutorConfig {
 
     /// Verbose logging
     pub verbose: bool,
+
+    /// Enable detailed profiling (tracing)
+    pub detailed_profiling: bool,
 }
 
 impl Default for ScenarioExecutorConfig {
@@ -32,6 +35,7 @@ impl Default for ScenarioExecutorConfig {
             capture_screenshots: false,
             screenshot_dir: "screenshots".to_string(),
             verbose: false,
+            detailed_profiling: false,
         }
     }
 }
@@ -52,6 +56,12 @@ pub struct ScenarioExecutor {
 
     /// Screenshots captured
     screenshots: Vec<String>,
+
+    /// Update counter (world.update() calls)
+    update_count: usize,
+
+    /// Frame timings (milliseconds)
+    frame_times: Vec<f64>,
 }
 
 impl ScenarioExecutor {
@@ -68,6 +78,8 @@ impl ScenarioExecutor {
             frame_count: 0,
             log: Vec::new(),
             screenshots: Vec::new(),
+            update_count: 0,
+            frame_times: Vec::new(),
         }
     }
 
@@ -77,16 +89,22 @@ impl ScenarioExecutor {
         scenario: &ScenarioDefinition,
         world: &mut World,
     ) -> Result<ExecutionReport> {
+        use std::time::Instant;
+
+        let start_time = Instant::now();
         let mut report = ExecutionReport::new(scenario.name.clone());
 
         self.log.clear();
         self.screenshots.clear();
         self.frame_count = 0;
+        self.update_count = 0;
+        self.frame_times.clear();
 
         self.log(&format!("Starting scenario: {}", scenario.name));
         self.log(&format!("Description: {}", scenario.description));
 
         // Execute setup actions
+        let setup_start = Instant::now();
         if !scenario.setup.is_empty() {
             self.log(&format!("Running {} setup actions", scenario.setup.len()));
             for (idx, action) in scenario.setup.iter().enumerate() {
@@ -100,8 +118,10 @@ impl ScenarioExecutor {
             // Crucial: Update active chunks after setup to ensure newly placed materials are considered
             world.update_active_chunks();
         }
+        report.performance.setup_duration_ms = setup_start.elapsed().as_secs_f64() * 1000.0;
 
         // Execute main actions
+        let action_start = Instant::now();
         self.log(&format!("Running {} main actions", scenario.actions.len()));
         for (idx, action) in scenario.actions.iter().enumerate() {
             if let Err(e) = self.execute_action(action, world) {
@@ -111,10 +131,12 @@ impl ScenarioExecutor {
                 return Err(anyhow::anyhow!(msg));
             }
         }
+        report.performance.action_duration_ms = action_start.elapsed().as_secs_f64() * 1000.0;
 
         report.actions_executed = scenario.setup.len() + scenario.actions.len();
 
         // Run verifications
+        let verify_start = Instant::now();
         if !scenario.verify.is_empty() {
             self.log(&format!("Running {} verifications", scenario.verify.len()));
             for condition in &scenario.verify {
@@ -130,6 +152,7 @@ impl ScenarioExecutor {
                 }
             }
         }
+        report.performance.verification_duration_ms = verify_start.elapsed().as_secs_f64() * 1000.0;
 
         // Cleanup actions (always run)
         if !scenario.cleanup.is_empty() {
@@ -150,11 +173,32 @@ impl ScenarioExecutor {
         report.screenshots = self.screenshots.clone();
         report.passed = report.verification_failures.is_empty();
 
+        // Calculate performance metrics
+        report.performance.total_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+        report.performance.update_count = self.update_count;
+        
+        if self.update_count > 0 {
+            report.performance.avg_update_time_ms = 
+                (report.performance.setup_duration_ms + report.performance.action_duration_ms) 
+                / self.update_count as f64;
+        }
+
+        if !self.frame_times.is_empty() {
+            let total_frame_time: f64 = self.frame_times.iter().sum();
+            report.performance.avg_frame_time_ms = total_frame_time / self.frame_times.len() as f64;
+            report.performance.peak_frame_time_ms = self.frame_times.iter()
+                .copied()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or(0.0);
+        }
+
         self.log(&format!(
-            "Scenario complete: {} ({})",
+            "Scenario complete: {} ({} frames, {:.1}ms)",
             if report.passed { "PASSED" } else { "FAILED" },
-            self.frame_count
+            self.frame_count,
+            report.performance.total_duration_ms
         ));
+        self.log(&format!("  Performance: {}", report.performance.summary()));
 
         Ok(report)
     }
@@ -563,12 +607,30 @@ impl ScenarioExecutor {
 
     /// Simulate N frames of physics
     fn simulate_frames(&mut self, world: &mut World, frames: usize) -> Result<()> {
+        use std::time::Instant;
+        
+        #[cfg(feature = "detailed_profiling")]
+        let _span = tracing::info_span!("simulate_frames", frames).entered();
+        
         let mut stats = NoopStats;
         let mut rng = thread_rng();
 
         for _ in 0..frames {
+            let frame_start = Instant::now();
+            
+            #[cfg(feature = "detailed_profiling")]
+            let _frame_span = tracing::info_span!("world_update").entered();
+            
             world.update(1.0 / 60.0, &mut stats, &mut rng, false);
+            
+            #[cfg(feature = "detailed_profiling")]
+            drop(_frame_span);
+            
+            let frame_time = frame_start.elapsed().as_secs_f64() * 1000.0;
+            
+            self.frame_times.push(frame_time);
             self.frame_count += 1;
+            self.update_count += 1;
         }
 
         Ok(())

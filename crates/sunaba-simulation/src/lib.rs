@@ -7,8 +7,8 @@
 //! - Pixel types (Pixel, pixel_flags, CHUNK_SIZE)
 //! - Texture variation for visual depth
 
-mod materials;
-mod pixel;
+pub mod materials;
+pub mod pixel;
 mod reactions;
 pub mod texture_variation;
 

@@ -107,6 +107,11 @@ struct Args {
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
     scenario_screenshots: bool,
 
+    /// Enable detailed profiling (flamegraph output)
+    #[arg(long)]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
+    detailed_profiling: bool,
+
     /// Read test scenario from stdin (RON format)
     #[arg(long)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
@@ -318,6 +323,22 @@ fn main() -> anyhow::Result<()> {
         use sunaba::scenario::{ScenarioDefinition, ScenarioExecutor, ScenarioExecutorConfig};
         use sunaba_core::world::World;
 
+        // Initialize detailed profiling if requested
+        #[cfg(feature = "detailed_profiling")]
+        let _guard = if args.detailed_profiling {
+            let (chrome_layer, guard) = tracing_chrome::ChromeLayerBuilder::new()
+                .file("profiling_trace.json")
+                .build();
+            
+            use tracing_subscriber::prelude::*;
+            let _ = tracing_subscriber::registry().with(chrome_layer).try_init();
+            
+            log::info!("Detailed profiling enabled - trace will be saved to profiling_trace.json");
+            Some(guard)
+        } else {
+            None
+        };
+
         log::info!("Reading scenario from stdin...");
 
         // Read scenario from stdin
@@ -335,6 +356,7 @@ fn main() -> anyhow::Result<()> {
             capture_screenshots: args.scenario_screenshots,
             screenshot_dir: "screenshots".to_string(),
             verbose: false,
+            detailed_profiling: args.detailed_profiling,
         };
         let mut executor = ScenarioExecutor::with_config(config);
 
@@ -386,6 +408,10 @@ fn main() -> anyhow::Result<()> {
         println!("\nResults saved to: {}", output_file);
         println!("═══════════════════════════════════════════════════");
 
+        // Explicitly drop guard to flush profiling data before exit
+        #[cfg(feature = "detailed_profiling")]
+        drop(_guard);
+
         std::process::exit(if report.passed { 0 } else { 1 });
     }
 
@@ -394,6 +420,22 @@ fn main() -> anyhow::Result<()> {
     if let Some(scenario_path) = args.test_scenario {
         use sunaba::scenario::{ScenarioDefinition, ScenarioExecutor, ScenarioExecutorConfig};
         use sunaba_core::world::World;
+
+        // Initialize detailed profiling if requested
+        #[cfg(feature = "detailed_profiling")]
+        let _guard = if args.detailed_profiling {
+            let (chrome_layer, guard) = tracing_chrome::ChromeLayerBuilder::new()
+                .file("profiling_trace.json")
+                .build();
+            
+            use tracing_subscriber::prelude::*;
+            let _ = tracing_subscriber::registry().with(chrome_layer).try_init();
+            
+            log::info!("Detailed profiling enabled - trace will be saved to profiling_trace.json");
+            Some(guard)
+        } else {
+            None
+        };
 
         log::info!("Loading scenario from: {}", scenario_path);
 
@@ -405,6 +447,7 @@ fn main() -> anyhow::Result<()> {
             capture_screenshots: args.scenario_screenshots,
             screenshot_dir: "screenshots".to_string(),
             verbose: false,
+            detailed_profiling: args.detailed_profiling,
         };
         let mut executor = ScenarioExecutor::with_config(config);
 
@@ -455,6 +498,10 @@ fn main() -> anyhow::Result<()> {
 
         println!("\nResults saved to: {}", output_file);
         println!("═══════════════════════════════════════════════════");
+
+        // Explicitly drop guard to flush profiling data before exit
+        #[cfg(feature = "detailed_profiling")]
+        drop(_guard);
 
         std::process::exit(if report.passed { 0 } else { 1 });
     }

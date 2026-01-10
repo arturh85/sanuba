@@ -688,7 +688,20 @@ just web-powder  # New justfile command
    - ✅ **Phase 1.4**: Add electrical reactions (2026-01-09)
    - ✅ **Phase 1.5**: Implement special behaviors (Spark/Thunder) (2026-01-09)
    - 🚧 **Phase 1.6**: Testing & validation
-3. ⏳ **Week 2**: Implement pressure system
+3. ✅ **Week 2**: Implement pressure system
+   - ✅ **Phase 2.1**: Create PressureSystem module (2026-01-09)
+     - Implemented PressureSystem in `sunaba-core/src/world/pressure_system.rs`.
+     - Added `pub mod pressure_system;` to `sunaba-core/src/world/mod.rs`.
+     - Integrated PressureSystem into `sunaba-core/src/world/world.rs` (field, instantiation, update call).
+   - ✅ **Phase 2.2**: Add NITRO material (2026-01-09)
+     - Added `MaterialId::NITRO` and its `MaterialDef` to `sunaba-simulation/src/materials.rs`.
+   - ✅ **Phase 2.3**: Add pressure-triggered reactions (2026-01-09)
+     - Added `NITRO` explosion reaction in `sunaba-simulation/src/reactions.rs`.
+   - ✅ **Phase 2.4**: Testing & validation (2026-01-10)
+     - Fixed all compilation errors (imports, borrowing issues)
+     - Added 3 unit tests for pressure system (accumulation, decay, basic flow)
+     - All tests pass (343 passed total in sunaba-core)
+     - System ready for integration with game world
 4. ⏳ **Week 3**: Add special behaviors
 5. ⏳ **Week 4**: Add entity AI
 6. ⏳ **Week 5**: Add all 20+ materials

@@ -221,6 +221,7 @@ The simulation core is complete and battle-tested:
 - Persistent world with procedural cave generation
 - Player systems: mining, crafting, inventory
 - **Multiplayer**: SpacetimeDB server module with server-side simulation and creature AI
+- **Automated testing**: Scenario system with performance profiling for AI agents
 
 ### Creature Evolution (Active Research)
 Building the ML creature pipeline—currently exploring:
@@ -234,6 +235,32 @@ What's working: CPPN-NEAT genomes, morphology generation, neural controllers,
 
 What we're learning: How to get creatures that actually walk, feed themselves,
 and exhibit meaningful behaviors rather than twitching in place.
+
+### Automated Performance Testing
+
+Sunaba includes scenario-based testing with profiling for AI agents to autonomously detect performance issues:
+
+```bash
+# Run stress tests with performance metrics
+just profile-stress-tests
+
+# Example output:
+# Scenario: Stress Test Falling Sand Inverted Pyramid
+# Status: ✅ PASSED
+# Frames: 900
+# Performance Metrics:
+#   Avg Frame Time: 10.2 ms (98 FPS)
+#   Peak Frame Time: 2062 ms
+#   Total Duration: 9264 ms
+```
+
+**Features:**
+- Automated stress tests (large-scale physics simulations)
+- Performance metrics (avg/peak frame time, FPS equivalent)
+- Compact JSON reports (~2-3KB, doesn't overwhelm AI context)
+- Regression detection (compare before/after optimization)
+
+See `scenarios/tier3_physics/README.md` for AI agent workflow and performance baselines.
 
 ### Research Roadmap
 These are experimental milestones, not promises:

@@ -306,6 +306,133 @@ test-scenario scenario_file:
 test-scenario-stdin:
     cargo run -p sunaba --bin sunaba --release --features headless -- --test-scenario-stdin --scenario-screenshots
 
+# Profile a scenario (run with timing and generate performance report)
+# Usage: just profile-scenario <file.ron>
+# Example: just profile-scenario scenarios/tier3_physics/stress_test_falling_sand.ron
+profile-scenario scenario_file:
+    @echo "Running scenario with profiling: {{scenario_file}}"
+    cargo run -p sunaba --bin sunaba --release --features headless -- --test-scenario {{scenario_file}} --scenario-screenshots
+    @echo ""
+    @echo "═══════════════════════════════════════════════════"
+    @echo "Performance Report:"
+    @echo "═══════════════════════════════════════════════════"
+    @just _show-profile-results {{scenario_file}}
+
+# Profile a scenario with detailed flamegraph output (Chrome trace format)
+# Usage: just profile-detailed <file.ron>
+# Example: just profile-detailed scenarios/tier3_physics/stress_test_falling_sand.ron
+# Output: profiling_trace.json (open in chrome://tracing or speedscope.app)
+profile-detailed scenario_file:
+    @echo "Running scenario with detailed profiling: {{scenario_file}}"
+    cargo run -p sunaba --bin sunaba --release --features "headless,detailed_profiling" -- --test-scenario {{scenario_file}} --scenario-screenshots --detailed-profiling
+    @echo ""
+    @echo "═══════════════════════════════════════════════════"
+    @echo "Detailed Profiling Complete!"
+    @echo "═══════════════════════════════════════════════════"
+    @echo "Flamegraph saved to: profiling_trace.json"
+    @echo ""
+    @echo "View in browser:"
+    @echo "  1. Open chrome://tracing in Chrome/Edge"
+    @echo "  2. Click 'Load' and select profiling_trace.json"
+    @echo ""
+    @echo "Or use speedscope (https://www.speedscope.app/):"
+    @echo "  - Drag profiling_trace.json to speedscope.app"
+    @echo "  - Interactive flamegraph with zoom/search"
+    @echo ""
+    @just _show-profile-results {{scenario_file}}
+
+# Internal: Display profiling results from JSON report
+[unix]
+_show-profile-results scenario_file:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Look for result file by pattern matching (handles special chars in scenario names)
+    result_files=$(ls scenario_results/*_result.json 2>/dev/null | sort -r | head -1)
+    if [ -z "$result_files" ]; then
+        echo "⚠️  No results found in scenario_results/"
+        exit 1
+    fi
+    result_file="$result_files"
+    echo "Reading: $result_file"
+    echo ""
+    # Use jq if available for pretty formatting, otherwise cat with grep
+    if command -v jq &> /dev/null; then
+        echo "Scenario: $(jq -r '.scenario_name' "$result_file")"
+        echo "Status: $(jq -r 'if .passed then "✅ PASSED" else "❌ FAILED" end' "$result_file")"
+        echo "Frames: $(jq -r '.frames_executed' "$result_file")"
+        echo ""
+        echo "Performance Metrics:"
+        echo "  Total Duration: $(jq -r '.performance.total_duration_ms' "$result_file") ms"
+        echo "  Setup Time: $(jq -r '.performance.setup_duration_ms' "$result_file") ms"
+        echo "  Action Time: $(jq -r '.performance.action_duration_ms' "$result_file") ms"
+        echo "  Verification Time: $(jq -r '.performance.verification_duration_ms' "$result_file") ms"
+        echo "  Updates: $(jq -r '.performance.update_count' "$result_file")"
+        echo "  Avg Frame Time: $(jq -r '.performance.avg_frame_time_ms' "$result_file") ms"
+        echo "  Avg Update Time: $(jq -r '.performance.avg_update_time_ms' "$result_file") ms"
+        echo "  Peak Frame Time: $(jq -r '.performance.peak_frame_time_ms' "$result_file") ms"
+        echo ""
+        fps=$(jq -r '1000.0 / .performance.avg_frame_time_ms' "$result_file")
+        echo "Equivalent FPS: $(printf "%.1f" $fps)"
+        echo ""
+        echo "Summary: $(jq -r '.performance | "Total: \(.total_duration_ms)ms | Avg frame: \(.avg_frame_time_ms)ms | Peak: \(.peak_frame_time_ms)ms | Updates: \(.update_count)"' "$result_file")"
+    else
+        echo "Full results (install jq for better formatting):"
+        grep -E "(scenario_name|passed|frames_executed|performance)" "$result_file" | head -20
+    fi
+
+[windows]
+_show-profile-results scenario_file:
+    @$resultFiles = Get-ChildItem -Path scenario_results -Filter *_result.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    @if (-not $resultFiles) { Write-Host "⚠️  No results found in scenario_results/"; exit 1 }
+    @$resultFile = $resultFiles.FullName
+    @Write-Host "Reading: $resultFile"
+    @Write-Host ""
+    @$json = Get-Content $resultFile | ConvertFrom-Json
+    @Write-Host "Scenario: $($json.scenario_name)"
+    @Write-Host "Status: $(if ($json.passed) { '✅ PASSED' } else { '❌ FAILED' })"
+    @Write-Host "Frames: $($json.frames_executed)"
+    @Write-Host ""
+    @Write-Host "Performance Metrics:"
+    @Write-Host "  Total Duration: $($json.performance.total_duration_ms) ms"
+    @Write-Host "  Setup Time: $($json.performance.setup_duration_ms) ms"
+    @Write-Host "  Action Time: $($json.performance.action_duration_ms) ms"
+    @Write-Host "  Verification Time: $($json.performance.verification_duration_ms) ms"
+    @Write-Host "  Updates: $($json.performance.update_count)"
+    @Write-Host "  Avg Frame Time: $($json.performance.avg_frame_time_ms) ms"
+    @Write-Host "  Avg Update Time: $($json.performance.avg_update_time_ms) ms"
+    @Write-Host "  Peak Frame Time: $($json.performance.peak_frame_time_ms) ms"
+    @Write-Host ""
+    @$fps = 1000.0 / $json.performance.avg_frame_time_ms
+    @Write-Host "Equivalent FPS: $([math]::Round($fps, 1))"
+
+# Run stress tests (performance benchmarks)
+[unix]
+profile-stress-tests:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Running performance stress tests..."
+    echo ""
+    for scenario in scenarios/tier3_physics/stress_test_*.ron; do
+        if [ -f "$scenario" ]; then
+            just profile-scenario "$scenario"
+            echo ""
+            echo "─────────────────────────────────────────────────────"
+            echo ""
+        fi
+    done
+
+[windows]
+profile-stress-tests:
+    @Write-Host "Running performance stress tests..."
+    @Write-Host ""
+    @$scenarios = Get-ChildItem -Path scenarios/tier3_physics -Filter stress_test_*.ron -File
+    @foreach ($scenario in $scenarios) { \
+        just profile-scenario $scenario.FullName; \
+        Write-Host ""; \
+        Write-Host "─────────────────────────────────────────────────────"; \
+        Write-Host "" \
+    }
+
 # Run all scenario tests in scenarios/ directory
 [unix]
 test-scenario-all:

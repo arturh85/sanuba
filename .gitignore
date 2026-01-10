@@ -21,3 +21,4 @@ web/src/generated/
 /.lsmcp/
 scenario_results/
 test_remote_control.sh
+profiling_trace.json

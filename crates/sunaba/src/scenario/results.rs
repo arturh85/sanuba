@@ -6,6 +6,69 @@ use std::path::Path;
 
 use super::verification::VerificationResult;
 
+/// Performance metrics for a scenario execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceMetrics {
+    /// Total wall-clock time (milliseconds)
+    pub total_duration_ms: f64,
+
+    /// Setup phase duration (milliseconds)
+    pub setup_duration_ms: f64,
+
+    /// Main action phase duration (milliseconds)
+    pub action_duration_ms: f64,
+
+    /// Verification phase duration (milliseconds)
+    pub verification_duration_ms: f64,
+
+    /// Average time per frame (milliseconds)
+    pub avg_frame_time_ms: f64,
+
+    /// Average time per world update (milliseconds)
+    pub avg_update_time_ms: f64,
+
+    /// Peak frame time (milliseconds)
+    pub peak_frame_time_ms: f64,
+
+    /// Number of world updates (simulation ticks)
+    pub update_count: usize,
+
+    /// Memory usage estimate (MB, approximate)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_mb: Option<f64>,
+}
+
+impl PerformanceMetrics {
+    /// Create new empty metrics
+    pub fn new() -> Self {
+        Self {
+            total_duration_ms: 0.0,
+            setup_duration_ms: 0.0,
+            action_duration_ms: 0.0,
+            verification_duration_ms: 0.0,
+            avg_frame_time_ms: 0.0,
+            avg_update_time_ms: 0.0,
+            peak_frame_time_ms: 0.0,
+            update_count: 0,
+            memory_mb: None,
+        }
+    }
+
+    /// Generate human-readable summary
+    pub fn summary(&self) -> String {
+        format!(
+            "Total: {:.1}ms | Avg frame: {:.2}ms | Peak: {:.2}ms | Updates: {}",
+            self.total_duration_ms, self.avg_frame_time_ms, self.peak_frame_time_ms, self.update_count
+        )
+    }
+}
+
+impl Default for PerformanceMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Report from scenario execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionReport {
@@ -32,6 +95,9 @@ pub struct ExecutionReport {
 
     /// Screenshot file paths
     pub screenshots: Vec<String>,
+
+    /// Performance metrics (timing, throughput)
+    pub performance: PerformanceMetrics,
 }
 
 impl ExecutionReport {
@@ -46,6 +112,7 @@ impl ExecutionReport {
             verification_failures: Vec::new(),
             log: Vec::new(),
             screenshots: Vec::new(),
+            performance: PerformanceMetrics::new(),
         }
     }
 

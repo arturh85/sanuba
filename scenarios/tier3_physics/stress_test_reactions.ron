@@ -1,0 +1,92 @@
+(
+    name: "Stress Test Multi-Material Reaction Chamber",
+    description: "Performance test with multiple materials interacting: water flowing through sand, mixing with fire/lava. Tests reaction system and fluid dynamics under load.",
+
+    setup: [
+        // Teleport player away
+        (type: "TeleportPlayer", x: -600.0, y: 200.0),
+
+        // Create containing chamber (stone walls)
+        (type: "FillRect", min_x: -150, min_y: -100, max_x: 150, max_y: -95, material: 1),  // Floor
+        (type: "FillRect", min_x: -150, min_y: -100, max_x: -145, max_y: 100, material: 1), // Left wall
+        (type: "FillRect", min_x: 145, min_y: -100, max_x: 150, max_y: 100, material: 1),   // Right wall
+
+        // Fill chamber with alternating layers of materials
+        // Layer 1: Sand base
+        (type: "FillRect", min_x: -140, min_y: -90, max_x: 140, max_y: -50, material: 2),
+        
+        // Layer 2: Water pockets (will seep through sand)
+        (type: "FillRect", min_x: -120, min_y: -40, max_x: -80, max_y: -20, material: 3),
+        (type: "FillRect", min_x: -20, min_y: -40, max_x: 20, max_y: -20, material: 3),
+        (type: "FillRect", min_x: 80, min_y: -40, max_x: 120, max_y: -20, material: 3),
+        
+        // Layer 3: More sand (cap water)
+        (type: "FillRect", min_x: -140, min_y: -10, max_x: 140, max_y: 10, material: 2),
+        
+        // Layer 4: Lava/fire sources (will interact with water)
+        (type: "FillRect", min_x: -100, min_y: 20, max_x: -60, max_y: 30, material: 5),
+        (type: "FillRect", min_x: 60, min_y: 20, max_x: 100, max_y: 30, material: 5),
+        
+        // Layer 5: Top sand layer
+        (type: "FillRect", min_x: -140, min_y: 40, max_x: 140, max_y: 60, material: 2),
+        
+        // Add some stone pillars (structural diversity)
+        (type: "FillRect", min_x: -50, min_y: -90, max_x: -45, max_y: 50, material: 1),
+        (type: "FillRect", min_x: 45, min_y: -90, max_x: 50, max_y: 50, material: 1),
+        
+        // Add vegetation/organic matter for more reactions
+        (type: "FillRect", min_x: -30, min_y: 10, max_x: 30, max_y: 20, material: 7),
+    ],
+
+    actions: [
+        (type: "Log", message: "Starting multi-material stress test"),
+
+        // Break structural pillars to destabilize everything
+        (type: "MineCircle", center_x: -47, center_y: 0, radius: 8),
+        (type: "MineCircle", center_x: 47, center_y: 0, radius: 8),
+
+        // Create openings for materials to flow
+        (type: "MineRect", min_x: -10, min_y: -60, max_x: 10, max_y: -40),
+
+        (type: "Log", message: "Structure destabilized - simulating complex interactions (600 frames = 10 seconds)"),
+
+        // Simulate sustained interaction (water+sand+lava+organic)
+        (type: "WaitFrames", frames: 600),
+
+        (type: "Log", message: "Continuing simulation for settling (600 more frames)"),
+
+        // More time for everything to react and settle
+        (type: "WaitFrames", frames: 600),
+
+        // Capture intermediate state
+        (type: "CaptureScreenshot", filename: "stress_test_reactions_mid.png"),
+
+        (type: "Log", message: "Final settling phase (300 frames)"),
+
+        // Final settling
+        (type: "WaitFrames", frames: 300),
+
+        (type: "CaptureScreenshot", filename: "stress_test_reactions_final.png"),
+
+        (type: "Log", message: "Multi-material stress test complete"),
+    ],
+
+    verify: [
+        // Just verify chamber still exists and has materials
+        (
+            type: "MaterialCountRange",
+            material: 1,  // Stone walls should still exist
+            region: (type: "Whole"),
+            min: 1000,
+            max: 50000,
+        ),
+        
+        // Verify some materials have interacted/changed state
+        (
+            type: "RegionFilled",
+            region: (type: "Rect", min_x: -150, min_y: -100, max_x: 150, max_y: -50),
+        ),
+    ],
+
+    cleanup: [],
+)

@@ -63,6 +63,7 @@ impl MaterialId {
     pub const LASER: u16 = 40;
     pub const BATTERY: u16 = 41;
     pub const WIRE: u16 = 42;
+    pub const NITRO: u16 = 43;
 }
 
 /// How a material behaves physically
@@ -903,6 +904,23 @@ impl Materials {
             conducts_electricity: true,
             electrical_conductivity: 0.98,
             electrical_resistance: 0.02,
+            ..Default::default()
+        });
+
+        // Nitro - highly sensitive liquid explosive
+        self.register(MaterialDef {
+            id: MaterialId::NITRO,
+            name: "nitro".to_string(),
+            material_type: MaterialType::Liquid,
+            color: [100, 0, 0, 255], // Dark red
+            density: 1.6,
+            hardness: None,
+            viscosity: 0.1,
+            flammable: true,
+            ignition_temp: Some(100.0), // Low ignition temp
+            burns_to: Some(MaterialId::SMOKE),
+            burn_rate: 1.0,          // Instant burn/explosion
+            fuel_value: Some(100.0), // High energy
             ..Default::default()
         });
     }

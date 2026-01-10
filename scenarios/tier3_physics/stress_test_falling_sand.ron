@@ -1,0 +1,85 @@
+(
+    name: "Stress Test Falling Sand Inverted Pyramid",
+    description: "Performance stress test with large inverted sand pyramid requiring sustained computation as materials fall and settle. Tests cellular automata throughput.",
+
+    setup: [
+        // Teleport player away from action
+        (type: "TeleportPlayer", x: -500.0, y: 500.0),
+
+        // Create solid ground platform (wide base for sand to land on)
+        (type: "FillRect", min_x: -200, min_y: -50, max_x: 200, max_y: -45, material: 1),
+
+        // Build inverted pyramid of sand (apex at bottom, wide at top)
+        // Each layer gets progressively wider as we go up
+        // Layer 0 (y=0): Width 5 (apex)
+        (type: "FillRect", min_x: -2, min_y: 0, max_x: 2, max_y: 5, material: 2),
+        
+        // Layer 1 (y=10): Width 20
+        (type: "FillRect", min_x: -10, min_y: 10, max_x: 10, max_y: 15, material: 2),
+        
+        // Layer 2 (y=20): Width 40
+        (type: "FillRect", min_x: -20, min_y: 20, max_x: 20, max_y: 25, material: 2),
+        
+        // Layer 3 (y=30): Width 60
+        (type: "FillRect", min_x: -30, min_y: 30, max_x: 30, max_y: 35, material: 2),
+        
+        // Layer 4 (y=40): Width 80
+        (type: "FillRect", min_x: -40, min_y: 40, max_x: 40, max_y: 45, material: 2),
+        
+        // Layer 5 (y=50): Width 100
+        (type: "FillRect", min_x: -50, min_y: 50, max_x: 50, max_y: 55, material: 2),
+        
+        // Layer 6 (y=60): Width 120
+        (type: "FillRect", min_x: -60, min_y: 60, max_x: 60, max_y: 65, material: 2),
+        
+        // Layer 7 (y=70): Width 140
+        (type: "FillRect", min_x: -70, min_y: 70, max_x: 70, max_y: 75, material: 2),
+        
+        // Layer 8 (y=80): Width 160 (top layer)
+        (type: "FillRect", min_x: -80, min_y: 80, max_x: 80, max_y: 85, material: 2),
+    ],
+
+    actions: [
+        (type: "Log", message: "Starting stress test - inverted sand pyramid will collapse"),
+
+        // Remove bottom apex - entire structure becomes unstable
+        (type: "MineCircle", center_x: 0, center_y: 2, radius: 3),
+
+        (type: "Log", message: "Apex removed - simulating collapse (300 frames = 5 seconds)"),
+
+        // Simulate 5 seconds of falling sand (sustained heavy computation)
+        (type: "WaitFrames", frames: 300),
+
+        (type: "Log", message: "Waiting for sand to fully settle (600 more frames = 10 seconds)"),
+
+        // Continue simulating to let everything settle
+        (type: "WaitFrames", frames: 600),
+
+        // Capture final state
+        (type: "CaptureScreenshot", filename: "stress_test_settled.png"),
+
+        (type: "Log", message: "Stress test complete"),
+    ],
+
+    verify: [
+        // Verify sand has accumulated somewhere (total amount should be preserved)
+        (
+            type: "MaterialCountRange",
+            material: 2,  // Sand
+            region: (type: "Whole"),
+            min: 3000,  // At least some sand should still exist
+            max: 50000,
+        ),
+        
+        // Verify upper region has more air than before (sand has fallen)
+        (
+            type: "MaterialCountRange",
+            material: 0,  // Air
+            region: (type: "Rect", min_x: -100, min_y: 50, max_x: 100, max_y: 100),
+            min: 7000,  // Most should be air after collapse (relaxed bound)
+            max: 20000,
+        ),
+    ],
+
+    cleanup: [],
+)

@@ -20,8 +20,11 @@ use super::mining_system::MiningSystem;
 use super::persistence_system::PersistenceSystem;
 use super::pixel_queries::PixelQueries;
 use super::player_physics::PlayerPhysicsSystem;
+use super::pressure_system::PressureSystem;
 use super::raycasting::Raycasting;
+use super::stats::NoopStats;
 use super::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
+
 use crate::entity::crafting::RecipeRegistry;
 use crate::entity::player::Player;
 use crate::entity::tools::ToolRegistry;
@@ -29,7 +32,6 @@ use crate::simulation::{
     ChunkRenderData, FallingChunk, MaterialId, MaterialType, Materials, ReactionRegistry,
     RegenerationSystem, StructuralIntegritySystem, TemperatureSimulator, WorldCollisionQuery,
 };
-use crate::world::NoopStats;
 
 /// The game world, composed of chunks
 pub struct World {
@@ -69,6 +71,9 @@ pub struct World {
     /// Electrical system (power propagation for Powder Game)
     electrical_system: ElectricalSystem,
 
+    /// Pressure system (gas accumulation and propagation for Powder Game)
+    pressure_system: PressureSystem,
+
     /// Creature manager (spawning, AI, behavior)
     pub creature_manager: crate::creature::spawning::CreatureManager,
 
@@ -107,6 +112,7 @@ impl World {
             regeneration_system: RegenerationSystem::new(),
             debris_system: DebrisSystem::new(),
             electrical_system: ElectricalSystem::new(),
+            pressure_system: PressureSystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
@@ -664,11 +670,6 @@ impl World {
         // 0. Update active chunks (remove distant, re-activate nearby)
         self.update_active_chunks();
 
-
-
-
-
-
         // 0.5. Dynamic chunk loading when player enters new chunk
         let current_chunk = IVec2::new(
             (self.player.position.x as i32).div_euclid(CHUNK_SIZE as i32),
@@ -704,6 +705,18 @@ impl World {
             puffin::profile_scope!("electrical");
 
             self.electrical_system.update(
+                &mut self.chunk_manager.chunks,
+                &chunks_to_update,
+                &self.materials,
+            );
+        }
+
+        // 2.6. Pressure system update (after electrical, before CA movement)
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("pressure");
+
+            self.pressure_system.update(
                 &mut self.chunk_manager.chunks,
                 &chunks_to_update,
                 &self.materials,

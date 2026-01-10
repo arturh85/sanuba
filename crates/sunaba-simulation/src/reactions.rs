@@ -574,6 +574,25 @@ impl ReactionRegistry {
             }
         }
         // Total: 5 original + 21 new + electrical = approximately 50+ reactions!
+
+        // === PRESSURE REACTIONS ===
+
+        // Nitro + Air (or anything) -> Smoke + Air (explosion when min_pressure is met)
+        self.register(Reaction {
+            name: "nitro_explosion".to_string(),
+            input_a: MaterialId::NITRO,
+            input_b: MaterialId::AIR, // Can explode in air
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: Some(20.0), // Explodes when pressure is high
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::AIR,
+            probability: 1.0,       // Instant explosion
+            energy_released: 500.0, // Massive energy release
+        });
     }
 
     /// Register a new reaction
