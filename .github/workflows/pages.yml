@@ -200,8 +200,9 @@ jobs:
           just screenshot 12 1920 1080
           just screenshot 20 1920 1080
           just screenshot 16 1920 1080
-          just screenshot-ui inventory 1280 720
-          just screenshot-ui crafting 1280 720
+          # UI screenshots skipped - require GPU (not available in GitHub Actions)
+          # just screenshot-ui inventory 1280 720
+          # just screenshot-ui crafting 1280 720
           mv screenshots/*.png site/screenshots/ || true
 
       - name: Generate documentation videos
