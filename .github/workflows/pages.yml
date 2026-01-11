@@ -177,6 +177,11 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v2
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Verify FFmpeg installation
         run: |
           ffmpeg -version
