@@ -79,7 +79,7 @@ Behaviors emerge from these properties, not from special-case code.
 #### Fire Propagation
 
 <video width="640" height="360" controls loop>
-  <source src="/videos/fire_spread.mp4" type="video/mp4">
+  <source src="/sunaba/videos/fire_spread.mp4" type="video/mp4">
   Fire spreading through wooden structures
 </video>
 
@@ -92,7 +92,7 @@ Fire spreads through flammable materials when temperature exceeds ignition point
 #### Liquid Physics
 
 <video width="640" height="360" controls loop>
-  <source src="/videos/water_flow.mp4" type="video/mp4">
+  <source src="/sunaba/videos/water_flow.mp4" type="video/mp4">
   Water flowing down platforms
 </video>
 
@@ -101,7 +101,7 @@ Liquids flow based on density, viscosity, and neighbor states. Water finds paths
 #### Structural Dependencies
 
 <video width="640" height="360" controls loop>
-  <source src="/videos/bridge_collapse.mp4" type="video/mp4">
+  <source src="/sunaba/videos/bridge_collapse.mp4" type="video/mp4">
   Bridge collapse cascade
 </video>
 
@@ -110,7 +110,7 @@ When a support pillar is removed, connected structures evaluate their support st
 #### Chemical Reactions
 
 <video width="640" height="360" controls loop>
-  <source src="/videos/lava_water_reaction.mp4" type="video/mp4">
+  <source src="/sunaba/videos/lava_water_reaction.mp4" type="video/mp4">
   Lava and water reaction
 </video>
 

@@ -1,0 +1,1734 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../map-elites/">
+      
+      
+        <link rel="next" href="../prior-work/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.15">
+    
+    
+      
+        <title>Neural Control: Brain Architectures for Embodied Agents - Sunaba 砂場（すなば）</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.f1b6466b.min.css">
+      
+      
+  
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+  
+  <style>:root{}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#neural-control-brain-architectures-for-embodied-agents" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-header__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Sunaba 砂場（すなば）
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Neural Control: Brain Architectures for Embodied Agents
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-nav__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Sunaba 砂場（すなば）
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sunaba: Emergent Artificial Life
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture: System Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cppn-neat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPPN-NEAT: Procedural Morphology Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../emergent-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emergent Physics: Cellular Automata Foundations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map-elites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MAP-Elites: Quality-Diversity Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Control: Brain Architectures for Embodied Agents
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Control: Brain Architectures for Embodied Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-embodied-cognition-challenge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Embodied Cognition Challenge
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Embodied Cognition Challenge">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variable-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable Morphology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensorimotor-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensorimotor Coordination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#graph-neural-networks-for-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph Neural Networks for Morphology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Graph Neural Networks for Morphology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-key-insight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Key Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nervenet-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NerveNet Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#message-passing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Passing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#benefits-of-gnn-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benefits of GNN Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformer-architectures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformer Architectures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformer Architectures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#amorpheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AMORPHEUS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#attention-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attention Mechanism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#positional-encoding-for-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positional Encoding for Bodies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sensor-systems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensor Systems
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sensor Systems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#proprioception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proprioception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exteroception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exteroception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensor-brain-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensor-Brain Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#co-evolution-of-body-and-brain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Co-evolution of Body and Brain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Co-evolution of Body and Brain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-they-must-evolve-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why They Must Evolve Together
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developmental-coupling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developmental Coupling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-baldwin-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Baldwin Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deep-neural-controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deep Neural Controller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-encoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input Encoding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Decoding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weight-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weight Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inference-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference Speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neural-stepping-frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neural Stepping Frequency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future Directions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Future Directions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hierarchical-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-and-attention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and Attention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meta-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta-Learning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prior-work/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prior Work: Literature Review and Inspirations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-embodied-cognition-challenge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Embodied Cognition Challenge
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Embodied Cognition Challenge">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variable-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable Morphology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensorimotor-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensorimotor Coordination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#graph-neural-networks-for-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph Neural Networks for Morphology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Graph Neural Networks for Morphology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-key-insight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Key Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nervenet-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NerveNet Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#message-passing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Passing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#benefits-of-gnn-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benefits of GNN Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformer-architectures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformer Architectures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformer Architectures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#amorpheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AMORPHEUS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#attention-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attention Mechanism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#positional-encoding-for-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positional Encoding for Bodies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sensor-systems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensor Systems
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sensor Systems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#proprioception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proprioception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exteroception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exteroception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensor-brain-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensor-Brain Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#co-evolution-of-body-and-brain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Co-evolution of Body and Brain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Co-evolution of Body and Brain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-they-must-evolve-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why They Must Evolve Together
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developmental-coupling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developmental Coupling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-baldwin-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Baldwin Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deep-neural-controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deep Neural Controller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-encoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input Encoding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Decoding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weight-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weight Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inference-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference Speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neural-stepping-frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neural Stepping Frequency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future Directions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Future Directions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hierarchical-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-and-attention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and Attention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meta-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta-Learning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="neural-control-brain-architectures-for-embodied-agents">Neural Control: Brain Architectures for Embodied Agents<a class="headerlink" href="#neural-control-brain-architectures-for-embodied-agents" title="Permanent link">&para;</a></h1>
+<p>Creatures in Sunaba need brains that can control their evolved bodies. This presents a unique challenge: the neural controller must work with any morphology that CPPN-NEAT produces.</p>
+<h2 id="the-embodied-cognition-challenge">The Embodied Cognition Challenge<a class="headerlink" href="#the-embodied-cognition-challenge" title="Permanent link">&para;</a></h2>
+<h3 id="variable-morphology">Variable Morphology<a class="headerlink" href="#variable-morphology" title="Permanent link">&para;</a></h3>
+<p>Unlike traditional robotics where the body is fixed, evolved creatures have:
+- Variable numbers of limbs
+- Different joint configurations
+- Varying sensor placements
+- Diverse body proportions</p>
+<p>A fixed-architecture neural network cannot handle this variability.</p>
+<h3 id="sensorimotor-coordination">Sensorimotor Coordination<a class="headerlink" href="#sensorimotor-coordination" title="Permanent link">&para;</a></h3>
+<p>The brain must:
+1. <strong>Sense</strong> — Receive inputs from proprioceptive and exteroceptive sensors
+2. <strong>Process</strong> — Integrate information into a coherent world model
+3. <strong>Act</strong> — Generate coordinated motor commands</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph Sensors
+        P[Proprioception]
+        E[Exteroception]
+    end
+
+    subgraph Brain
+        I[Integration]
+        D[Decision]
+    end
+
+    subgraph Motors
+        M[Motor Commands]
+    end
+
+    P --&gt; I
+    E --&gt; I
+    I --&gt; D
+    D --&gt; M</code></pre>
+<h2 id="graph-neural-networks-for-morphology">Graph Neural Networks for Morphology<a class="headerlink" href="#graph-neural-networks-for-morphology" title="Permanent link">&para;</a></h2>
+<h3 id="the-key-insight">The Key Insight<a class="headerlink" href="#the-key-insight" title="Permanent link">&para;</a></h3>
+<p>A creature's body can be represented as a graph:
+- <strong>Nodes</strong> = Body segments
+- <strong>Edges</strong> = Joints connecting segments</p>
+<p>Graph Neural Networks (GNNs) naturally process graph-structured data, making them ideal for morphology-aware control.</p>
+<h3 id="nervenet-architecture">NerveNet Architecture<a class="headerlink" href="#nervenet-architecture" title="Permanent link">&para;</a></h3>
+<p>NerveNet (Wang et al., 2018) pioneered GNN-based control for articulated bodies:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Body Graph"
+        A[Torso] --- B[Left Arm]
+        A --- C[Right Arm]
+        A --- D[Left Leg]
+        A --- E[Right Leg]
+    end
+
+    subgraph "Message Passing"
+        B --&gt; |"message"| A
+        C --&gt; |"message"| A
+        D --&gt; |"message"| A
+        E --&gt; |"message"| A
+        A --&gt; |"message"| B
+        A --&gt; |"message"| C
+        A --&gt; |"message"| D
+        A --&gt; |"message"| E
+    end</code></pre>
+<h3 id="message-passing">Message Passing<a class="headerlink" href="#message-passing" title="Permanent link">&para;</a></h3>
+<p>Each node computes messages to send to neighbors based on:
+- Its own state (joint angles, velocities)
+- The edge properties (joint type, limits)</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>m_ij = MLP_message(h_i, h_j, e_ij)
+</span></code></pre></div>
+<p>Nodes aggregate incoming messages:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>h_i&#39; = MLP_update(h_i, Σ_j m_ji)
+</span></code></pre></div>
+<p>After several message-passing rounds, each node has information about the global body state.</p>
+<h3 id="benefits-of-gnn-control">Benefits of GNN Control<a class="headerlink" href="#benefits-of-gnn-control" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Benefit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Variable input size</td>
+<td>Handles any number of limbs</td>
+</tr>
+<tr>
+<td>Local computation</td>
+<td>Scales linearly with body size</td>
+</tr>
+<tr>
+<td>Permutation equivariance</td>
+<td>Robust to limb ordering</td>
+</tr>
+<tr>
+<td>Transfer learning</td>
+<td>Policies can transfer between bodies</td>
+</tr>
+</tbody>
+</table>
+<h2 id="transformer-architectures">Transformer Architectures<a class="headerlink" href="#transformer-architectures" title="Permanent link">&para;</a></h2>
+<h3 id="amorpheus">AMORPHEUS<a class="headerlink" href="#amorpheus" title="Permanent link">&para;</a></h3>
+<p>AMORPHEUS (Gupta et al., 2021) applies transformer attention to morphology control:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Self-Attention"
+        A[Torso Token]
+        B[Arm 1 Token]
+        C[Arm 2 Token]
+        D[Leg 1 Token]
+        E[Leg 2 Token]
+
+        A &lt;--&gt; B
+        A &lt;--&gt; C
+        A &lt;--&gt; D
+        A &lt;--&gt; E
+        B &lt;--&gt; C
+        D &lt;--&gt; E
+    end</code></pre>
+<h3 id="attention-mechanism">Attention Mechanism<a class="headerlink" href="#attention-mechanism" title="Permanent link">&para;</a></h3>
+<p>Each body part attends to all other parts:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Attention(Q, K, V) = softmax(QK^T / √d) V
+</span></code></pre></div>
+<p>Where Q, K, V are projections of segment states.</p>
+<h3 id="positional-encoding-for-bodies">Positional Encoding for Bodies<a class="headerlink" href="#positional-encoding-for-bodies" title="Permanent link">&para;</a></h3>
+<p>Unlike sequences, bodies have graph structure. AMORPHEUS uses:
+- <strong>Proprioceptive encoding</strong> — Joint angles and velocities
+- <strong>Morphological encoding</strong> — Body part type, parent relationship
+- <strong>Spatial encoding</strong> — Position relative to body center</p>
+<h2 id="sensor-systems">Sensor Systems<a class="headerlink" href="#sensor-systems" title="Permanent link">&para;</a></h2>
+<h3 id="proprioception">Proprioception<a class="headerlink" href="#proprioception" title="Permanent link">&para;</a></h3>
+<p>Internal body sensing:</p>
+<table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>Information</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joint angle</td>
+<td>Current position of each joint</td>
+</tr>
+<tr>
+<td>Joint velocity</td>
+<td>Rate of change of joint angle</td>
+</tr>
+<tr>
+<td>Joint torque</td>
+<td>Force being applied by motor</td>
+</tr>
+<tr>
+<td>Contact</td>
+<td>Binary: is this part touching something?</td>
+</tr>
+</tbody>
+</table>
+<h3 id="exteroception">Exteroception<a class="headerlink" href="#exteroception" title="Permanent link">&para;</a></h3>
+<p>External world sensing:</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph "Raycast Sensors"
+        R1[Forward ray]
+        R2[Downward ray]
+        R3[Lateral rays]
+    end
+
+    subgraph "Returns"
+        D[Distance to hit]
+        M[Material type]
+        T[Temperature]
+    end
+
+    R1 --&gt; D
+    R1 --&gt; M
+    R1 --&gt; T</code></pre>
+<table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>Information</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raycasts</td>
+<td>Distance/material in various directions</td>
+</tr>
+<tr>
+<td>Ground detection</td>
+<td>What's beneath each foot</td>
+</tr>
+<tr>
+<td>Food detection</td>
+<td>Nearby edible materials</td>
+</tr>
+<tr>
+<td>Threat detection</td>
+<td>Nearby predators/dangers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sensor-brain-pipeline">Sensor-Brain Pipeline<a class="headerlink" href="#sensor-brain-pipeline" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Raw Sensors"
+        P[Proprioception: 4 values per joint]
+        E[Exteroception: 8 raycasts × 3 values]
+    end
+
+    subgraph "Encoding"
+        PE[Proprioceptive Encoder]
+        EE[Exteroceptive Encoder]
+    end
+
+    subgraph "Brain"
+        F[Feature Integration]
+        H[Hidden Layers]
+        O[Output Layer]
+    end
+
+    subgraph "Motors"
+        M[Motor Commands: 1 per actuated joint]
+    end
+
+    P --&gt; PE
+    E --&gt; EE
+    PE --&gt; F
+    EE --&gt; F
+    F --&gt; H
+    H --&gt; O
+    O --&gt; M</code></pre>
+<h2 id="co-evolution-of-body-and-brain">Co-evolution of Body and Brain<a class="headerlink" href="#co-evolution-of-body-and-brain" title="Permanent link">&para;</a></h2>
+<h3 id="why-they-must-evolve-together">Why They Must Evolve Together<a class="headerlink" href="#why-they-must-evolve-together" title="Permanent link">&para;</a></h3>
+<p>Bodies and brains are deeply coupled:
+- A body optimized for a different brain won't function
+- A brain optimized for a different body won't control well</p>
+<h3 id="developmental-coupling">Developmental Coupling<a class="headerlink" href="#developmental-coupling" title="Permanent link">&para;</a></h3>
+<p>In nature, bodies and nervous systems develop together. Nerves grow along with limbs. Sunaba mimics this:</p>
+<ol>
+<li>CPPN-NEAT generates morphology</li>
+<li>Body graph determines neural architecture</li>
+<li>Neural weights are part of the genome</li>
+<li>Both evolve together under selection</li>
+</ol>
+<h3 id="the-baldwin-effect">The Baldwin Effect<a class="headerlink" href="#the-baldwin-effect" title="Permanent link">&para;</a></h3>
+<p>An interesting phenomenon emerges:</p>
+<ol>
+<li>Learning (neural adaptation) helps individuals survive</li>
+<li>Individuals with better learning capacity are selected</li>
+<li>Eventually, learned behaviors become "hardcoded"</li>
+</ol>
+<p>This accelerates evolution by allowing beneficial behaviors to be discovered through learning before being genetically encoded.</p>
+<h2 id="in-sunaba">In Sunaba<a class="headerlink" href="#in-sunaba" title="Permanent link">&para;</a></h2>
+<h3 id="deep-neural-controller">Deep Neural Controller<a class="headerlink" href="#deep-neural-controller" title="Permanent link">&para;</a></h3>
+<p>Sunaba uses a deep feedforward network with the following structure:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Input Layer"
+        I1[Proprioceptive inputs]
+        I2[Exteroceptive inputs]
+        I3[Internal state hunger/health]
+    end
+
+    subgraph "Hidden Layers"
+        H1[Dense Layer 64 units]
+        H2[Dense Layer 64 units]
+        H3[Dense Layer 32 units]
+    end
+
+    subgraph "Output Layer"
+        O[Motor commands per joint]
+    end
+
+    I1 --&gt; H1
+    I2 --&gt; H1
+    I3 --&gt; H1
+    H1 --&gt; H2
+    H2 --&gt; H3
+    H3 --&gt; O</code></pre>
+<h3 id="input-encoding">Input Encoding<a class="headerlink" href="#input-encoding" title="Permanent link">&para;</a></h3>
+<p>For each joint:
+- Angle (normalized to [-1, 1])
+- Angular velocity (normalized)
+- Motor activation (previous frame)</p>
+<p>Global inputs:
+- Health level
+- Hunger level
+- Orientation (sin/cos of body angle)</p>
+<h3 id="output-decoding">Output Decoding<a class="headerlink" href="#output-decoding" title="Permanent link">&para;</a></h3>
+<p>Each output corresponds to a motor:
+- Range: [-1, 1]
+- -1 = maximum torque in negative direction
+- 0 = no torque
+- +1 = maximum torque in positive direction</p>
+<h3 id="activation-functions">Activation Functions<a class="headerlink" href="#activation-functions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Hidden layers: ReLU (fast, avoids vanishing gradients)</li>
+<li>Output layer: Tanh (bounded motor commands)</li>
+</ul>
+<h3 id="weight-initialization">Weight Initialization<a class="headerlink" href="#weight-initialization" title="Permanent link">&para;</a></h3>
+<p>Weights are initialized using He initialization and then evolved. Initial random weights produce random behaviors, which MAP-Elites explores.</p>
+<h2 id="performance-considerations">Performance Considerations<a class="headerlink" href="#performance-considerations" title="Permanent link">&para;</a></h2>
+<h3 id="inference-speed">Inference Speed<a class="headerlink" href="#inference-speed" title="Permanent link">&para;</a></h3>
+<p>With many creatures, neural inference becomes a bottleneck:</p>
+<table>
+<thead>
+<tr>
+<th>Optimization</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIMD operations</td>
+<td>2-4x speedup</td>
+</tr>
+<tr>
+<td>Batch inference</td>
+<td>Reduces per-creature overhead</td>
+</tr>
+<tr>
+<td>Pruned networks</td>
+<td>Smaller networks run faster</td>
+</tr>
+<tr>
+<td>Fixed-point</td>
+<td>Reduces memory bandwidth</td>
+</tr>
+</tbody>
+</table>
+<h3 id="neural-stepping-frequency">Neural Stepping Frequency<a class="headerlink" href="#neural-stepping-frequency" title="Permanent link">&para;</a></h3>
+<p>Brains don't need to run every physics frame:
+- Physics: 60 FPS
+- Neural: 15-30 FPS (configurable)
+- Motor commands interpolated between decisions</p>
+<h2 id="future-directions">Future Directions<a class="headerlink" href="#future-directions" title="Permanent link">&para;</a></h2>
+<h3 id="hierarchical-control">Hierarchical Control<a class="headerlink" href="#hierarchical-control" title="Permanent link">&para;</a></h3>
+<p>Separating high-level goals from low-level motor control:</p>
+<pre class="mermaid"><code>flowchart TD
+    G[Goal Selection: GOAP] --&gt; T[Task Planning]
+    T --&gt; S[Skill Selection]
+    S --&gt; M[Motor Control: Neural]
+    M --&gt; A[Actions]</code></pre>
+<h3 id="memory-and-attention">Memory and Attention<a class="headerlink" href="#memory-and-attention" title="Permanent link">&para;</a></h3>
+<p>Adding recurrent or transformer layers for:
+- Remembering past observations
+- Tracking moving prey/threats
+- Planning multi-step sequences</p>
+<h3 id="meta-learning">Meta-Learning<a class="headerlink" href="#meta-learning" title="Permanent link">&para;</a></h3>
+<p>Training controllers that can quickly adapt to new bodies, enabling faster evolution of novel morphologies.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Wang, T., Liao, R., Ba, J., &amp; Fidler, S. (2018). "NerveNet: Learning Structured Policy with Graph Neural Networks." <em>ICLR</em>.</li>
+<li>Huang, W., Mordatch, I., &amp; Pathak, D. (2020). "One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control." <em>ICML</em>.</li>
+<li>Gupta, A., Fan, L., Ganguli, S., &amp; Fei-Fei, L. (2021). "MetaMorph: Learning Universal Controllers with Transformers." <em>ICLR</em>.</li>
+<li>Ha, D. (2019). "Reinforcement Learning for Improving Agent Design." <em>Artificial Life</em>.</li>
+<li>Heess, N., et al. (2017). "Emergence of Locomotion Behaviours in Rich Environments." <em>arXiv</em>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":[],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.00c35305.min.js"></script>
+      
+    
+  </body>
+</html>

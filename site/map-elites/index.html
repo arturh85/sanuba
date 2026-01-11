@@ -1,0 +1,1579 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../emergent-physics/">
+      
+      
+        <link rel="next" href="../neural-control/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.15">
+    
+    
+      
+        <title>MAP-Elites: Quality-Diversity Optimization - Sunaba 砂場（すなば）</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.f1b6466b.min.css">
+      
+      
+  
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+  
+  <style>:root{}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#map-elites-quality-diversity-optimization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-header__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Sunaba 砂場（すなば）
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MAP-Elites: Quality-Diversity Optimization
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-nav__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Sunaba 砂場（すなば）
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sunaba: Emergent Artificial Life
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture: System Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cppn-neat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPPN-NEAT: Procedural Morphology Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../emergent-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emergent Physics: Cellular Automata Foundations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MAP-Elites: Quality-Diversity Optimization
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MAP-Elites: Quality-Diversity Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-with-fitness-only-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem with Fitness-Only Optimization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Problem with Fitness-Only Optimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-optima" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Optima
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loss-of-diversity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss of Diversity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality-diversity-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality-Diversity Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quality-Diversity Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-illumination-metaphor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Illumination Metaphor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-map-elites-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The MAP-Elites Algorithm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The MAP-Elites Algorithm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pseudocode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pseudocode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-dimensions-for-creatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior Dimensions for Creatures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behavior Dimensions for Creatures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#locomotion-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locomotion Style
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diet-specialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diet Specialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#social-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Social Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-qd-for-artificial-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why QD for Artificial Life?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Why QD for Artificial Life?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-ecological-niches-emerge-naturally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Ecological Niches Emerge Naturally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-robustness-through-diversity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Robustness Through Diversity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-stepping-stones-to-complex-behaviors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Stepping Stones to Complex Behaviors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-co-evolution-dynamics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Co-evolution Dynamics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behavior-characterization-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior Characterization Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archive-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archive Visualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-archive-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Archive Evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparison-with-other-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison with Other Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Topics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Topics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cvt-map-elites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVT-MAP-Elites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deep-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deep Grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-elites-with-curiosity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAP-Elites with Curiosity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Control: Brain Architectures for Embodied Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prior-work/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prior Work: Literature Review and Inspirations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-with-fitness-only-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem with Fitness-Only Optimization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Problem with Fitness-Only Optimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-optima" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Optima
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loss-of-diversity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss of Diversity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality-diversity-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality-Diversity Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quality-Diversity Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-illumination-metaphor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Illumination Metaphor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-map-elites-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The MAP-Elites Algorithm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The MAP-Elites Algorithm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pseudocode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pseudocode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-dimensions-for-creatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior Dimensions for Creatures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behavior Dimensions for Creatures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#locomotion-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locomotion Style
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diet-specialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diet Specialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#social-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Social Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-qd-for-artificial-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why QD for Artificial Life?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Why QD for Artificial Life?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-ecological-niches-emerge-naturally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Ecological Niches Emerge Naturally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-robustness-through-diversity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Robustness Through Diversity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-stepping-stones-to-complex-behaviors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Stepping Stones to Complex Behaviors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-co-evolution-dynamics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Co-evolution Dynamics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behavior-characterization-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior Characterization Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archive-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archive Visualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-archive-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Archive Evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparison-with-other-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison with Other Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Topics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Topics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cvt-map-elites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVT-MAP-Elites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deep-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deep Grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-elites-with-curiosity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAP-Elites with Curiosity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="map-elites-quality-diversity-optimization">MAP-Elites: Quality-Diversity Optimization<a class="headerlink" href="#map-elites-quality-diversity-optimization" title="Permanent link">&para;</a></h1>
+<p>Traditional evolutionary algorithms optimize a single fitness function, converging toward a single "best" solution. <strong>MAP-Elites</strong> takes a different approach: it simultaneously discovers diverse, high-quality solutions across a space of behavioral characteristics.</p>
+<h2 id="the-problem-with-fitness-only-optimization">The Problem with Fitness-Only Optimization<a class="headerlink" href="#the-problem-with-fitness-only-optimization" title="Permanent link">&para;</a></h2>
+<h3 id="local-optima">Local Optima<a class="headerlink" href="#local-optima" title="Permanent link">&para;</a></h3>
+<p>Consider evolving creatures to move quickly. A fitness function rewarding speed will:</p>
+<ol>
+<li>Find an initial solution (e.g., rolling)</li>
+<li>Optimize that solution</li>
+<li>Get stuck if a different strategy (e.g., walking) requires passing through low-fitness intermediate forms</li>
+</ol>
+<pre class="mermaid"><code>flowchart LR
+    subgraph "Fitness Landscape"
+        A[Rolling\nLocal Optimum]
+        B[Valley\nLow Fitness]
+        C[Walking\nGlobal Optimum]
+    end
+    A -.-&gt;|"Blocked by valley"| B
+    B -.-&gt; C</code></pre>
+<h3 id="loss-of-diversity">Loss of Diversity<a class="headerlink" href="#loss-of-diversity" title="Permanent link">&para;</a></h3>
+<p>Fitness-only evolution exhibits <strong>premature convergence</strong>:</p>
+<ul>
+<li>Population concentrates around local optimum</li>
+<li>Genetic diversity collapses</li>
+<li>Exploration ceases</li>
+<li>Novel strategies become unreachable</li>
+</ul>
+<h2 id="quality-diversity-algorithms">Quality-Diversity Algorithms<a class="headerlink" href="#quality-diversity-algorithms" title="Permanent link">&para;</a></h2>
+<p>Quality-Diversity (QD) algorithms reframe the goal:</p>
+<blockquote>
+<p>Instead of finding <em>one</em> optimal solution, find <em>many</em> solutions that are both high-quality and behaviorally diverse.</p>
+</blockquote>
+<h3 id="the-illumination-metaphor">The Illumination Metaphor<a class="headerlink" href="#the-illumination-metaphor" title="Permanent link">&para;</a></h3>
+<p>QD algorithms "illuminate" the space of possible behaviors, revealing which behaviors are achievable and how well they can be performed.</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Traditional EA"
+        T1[Population] --&gt; T2[Single Optimum]
+    end
+
+    subgraph "Quality-Diversity"
+        Q1[Population] --&gt; Q2[Archive of Diverse Solutions]
+        Q2 --&gt; Q3[Full Behavior Space Coverage]
+    end</code></pre>
+<h2 id="the-map-elites-algorithm">The MAP-Elites Algorithm<a class="headerlink" href="#the-map-elites-algorithm" title="Permanent link">&para;</a></h2>
+<p>MAP-Elites (Multi-dimensional Archive of Phenotypic Elites) maintains a grid of solutions, where each cell represents a region of behavior space.</p>
+<h3 id="algorithm-overview">Algorithm Overview<a class="headerlink" href="#algorithm-overview" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    A[Initialize random solutions] --&gt; B[Evaluate each solution]
+    B --&gt; C[Compute behavior descriptor]
+    C --&gt; D[Find corresponding archive cell]
+    D --&gt; E{Cell empty OR new solution better?}
+    E --&gt;|Yes| F[Store in archive]
+    E --&gt;|No| G[Discard]
+    F --&gt; H[Select random solution from archive]
+    G --&gt; H
+    H --&gt; I[Mutate]
+    I --&gt; B</code></pre>
+<h3 id="key-components">Key Components<a class="headerlink" href="#key-components" title="Permanent link">&para;</a></h3>
+<p><strong>1. Behavior Descriptor (BD)</strong></p>
+<p>A function mapping solutions to a low-dimensional behavior space:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>BD: Solution → (b₁, b₂, ..., bₙ)
+</span></code></pre></div>
+<p>Example for creatures:
+- b₁ = proportion of time in contact with ground
+- b₂ = average height during movement</p>
+<p><strong>2. Archive Grid</strong></p>
+<p>The behavior space is discretized into a grid:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌─────┬─────┬─────┬─────┐
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│     │  ●  │  ●  │     │  ● = Elite solution
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├─────┼─────┼─────┼─────┤
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│  ●  │  ●  │     │  ●  │
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├─────┼─────┼─────┼─────┤
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│     │  ●  │  ●  │  ●  │
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├─────┼─────┼─────┼─────┤
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│  ●  │     │  ●  │     │
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>└─────┴─────┴─────┴─────┘
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>       Behavior Dimension 1 →
+</span></code></pre></div>
+<p><strong>3. Elite Replacement</strong></p>
+<p>A new solution replaces the existing elite in its cell only if it has higher fitness.</p>
+<h3 id="pseudocode">Pseudocode<a class="headerlink" href="#pseudocode" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Initialize archive A (empty grid)
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>For iteration = 1 to MAX_ITERATIONS:
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    If archive is empty:
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        x = random_solution()
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    Else:
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        x&#39; = random_select(A)
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        x = mutate(x&#39;)
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    fitness = evaluate(x)
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    behavior = compute_behavior(x)
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    cell = discretize(behavior)
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    If A[cell] is empty OR fitness &gt; A[cell].fitness:
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        A[cell] = (x, fitness, behavior)
+</span></code></pre></div>
+<h2 id="behavior-dimensions-for-creatures">Behavior Dimensions for Creatures<a class="headerlink" href="#behavior-dimensions-for-creatures" title="Permanent link">&para;</a></h2>
+<h3 id="locomotion-style">Locomotion Style<a class="headerlink" href="#locomotion-style" title="Permanent link">&para;</a></h3>
+<p>How does the creature move?</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Low Value</th>
+<th>High Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ground contact</td>
+<td>Aerial/jumping</td>
+<td>Crawling</td>
+</tr>
+<tr>
+<td>Body oscillation</td>
+<td>Rigid</td>
+<td>Undulating</td>
+</tr>
+<tr>
+<td>Limb usage</td>
+<td>Body-based</td>
+<td>Limb-based</td>
+</tr>
+</tbody>
+</table>
+<h3 id="diet-specialization">Diet Specialization<a class="headerlink" href="#diet-specialization" title="Permanent link">&para;</a></h3>
+<p>What does the creature eat?</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Range</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Plant consumption</td>
+<td>0% to 100%</td>
+</tr>
+<tr>
+<td>Meat consumption</td>
+<td>0% to 100%</td>
+</tr>
+<tr>
+<td>Scavenging</td>
+<td>0% to 100%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="social-behavior">Social Behavior<a class="headerlink" href="#social-behavior" title="Permanent link">&para;</a></h3>
+<p>How does the creature interact with others?</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Low</th>
+<th>High</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Group size</td>
+<td>Solitary</td>
+<td>Swarm</td>
+</tr>
+<tr>
+<td>Cooperation</td>
+<td>Competitive</td>
+<td>Cooperative</td>
+</tr>
+<tr>
+<td>Territory</td>
+<td>Nomadic</td>
+<td>Territorial</td>
+</tr>
+</tbody>
+</table>
+<h3 id="strategy">Strategy<a class="headerlink" href="#strategy" title="Permanent link">&para;</a></h3>
+<p>How does the creature behave under pressure?</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Low</th>
+<th>High</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Aggression</td>
+<td>Evasive</td>
+<td>Aggressive</td>
+</tr>
+<tr>
+<td>Risk-taking</td>
+<td>Cautious</td>
+<td>Bold</td>
+</tr>
+<tr>
+<td>Resource hoarding</td>
+<td>Immediate consumption</td>
+<td>Stockpiling</td>
+</tr>
+</tbody>
+</table>
+<h2 id="why-qd-for-artificial-life">Why QD for Artificial Life?<a class="headerlink" href="#why-qd-for-artificial-life" title="Permanent link">&para;</a></h2>
+<h3 id="1-ecological-niches-emerge-naturally">1. Ecological Niches Emerge Naturally<a class="headerlink" href="#1-ecological-niches-emerge-naturally" title="Permanent link">&para;</a></h3>
+<p>Different behavior regions correspond to different ecological niches:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Behavior Space"
+        A[Fast + Aggressive] --&gt; P[Predators]
+        B[Slow + Evasive] --&gt; H[Hiders]
+        C[Medium + Hoarding] --&gt; G[Gatherers]
+        D[Fast + Social] --&gt; S[Swarmers]
+    end</code></pre>
+<h3 id="2-robustness-through-diversity">2. Robustness Through Diversity<a class="headerlink" href="#2-robustness-through-diversity" title="Permanent link">&para;</a></h3>
+<p>A diverse population is more robust to environmental changes. If conditions shift, some existing strategies may already be adapted.</p>
+<h3 id="3-stepping-stones-to-complex-behaviors">3. Stepping Stones to Complex Behaviors<a class="headerlink" href="#3-stepping-stones-to-complex-behaviors" title="Permanent link">&para;</a></h3>
+<p>Some behaviors are only reachable by passing through intermediate forms. MAP-Elites preserves these stepping stones.</p>
+<pre class="mermaid"><code>flowchart LR
+    A[Simple Rolling] --&gt; B[Rolling + Steering]
+    B --&gt; C[Steering + Limb Growth]
+    C --&gt; D[Walking]
+
+    style A fill:#f9f
+    style B fill:#f9f
+    style C fill:#f9f
+    style D fill:#9f9</code></pre>
+<h3 id="4-co-evolution-dynamics">4. Co-evolution Dynamics<a class="headerlink" href="#4-co-evolution-dynamics" title="Permanent link">&para;</a></h3>
+<p>When multiple species co-evolve, diversity prevents arms races from collapsing to single strategies.</p>
+<h2 id="in-sunaba">In Sunaba<a class="headerlink" href="#in-sunaba" title="Permanent link">&para;</a></h2>
+<h3 id="behavior-characterization-functions">Behavior Characterization Functions<a class="headerlink" href="#behavior-characterization-functions" title="Permanent link">&para;</a></h3>
+<p>Sunaba computes behavior descriptors from creature performance:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Locomotion BC:
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>- ground_contact_ratio: time touching ground / total time
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>- average_height: mean y-position during evaluation
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>- distance_traveled: total displacement
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>- movement_efficiency: distance / energy_spent
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>Foraging BC:
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>- food_types_eaten: count of distinct materials consumed
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>- foraging_range: area covered while seeking food
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>- consumption_rate: food eaten / time
+</span></code></pre></div>
+<h3 id="archive-visualization">Archive Visualization<a class="headerlink" href="#archive-visualization" title="Permanent link">&para;</a></h3>
+<p>The MAP-Elites archive can be visualized as a heatmap:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>          Ground Contact →
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>        0.0   0.25  0.5   0.75  1.0
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>      ┌─────┬─────┬─────┬─────┬─────┐
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a> H  0 │ 0.2 │ 0.4 │     │     │     │
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a> e    ├─────┼─────┼─────┼─────┼─────┤
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a> i  1 │ 0.3 │ 0.7 │ 0.8 │ 0.5 │     │
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a> g    ├─────┼─────┼─────┼─────┼─────┤
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a> h  2 │     │ 0.6 │ 0.9 │ 0.8 │ 0.6 │
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a> t    ├─────┼─────┼─────┼─────┼─────┤
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a> ↓  3 │     │     │ 0.7 │ 0.9 │ 0.7 │
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>      └─────┴─────┴─────┴─────┴─────┘
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>      Cell values = fitness scores
+</span></code></pre></div>
+<h3 id="multi-archive-evolution">Multi-Archive Evolution<a class="headerlink" href="#multi-archive-evolution" title="Permanent link">&para;</a></h3>
+<p>Sunaba supports multiple archives for different fitness objectives:</p>
+<ul>
+<li>Locomotion archive (speed, efficiency)</li>
+<li>Foraging archive (resource gathering)</li>
+<li>Combat archive (hunting success)</li>
+<li>Survival archive (longevity)</li>
+</ul>
+<p>Creatures can be sampled from any archive for different purposes.</p>
+<h2 id="comparison-with-other-algorithms">Comparison with Other Algorithms<a class="headerlink" href="#comparison-with-other-algorithms" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Diversity</th>
+<th>Quality</th>
+<th>Scalability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standard EA</td>
+<td>Low</td>
+<td>High</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Novelty Search</td>
+<td>High</td>
+<td>Variable</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>NSGA-II</td>
+<td>Medium</td>
+<td>High</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>MAP-Elites</td>
+<td>High</td>
+<td>High</td>
+<td>High</td>
+</tr>
+</tbody>
+</table>
+<h2 id="advanced-topics">Advanced Topics<a class="headerlink" href="#advanced-topics" title="Permanent link">&para;</a></h2>
+<h3 id="cvt-map-elites">CVT-MAP-Elites<a class="headerlink" href="#cvt-map-elites" title="Permanent link">&para;</a></h3>
+<p>Centroidal Voronoi Tessellation (CVT) replaces the regular grid with adaptive cells that better cover the behavior space.</p>
+<h3 id="deep-grid">Deep Grid<a class="headerlink" href="#deep-grid" title="Permanent link">&para;</a></h3>
+<p>Hierarchical grids that allocate finer resolution to dense regions.</p>
+<h3 id="map-elites-with-curiosity">MAP-Elites with Curiosity<a class="headerlink" href="#map-elites-with-curiosity" title="Permanent link">&para;</a></h3>
+<p>Bonus rewards for discovering new cells, encouraging exploration of unoccupied regions.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Mouret, J.-B. &amp; Clune, J. (2015). "Illuminating search spaces by mapping elites." <em>arXiv preprint arXiv:1504.04909</em>.</li>
+<li>Pugh, J.K., Soros, L.B., &amp; Stanley, K.O. (2016). "Quality Diversity: A New Frontier for Evolutionary Computation." <em>Frontiers in Robotics and AI</em>.</li>
+<li>Cully, A., Clune, J., Tarapore, D., &amp; Mouret, J.-B. (2015). "Robots that can adapt like animals." <em>Nature</em>.</li>
+<li>Lehman, J. &amp; Stanley, K.O. (2011). "Abandoning Objectives: Evolution Through the Search for Novelty Alone." <em>Evolutionary Computation</em>.</li>
+<li>Vassiliades, V., Chatzilygeroudis, K., &amp; Mouret, J.-B. (2017). "Using Centroidal Voronoi Tessellations to Scale Up the Multidimensional Archive of Phenotypic Elites Algorithm." <em>IEEE TEVC</em>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":[],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.00c35305.min.js"></script>
+      
+    
+  </body>
+</html>

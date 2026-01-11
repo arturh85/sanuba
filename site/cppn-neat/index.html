@@ -1,0 +1,1345 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../emergent-physics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.15">
+    
+    
+      
+        <title>CPPN-NEAT: Procedural Morphology Generation - Sunaba 砂場（すなば）</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.f1b6466b.min.css">
+      
+      
+  
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+  
+  <style>:root{}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cppn-neat-procedural-morphology-generation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-header__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Sunaba 砂場（すなば）
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CPPN-NEAT: Procedural Morphology Generation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-nav__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Sunaba 砂場（すなば）
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sunaba: Emergent Artificial Life
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture: System Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPPN-NEAT: Procedural Morphology Generation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPPN-NEAT: Procedural Morphology Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-designing-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem: Designing Bodies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compositional-pattern-producing-networks-cppns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compositional Pattern Producing Networks (CPPNs)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compositional Pattern Producing Networks (CPPNs)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-cppn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a CPPN?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-cppns-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why CPPNs Work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cppn-query-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN Query Process
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neat-neuroevolution-of-augmenting-topologies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NEAT: NeuroEvolution of Augmenting Topologies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NEAT: NeuroEvolution of Augmenting Topologies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-challenge-of-evolving-network-topology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Challenge of Evolving Network Topology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#historical-markings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical Markings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crossover-with-historical-genes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crossover with Historical Genes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#speciation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Speciation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mutation-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation Operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cppn-neat-for-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN-NEAT for Morphology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CPPN-NEAT for Morphology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-genotype-phenotype-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Genotype-Phenotype Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cppn-outputs-for-sunaba-creatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN Outputs for Sunaba Creatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-how-a-limb-emerges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: How a Limb Emerges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#joint-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joint Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#morphology-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Morphology Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evolved-morphology-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evolved Morphology Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benefits-of-cppn-neat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benefits of CPPN-NEAT
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../emergent-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emergent Physics: Cellular Automata Foundations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map-elites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MAP-Elites: Quality-Diversity Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Control: Brain Architectures for Embodied Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prior-work/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prior Work: Literature Review and Inspirations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-designing-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem: Designing Bodies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compositional-pattern-producing-networks-cppns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compositional Pattern Producing Networks (CPPNs)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compositional Pattern Producing Networks (CPPNs)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-cppn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a CPPN?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-cppns-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why CPPNs Work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cppn-query-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN Query Process
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neat-neuroevolution-of-augmenting-topologies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NEAT: NeuroEvolution of Augmenting Topologies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NEAT: NeuroEvolution of Augmenting Topologies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-challenge-of-evolving-network-topology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Challenge of Evolving Network Topology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#historical-markings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical Markings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crossover-with-historical-genes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crossover with Historical Genes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#speciation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Speciation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mutation-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation Operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cppn-neat-for-morphology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN-NEAT for Morphology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CPPN-NEAT for Morphology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-genotype-phenotype-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Genotype-Phenotype Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cppn-outputs-for-sunaba-creatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPPN Outputs for Sunaba Creatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-how-a-limb-emerges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: How a Limb Emerges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-sunaba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Sunaba
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In Sunaba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#joint-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joint Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#morphology-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Morphology Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evolved-morphology-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evolved Morphology Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benefits-of-cppn-neat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benefits of CPPN-NEAT
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="cppn-neat-procedural-morphology-generation">CPPN-NEAT: Procedural Morphology Generation<a class="headerlink" href="#cppn-neat-procedural-morphology-generation" title="Permanent link">&para;</a></h1>
+<p>Sunaba's creatures don't have hand-designed bodies. Instead, their morphologies are procedurally generated by <strong>Compositional Pattern Producing Networks (CPPNs)</strong>, evolved using <strong>NeuroEvolution of Augmenting Topologies (NEAT)</strong>.</p>
+<h2 id="the-problem-designing-bodies">The Problem: Designing Bodies<a class="headerlink" href="#the-problem-designing-bodies" title="Permanent link">&para;</a></h2>
+<p>How do you create diverse, functional creature morphologies without hand-designing each one?</p>
+<p>Nature's solution is development — a genetic blueprint (genotype) unfolds into a physical body (phenotype) through growth processes. The same approach can work for artificial creatures.</p>
+<h2 id="compositional-pattern-producing-networks-cppns">Compositional Pattern Producing Networks (CPPNs)<a class="headerlink" href="#compositional-pattern-producing-networks-cppns" title="Permanent link">&para;</a></h2>
+<h3 id="what-is-a-cppn">What is a CPPN?<a class="headerlink" href="#what-is-a-cppn" title="Permanent link">&para;</a></h3>
+<p>A CPPN is a neural network that generates patterns by taking spatial coordinates as input and outputting values that determine properties at those locations.</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph Inputs
+        X[x coordinate]
+        Y[y coordinate]
+        D[distance from center]
+    end
+
+    subgraph "CPPN Network"
+        H1[Hidden Layer]
+        H2[Hidden Layer]
+    end
+
+    subgraph Outputs
+        M[Material presence]
+        J[Joint type]
+        S[Segment ID]
+    end
+
+    X --&gt; H1
+    Y --&gt; H1
+    D --&gt; H1
+    H1 --&gt; H2
+    H2 --&gt; M
+    H2 --&gt; J
+    H2 --&gt; S</code></pre>
+<h3 id="why-cppns-work">Why CPPNs Work<a class="headerlink" href="#why-cppns-work" title="Permanent link">&para;</a></h3>
+<p>CPPNs leverage <strong>geometric regularities</strong> found in natural organisms:</p>
+<table>
+<thead>
+<tr>
+<th>Regularity</th>
+<th>Activation Function</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Symmetry</td>
+<td>Gaussian (distance)</td>
+<td>Bilateral symmetry</td>
+</tr>
+<tr>
+<td>Repetition</td>
+<td>Sine</td>
+<td>Repeating segments</td>
+</tr>
+<tr>
+<td>Gradients</td>
+<td>Linear</td>
+<td>Smooth transitions</td>
+</tr>
+<tr>
+<td>Sharp boundaries</td>
+<td>Step</td>
+<td>Distinct regions</td>
+</tr>
+</tbody>
+</table>
+<p>By combining these functions, CPPNs can produce:
+- Bilaterally symmetric bodies
+- Repeating limb segments
+- Smooth body contours
+- Distinct organs/regions</p>
+<h3 id="activation-functions">Activation Functions<a class="headerlink" href="#activation-functions" title="Permanent link">&para;</a></h3>
+<p>CPPNs use diverse activation functions, each contributing different geometric properties:</p>
+<pre class="mermaid"><code>flowchart TB
+    subgraph "Activation Functions"
+        direction LR
+        A1["sin(x): Repetition"]
+        A2["gauss(x): Symmetry"]
+        A3["sigmoid(x): Gradients"]
+        A4["step(x): Boundaries"]
+        A5["abs(x): V-shapes"]
+    end</code></pre>
+<p><strong>Sine</strong> — Creates repeating, periodic patterns (limb segments, stripes)</p>
+<p><strong>Gaussian</strong> — Creates radially symmetric patterns (eyes, body centers)</p>
+<p><strong>Sigmoid</strong> — Creates smooth gradients (density variations, tapers)</p>
+<p><strong>Step</strong> — Creates sharp boundaries (distinct body regions)</p>
+<p><strong>Absolute value</strong> — Creates V-shaped patterns (limb bifurcations)</p>
+<h3 id="cppn-query-process">CPPN Query Process<a class="headerlink" href="#cppn-query-process" title="Permanent link">&para;</a></h3>
+<p>To generate a creature body, we query the CPPN at many spatial coordinates:</p>
+<pre class="mermaid"><code>flowchart TD
+    A[Define query grid] --&gt; B[For each point x,y]
+    B --&gt; C[Compute distance d from origin]
+    C --&gt; D[Feed x,y,d into CPPN]
+    D --&gt; E[Get output values]
+    E --&gt; F{material_presence &gt; threshold?}
+    F --&gt;|Yes| G[Create body segment]
+    F --&gt;|No| H[Empty space]
+    G --&gt; I[Assign joint type from output]
+    I --&gt; B</code></pre>
+<h2 id="neat-neuroevolution-of-augmenting-topologies">NEAT: NeuroEvolution of Augmenting Topologies<a class="headerlink" href="#neat-neuroevolution-of-augmenting-topologies" title="Permanent link">&para;</a></h2>
+<h3 id="the-challenge-of-evolving-network-topology">The Challenge of Evolving Network Topology<a class="headerlink" href="#the-challenge-of-evolving-network-topology" title="Permanent link">&para;</a></h3>
+<p>Traditional neuroevolution fixes the network architecture and only evolves weights. But optimal topology varies by problem. NEAT solves this by evolving both topology and weights simultaneously.</p>
+<h3 id="historical-markings">Historical Markings<a class="headerlink" href="#historical-markings" title="Permanent link">&para;</a></h3>
+<p>NEAT's key innovation is <strong>historical markings</strong> — every gene (connection) receives a unique global ID when created:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Gene 1: Node A → Node B (innovation #1)
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Gene 2: Node B → Node C (innovation #2)
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Gene 3: Node A → Node C (innovation #3)  ← New connection
+</span></code></pre></div>
+<p>These markings enable meaningful crossover between networks with different topologies.</p>
+<h3 id="crossover-with-historical-genes">Crossover with Historical Genes<a class="headerlink" href="#crossover-with-historical-genes" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Parent 1"
+        P1["Genes: 1, 2, 3, 4, 8"]
+    end
+
+    subgraph "Parent 2"
+        P2["Genes: 1, 2, 3, 5, 6, 7"]
+    end
+
+    subgraph "Matching"
+        M["1, 2, 3 — randomly inherit from either parent"]
+    end
+
+    subgraph "Disjoint/Excess"
+        D["4, 5, 6, 7, 8 — inherit from fitter parent"]
+    end
+
+    P1 --&gt; M
+    P2 --&gt; M
+    P1 --&gt; D
+    P2 --&gt; D
+    M --&gt; C[Child Genome]
+    D --&gt; C</code></pre>
+<h3 id="speciation">Speciation<a class="headerlink" href="#speciation" title="Permanent link">&para;</a></h3>
+<p>NEAT protects innovation through <strong>speciation</strong>. New topological structures initially perform poorly but may lead to better solutions. By grouping similar genomes into species, NEAT prevents premature convergence.</p>
+<p>Species distance:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>δ = c₁(E/N) + c₂(D/N) + c₃·W̄
+</span></code></pre></div>
+<p>Where:
+- E = excess genes
+- D = disjoint genes
+- W̄ = average weight difference
+- N = normalizing factor (genome size)</p>
+<h3 id="mutation-operators">Mutation Operators<a class="headerlink" href="#mutation-operators" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph "Structural Mutations"
+        A1[Add Node] --&gt; A2["Split existing connection\nA→B becomes A→C→B"]
+        B1[Add Connection] --&gt; B2["New edge between\nexisting nodes"]
+    end
+
+    subgraph "Weight Mutations"
+        C1[Perturb Weights] --&gt; C2["Small random changes\nto connection weights"]
+        D1[Reset Weight] --&gt; D2["Replace with new\nrandom value"]
+    end</code></pre>
+<h2 id="cppn-neat-for-morphology">CPPN-NEAT for Morphology<a class="headerlink" href="#cppn-neat-for-morphology" title="Permanent link">&para;</a></h2>
+<p>Combining CPPN and NEAT creates a powerful system for evolving creature bodies.</p>
+<h3 id="the-genotype-phenotype-mapping">The Genotype-Phenotype Mapping<a class="headerlink" href="#the-genotype-phenotype-mapping" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    subgraph Genotype
+        G[CPPN-NEAT Genome]
+        G --&gt; |Encodes| N[CPPN Network Topology]
+        G --&gt; |Encodes| W[Connection Weights]
+    end
+
+    subgraph Development
+        N --&gt; Q[Query at spatial coordinates]
+        W --&gt; Q
+        Q --&gt; O[Output values per location]
+    end
+
+    subgraph Phenotype
+        O --&gt; B[Body segments]
+        O --&gt; J[Joint placements]
+        O --&gt; M[Motor attachments]
+    end</code></pre>
+<h3 id="cppn-outputs-for-sunaba-creatures">CPPN Outputs for Sunaba Creatures<a class="headerlink" href="#cppn-outputs-for-sunaba-creatures" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body_presence</td>
+<td>Whether material exists at this point (threshold)</td>
+</tr>
+<tr>
+<td>segment_id</td>
+<td>Which body segment this belongs to</td>
+</tr>
+<tr>
+<td>joint_type</td>
+<td>0=none, 1=revolute, 2=prismatic, 3=fixed</td>
+</tr>
+<tr>
+<td>motor_strength</td>
+<td>Maximum torque for motorized joints</td>
+</tr>
+<tr>
+<td>limb_thickness</td>
+<td>Radius of body at this point</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-how-a-limb-emerges">Example: How a Limb Emerges<a class="headerlink" href="#example-how-a-limb-emerges" title="Permanent link">&para;</a></h3>
+<p>Consider a CPPN with a sine function in its hidden layer:</p>
+<ol>
+<li>Query points along the x-axis</li>
+<li>Sine function creates periodic output</li>
+<li>High values → body present</li>
+<li>Periodic high values → segmented limb</li>
+<li>Joint outputs between segments → articulated limb</li>
+</ol>
+<pre class="mermaid"><code>flowchart LR
+    subgraph "Query Points"
+        P1[x=0] --&gt; V1[high]
+        P2[x=0.5] --&gt; V2[low]
+        P3[x=1.0] --&gt; V3[high]
+        P4[x=1.5] --&gt; V4[low]
+        P5[x=2.0] --&gt; V5[high]
+    end
+
+    subgraph "Result"
+        V1 --&gt; S1[Segment 1]
+        V3 --&gt; S2[Segment 2]
+        V5 --&gt; S3[Segment 3]
+        S1 ---|joint| S2
+        S2 ---|joint| S3
+    end</code></pre>
+<h2 id="in-sunaba">In Sunaba<a class="headerlink" href="#in-sunaba" title="Permanent link">&para;</a></h2>
+<h3 id="joint-types">Joint Types<a class="headerlink" href="#joint-types" title="Permanent link">&para;</a></h3>
+<p>Sunaba creatures can have three joint types:</p>
+<p><strong>Revolute</strong> — Rotation around a point (like an elbow)
+- 1 degree of freedom
+- Motor applies torque
+- Used for walking, swimming</p>
+<p><strong>Prismatic</strong> — Linear sliding (like a piston)
+- 1 degree of freedom
+- Motor applies force
+- Used for jumping, striking</p>
+<p><strong>Fixed</strong> — Rigid connection
+- 0 degrees of freedom
+- Structural support
+- Used for body cores</p>
+<h3 id="morphology-constraints">Morphology Constraints<a class="headerlink" href="#morphology-constraints" title="Permanent link">&para;</a></h3>
+<p>To ensure physically viable creatures:</p>
+<ul>
+<li>Minimum body mass threshold</li>
+<li>Maximum aspect ratio</li>
+<li>Connectivity requirements (no floating parts)</li>
+<li>Joint limits to prevent self-intersection</li>
+</ul>
+<h3 id="evolved-morphology-examples">Evolved Morphology Examples<a class="headerlink" href="#evolved-morphology-examples" title="Permanent link">&para;</a></h3>
+<p>Evolution produces diverse body plans:</p>
+<ul>
+<li><strong>Worm-like</strong>: Long chains of segments with revolute joints</li>
+<li><strong>Spider-like</strong>: Central body with radiating limbs</li>
+<li><strong>Blob-like</strong>: Compact bodies with few joints</li>
+<li><strong>Snake-like</strong>: Undulating chains using prismatic joints</li>
+</ul>
+<h2 id="benefits-of-cppn-neat">Benefits of CPPN-NEAT<a class="headerlink" href="#benefits-of-cppn-neat" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Indirect encoding</strong> — Small genomes produce complex bodies</li>
+<li><strong>Geometric regularities</strong> — Natural symmetry and repetition</li>
+<li><strong>Evolvability</strong> — Small mutations produce meaningful variations</li>
+<li><strong>Open-ended</strong> — Topology can grow without bound</li>
+</ol>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Stanley, K.O. (2007). "Compositional Pattern Producing Networks: A Novel Abstraction of Development." <em>Genetic Programming and Evolvable Machines</em>.</li>
+<li>Stanley, K.O. &amp; Miikkulainen, R. (2002). "Evolving Neural Networks through Augmenting Topologies." <em>Evolutionary Computation</em>.</li>
+<li>Cheney, N., MacCurdy, R., Clune, J., &amp; Lipson, H. (2013). "Unshackling Evolution: Evolving Soft Robots with Multiple Materials and a Powerful Generative Encoding." <em>GECCO</em>.</li>
+<li>Clune, J., Stanley, K.O., Pennock, R.T., &amp; Ofria, C. (2011). "On the Performance of Indirect Encoding Across the Continuum of Regularity." <em>IEEE TEVC</em>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":[],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.00c35305.min.js"></script>
+      
+    
+  </body>
+</html>

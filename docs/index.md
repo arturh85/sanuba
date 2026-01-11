@@ -13,14 +13,14 @@ The playable web version is available at [/game/](game/).
 ### Emergent Physics
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/fire_spread.mp4" type="video/mp4">
+  <source src="/sunaba/videos/fire_spread.mp4" type="video/mp4">
   Fire spreading through wooden structures
 </video>
 
 *Fire propagates through flammable materials based on temperature and material properties*
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/water_flow.mp4" type="video/mp4">
+  <source src="/sunaba/videos/water_flow.mp4" type="video/mp4">
   Water flowing down platforms
 </video>
 
@@ -29,7 +29,7 @@ The playable web version is available at [/game/](game/).
 ### Structural Integrity
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/bridge_collapse.mp4" type="video/mp4">
+  <source src="/sunaba/videos/bridge_collapse.mp4" type="video/mp4">
   Bridge collapse with cascade failure
 </video>
 
@@ -37,23 +37,23 @@ The playable web version is available at [/game/](game/).
 
 ### Material Diversity
 
-![Material Catalog](/screenshots/level_3.png)
+![Material Catalog](/sunaba/screenshots/level_3.png)
 *37 unique materials with distinct properties and interactions*
 
-![Phase 5 Materials](/screenshots/level_17.png)
+![Phase 5 Materials](/sunaba/screenshots/level_17.png)
 *Extended material system: ores, organics, refined materials, and special compounds*
 
 ### Chemistry & Reactions
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/lava_water_reaction.mp4" type="video/mp4">
+  <source src="/sunaba/videos/lava_water_reaction.mp4" type="video/mp4">
   Lava meets water reaction
 </video>
 
 *Temperature-based state changes: lava + water → steam + stone*
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/material_reactions.mp4" type="video/mp4">
+  <source src="/sunaba/videos/material_reactions.mp4" type="video/mp4">
   Multiple material reactions
 </video>
 
@@ -62,21 +62,21 @@ The playable web version is available at [/game/](game/).
 ### Advanced Systems
 
 <video width="640" height="360" controls loop autoplay muted>
-  <source src="/videos/plant_growth.mp4" type="video/mp4">
+  <source src="/sunaba/videos/plant_growth.mp4" type="video/mp4">
   Plant growth under light
 </video>
 
 *Light propagation and organic growth systems enable renewable resources*
 
-![Lighting System](/screenshots/level_20.png)
+![Lighting System](/sunaba/screenshots/level_20.png)
 *Day/night cycle with realistic light propagation from multiple sources*
 
 ### User Interface
 
-![Inventory System](/screenshots/ui_inventory.png)
+![Inventory System](/sunaba/screenshots/ui_inventory.png)
 *Inventory management with item stacking and tool durability*
 
-![Crafting System](/screenshots/ui_crafting.png)
+![Crafting System](/sunaba/screenshots/ui_crafting.png)
 *Recipe-based crafting for material transformations*
 
 ## The Core Question

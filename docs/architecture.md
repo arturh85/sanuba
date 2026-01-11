@@ -451,7 +451,7 @@ Sunaba's UI is built with egui, providing immediate-mode rendering for game cont
 
 ### Inventory System
 
-![Inventory Panel](/screenshots/ui_inventory.png)
+![Inventory Panel](/sunaba/screenshots/ui_inventory.png)
 
 The inventory system supports:
 - **Item Stacking**: Materials stack up to 999 per slot
@@ -461,7 +461,7 @@ The inventory system supports:
 
 ### Crafting System
 
-![Crafting Panel](/screenshots/ui_crafting.png)
+![Crafting Panel](/sunaba/screenshots/ui_crafting.png)
 
 The crafting interface provides:
 - **Recipe Discovery**: Available recipes shown based on inventory
@@ -471,23 +471,23 @@ The crafting interface provides:
 
 ### Material Showcase
 
-![Material Catalog](/screenshots/level_3.png)
+![Material Catalog](/sunaba/screenshots/level_3.png)
 *Basic material showcase: 8 fundamental materials with distinct visual properties*
 
-![Extended Materials](/screenshots/level_17.png)
+![Extended Materials](/sunaba/screenshots/level_17.png)
 *Phase 5 materials: 30+ materials including ores, organics, refined materials, and special compounds*
 
 ### Lighting & World Systems
 
-![Day/Night Cycle](/screenshots/level_20.png)
+![Day/Night Cycle](/sunaba/screenshots/level_20.png)
 *Light propagation demonstration: underground lava, fire sources, and surface daylight*
 
 ### Structural Complexity
 
-![Castle Structure](/screenshots/level_12.png)
+![Castle Structure](/sunaba/screenshots/level_12.png)
 *Complex architectural structures demonstrating building capabilities*
 
-![Survival Environment](/screenshots/level_16.png)
+![Survival Environment](/sunaba/screenshots/level_16.png)
 *Tutorial level with resource distribution and starter area*
 
 ## Tech Stack Summary

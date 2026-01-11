@@ -1,0 +1,1422 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../cppn-neat/">
+      
+      
+        <link rel="next" href="../map-elites/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.15">
+    
+    
+      
+        <title>Emergent Physics: Cellular Automata Foundations - Sunaba 砂場（すなば）</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.f1b6466b.min.css">
+      
+      
+  
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+  
+  <style>:root{}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#emergent-physics-cellular-automata-foundations" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-header__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Sunaba 砂場（すなば）
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Emergent Physics: Cellular Automata Foundations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Sunaba 砂場（すなば）" class="md-nav__button md-logo" aria-label="Sunaba 砂場（すなば）" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Sunaba 砂場（すなば）
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sunaba: Emergent Artificial Life
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture: System Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cppn-neat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPPN-NEAT: Procedural Morphology Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emergent Physics: Cellular Automata Foundations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emergent Physics: Cellular Automata Foundations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#a-brief-history-of-cellular-automata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Brief History of Cellular Automata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A Brief History of Cellular Automata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#von-neumann-and-self-replication-1940s" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Von Neumann and Self-Replication (1940s)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conways-game-of-life-1970" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conway's Game of Life (1970)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wolframs-elementary-automata-1983" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wolfram's Elementary Automata (1983)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#falling-sand-games-ca-for-material-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Falling Sand Games: CA for Material Simulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Falling Sand Games: CA for Material Simulation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Lineage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-falling-sand-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Falling Sand Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sunabas-material-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunaba's Material System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sunaba&#x27;s Material System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#material-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Material Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-demonstrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Demonstrations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Visual Demonstrations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fire-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fire Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#liquid-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquid Physics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#structural-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structural Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chemical-reactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chemical Reactions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-update-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Update Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#movement-rules-by-material-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Movement Rules by Material State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temperature-and-state-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature and State Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Temperature and State Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#temperature-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature Grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heat-diffusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heat Diffusion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structural-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structural Integrity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structural Integrity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-flood-fill-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Flood-Fill Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debris-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debris Physics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#emergent-behaviors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emergent Behaviors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noita-the-state-of-the-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noita: The State of the Art
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map-elites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MAP-Elites: Quality-Diversity Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Control: Brain Architectures for Embodied Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prior-work/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prior Work: Literature Review and Inspirations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#a-brief-history-of-cellular-automata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Brief History of Cellular Automata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A Brief History of Cellular Automata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#von-neumann-and-self-replication-1940s" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Von Neumann and Self-Replication (1940s)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conways-game-of-life-1970" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conway's Game of Life (1970)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wolframs-elementary-automata-1983" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wolfram's Elementary Automata (1983)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#falling-sand-games-ca-for-material-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Falling Sand Games: CA for Material Simulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Falling Sand Games: CA for Material Simulation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Lineage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-falling-sand-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Falling Sand Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sunabas-material-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunaba's Material System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sunaba&#x27;s Material System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#material-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Material Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-demonstrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Demonstrations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Visual Demonstrations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fire-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fire Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#liquid-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquid Physics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#structural-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structural Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chemical-reactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chemical Reactions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-update-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Update Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#movement-rules-by-material-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Movement Rules by Material State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temperature-and-state-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature and State Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Temperature and State Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#temperature-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature Grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heat-diffusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heat Diffusion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structural-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structural Integrity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structural Integrity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-flood-fill-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Flood-Fill Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debris-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debris Physics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#emergent-behaviors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emergent Behaviors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noita-the-state-of-the-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noita: The State of the Art
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="emergent-physics-cellular-automata-foundations">Emergent Physics: Cellular Automata Foundations<a class="headerlink" href="#emergent-physics-cellular-automata-foundations" title="Permanent link">&para;</a></h1>
+<p>Sunaba's world is built on cellular automata (CA) — a computational model where complex behaviors emerge from simple, local rules applied uniformly across a grid.</p>
+<h2 id="a-brief-history-of-cellular-automata">A Brief History of Cellular Automata<a class="headerlink" href="#a-brief-history-of-cellular-automata" title="Permanent link">&para;</a></h2>
+<h3 id="von-neumann-and-self-replication-1940s">Von Neumann and Self-Replication (1940s)<a class="headerlink" href="#von-neumann-and-self-replication-1940s" title="Permanent link">&para;</a></h3>
+<p>John von Neumann, inspired by Stanislaw Ulam, developed the first cellular automaton to study self-replicating systems. His goal was to understand the logical requirements for a machine that could build copies of itself.</p>
+<h3 id="conways-game-of-life-1970">Conway's Game of Life (1970)<a class="headerlink" href="#conways-game-of-life-1970" title="Permanent link">&para;</a></h3>
+<p>John Conway's Game of Life demonstrated that four simple rules could produce extraordinary complexity:</p>
+<ol>
+<li>Any live cell with fewer than two neighbors dies (underpopulation)</li>
+<li>Any live cell with two or three neighbors survives</li>
+<li>Any live cell with more than three neighbors dies (overpopulation)</li>
+<li>Any dead cell with exactly three neighbors becomes alive (reproduction)</li>
+</ol>
+<p>From these rules emerge gliders, oscillators, and even Turing-complete computation.</p>
+<h3 id="wolframs-elementary-automata-1983">Wolfram's Elementary Automata (1983)<a class="headerlink" href="#wolframs-elementary-automata-1983" title="Permanent link">&para;</a></h3>
+<p>Stephen Wolfram systematically studied one-dimensional CA, cataloging 256 possible rules. Rule 110 was proven Turing-complete, demonstrating that even the simplest CA can perform arbitrary computation.</p>
+<blockquote>
+<p>"It is possible to construct a universal computer within any rule 110 system."
+— Matthew Cook, 2004</p>
+</blockquote>
+<h2 id="falling-sand-games-ca-for-material-simulation">Falling Sand Games: CA for Material Simulation<a class="headerlink" href="#falling-sand-games-ca-for-material-simulation" title="Permanent link">&para;</a></h2>
+<p>Falling sand games apply cellular automata principles to simulate physical materials. Each pixel has a material type, and update rules determine how materials interact.</p>
+<h3 id="the-lineage">The Lineage<a class="headerlink" href="#the-lineage" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>timeline
+    title Evolution of Falling Sand Games
+    2005 : Falling Sand Game (Java applet)
+    2008 : Powder Game (Dan-Ball)
+    2009 : The Powder Toy
+    2019 : Noita
+    2026 : Sunaba</code></pre>
+<h3 id="why-falling-sand-works">Why Falling Sand Works<a class="headerlink" href="#why-falling-sand-works" title="Permanent link">&para;</a></h3>
+<p>Traditional physics engines simulate rigid bodies with explicit collision detection. Falling sand takes a fundamentally different approach:</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Rigid Body Physics</th>
+<th>Cellular Automata</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit</td>
+<td>Objects with shape/mass</td>
+<td>Individual pixels</td>
+</tr>
+<tr>
+<td>Interactions</td>
+<td>Collision detection</td>
+<td>Neighbor rules</td>
+</tr>
+<tr>
+<td>Complexity</td>
+<td>O(n²) pairwise checks</td>
+<td>O(n) local updates</td>
+</tr>
+<tr>
+<td>Emergence</td>
+<td>Limited</td>
+<td>High</td>
+</tr>
+</tbody>
+</table>
+<p>The CA approach scales better and produces more emergent behaviors, at the cost of physical accuracy.</p>
+<h2 id="sunabas-material-system">Sunaba's Material System<a class="headerlink" href="#sunabas-material-system" title="Permanent link">&para;</a></h2>
+<h3 id="material-properties">Material Properties<a class="headerlink" href="#material-properties" title="Permanent link">&para;</a></h3>
+<p>Each material in Sunaba is defined by a set of properties:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Material: Water
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── state: Liquid
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── density: 1.0
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── viscosity: 0.1
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── thermal_conductivity: 0.6
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── specific_heat: 4.18
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── boiling_point: 100°C
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└── freezing_point: 0°C
+</span></code></pre></div>
+<p>Behaviors emerge from these properties, not from special-case code.</p>
+<h3 id="visual-demonstrations">Visual Demonstrations<a class="headerlink" href="#visual-demonstrations" title="Permanent link">&para;</a></h3>
+<h4 id="fire-propagation">Fire Propagation<a class="headerlink" href="#fire-propagation" title="Permanent link">&para;</a></h4>
+<video width="640" height="360" controls loop>
+  <source src="/sunaba/videos/fire_spread.mp4" type="video/mp4">
+  Fire spreading through wooden structures
+</video>
+
+<p>Fire spreads through flammable materials when temperature exceeds ignition point. No explicit "fire spreading" code exists — the behavior emerges from:
+- Wood's flammability property
+- Fire's heat output
+- Temperature diffusion
+- Material state transitions</p>
+<h4 id="liquid-physics">Liquid Physics<a class="headerlink" href="#liquid-physics" title="Permanent link">&para;</a></h4>
+<video width="640" height="360" controls loop>
+  <source src="/sunaba/videos/water_flow.mp4" type="video/mp4">
+  Water flowing down platforms
+</video>
+
+<p>Liquids flow based on density, viscosity, and neighbor states. Water finds paths through gaps and pools at the lowest point through simple neighbor-checking rules.</p>
+<h4 id="structural-dependencies">Structural Dependencies<a class="headerlink" href="#structural-dependencies" title="Permanent link">&para;</a></h4>
+<video width="640" height="360" controls loop>
+  <source src="/sunaba/videos/bridge_collapse.mp4" type="video/mp4">
+  Bridge collapse cascade
+</video>
+
+<p>When a support pillar is removed, connected structures evaluate their support state. Unsupported sections convert to debris, triggering a cascade. This demonstrates emergent structural integrity from local connectivity checks.</p>
+<h4 id="chemical-reactions">Chemical Reactions<a class="headerlink" href="#chemical-reactions" title="Permanent link">&para;</a></h4>
+<video width="640" height="360" controls loop>
+  <source src="/sunaba/videos/lava_water_reaction.mp4" type="video/mp4">
+  Lava and water reaction
+</video>
+
+<p>Lava + Water → Steam + Stone demonstrates temperature-based state changes. The reaction emerges from material properties and temperature thresholds, not hardcoded behavior.</p>
+<h3 id="the-update-algorithm">The Update Algorithm<a class="headerlink" href="#the-update-algorithm" title="Permanent link">&para;</a></h3>
+<p>Sunaba processes pixels bottom-to-top, alternating horizontal direction each row to avoid directional bias:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph "Frame Update"
+        A[Start Frame] --&gt; B[Checkerboard Pass 1]
+        B --&gt; C[Checkerboard Pass 2]
+        C --&gt; D[Checkerboard Pass 3]
+        D --&gt; E[Checkerboard Pass 4]
+        E --&gt; F[End Frame]
+    end
+
+    subgraph "Pixel Update"
+        P1[Read Material Properties] --&gt; P2[Check Neighbors]
+        P2 --&gt; P3[Apply Movement Rules]
+        P3 --&gt; P4[Check Reactions]
+        P4 --&gt; P5[Update State]
+    end</code></pre>
+<p>The checkerboard pattern enables parallel chunk processing without race conditions.</p>
+<h3 id="movement-rules-by-material-state">Movement Rules by Material State<a class="headerlink" href="#movement-rules-by-material-state" title="Permanent link">&para;</a></h3>
+<p><strong>Solids:</strong>
+- Stationary unless unsupported
+- Fall when no solid below
+- Stack on other solids</p>
+<p><strong>Powders:</strong>
+- Fall straight down if empty
+- Slide diagonally if blocked below
+- Pile at angle of repose</p>
+<p><strong>Liquids:</strong>
+- Fall if space below
+- Spread horizontally based on viscosity
+- Equalize pressure across connected regions</p>
+<p><strong>Gases:</strong>
+- Rise based on density difference with air
+- Diffuse horizontally
+- Fill enclosed spaces</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph "Sand Movement Priority"
+        direction TB
+        S1[Below] --&gt;|blocked| S2[Below-Left]
+        S2 --&gt;|blocked| S3[Below-Right]
+        S3 --&gt;|blocked| S4[Stay]
+    end
+
+    subgraph "Water Movement Priority"
+        direction TB
+        W1[Below] --&gt;|blocked| W2[Below-Left/Right]
+        W2 --&gt;|blocked| W3[Left/Right]
+        W3 --&gt;|blocked| W4[Stay]
+    end</code></pre>
+<h2 id="temperature-and-state-changes">Temperature and State Changes<a class="headerlink" href="#temperature-and-state-changes" title="Permanent link">&para;</a></h2>
+<p>Sunaba implements a coarse-grained temperature simulation layered on top of the CA:</p>
+<h3 id="temperature-grid">Temperature Grid<a class="headerlink" href="#temperature-grid" title="Permanent link">&para;</a></h3>
+<p>Temperature is simulated on an 8×8 supergrid for performance:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>64×64 pixel chunk
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>└── 8×8 temperature cells (8 pixels per cell)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    └── Heat diffusion at 30 FPS
+</span></code></pre></div>
+<h3 id="state-transitions">State Transitions<a class="headerlink" href="#state-transitions" title="Permanent link">&para;</a></h3>
+<p>Materials transition between states based on temperature:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; Ice: T &lt; 0°C
+    Ice --&gt; Water: T &gt; 0°C (melting)
+    Water --&gt; Ice: T &lt; 0°C (freezing)
+    Water --&gt; Steam: T &gt; 100°C (boiling)
+    Steam --&gt; Water: T &lt; 100°C (condensation)</code></pre>
+<h3 id="heat-diffusion">Heat Diffusion<a class="headerlink" href="#heat-diffusion" title="Permanent link">&para;</a></h3>
+<p>Heat spreads according to the discrete heat equation:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>T(t+1) = T(t) + k * Σ(T_neighbor - T) / neighbors
+</span></code></pre></div>
+<p>Where <code>k</code> is the thermal conductivity of the material.</p>
+<h2 id="structural-integrity">Structural Integrity<a class="headerlink" href="#structural-integrity" title="Permanent link">&para;</a></h2>
+<p>When a solid structure loses its connection to anchored terrain, it must respond physically.</p>
+<h3 id="the-flood-fill-algorithm">The Flood-Fill Algorithm<a class="headerlink" href="#the-flood-fill-algorithm" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    A[Pixel Removed] --&gt; B[Flood-fill connected solids]
+    B --&gt; C{Region anchored?}
+    C --&gt;|Yes| D[Structure stable]
+    C --&gt;|No| E{Region size?}
+    E --&gt;|Small &lt; 50px| F[Convert to particles]
+    E --&gt;|Large ≥ 50px| G[Convert to rigid body]</code></pre>
+<h3 id="debris-physics">Debris Physics<a class="headerlink" href="#debris-physics" title="Permanent link">&para;</a></h3>
+<p>Large disconnected regions become rigid bodies simulated by Rapier2D physics engine. This creates dramatic collapses and falling debris.</p>
+<h2 id="emergent-behaviors">Emergent Behaviors<a class="headerlink" href="#emergent-behaviors" title="Permanent link">&para;</a></h2>
+<p>None of these behaviors are explicitly programmed:</p>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Emerges From</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fire spreading</td>
+<td>Temperature + flammability</td>
+</tr>
+<tr>
+<td>Water erosion</td>
+<td>Liquid movement + solid displacement</td>
+</tr>
+<tr>
+<td>Cave-ins</td>
+<td>Structural integrity + gravity</td>
+</tr>
+<tr>
+<td>Steam geysers</td>
+<td>Heat + water + pressure</td>
+</tr>
+<tr>
+<td>Lava cooling</td>
+<td>Heat transfer + state change</td>
+</tr>
+</tbody>
+</table>
+<h2 id="noita-the-state-of-the-art">Noita: The State of the Art<a class="headerlink" href="#noita-the-state-of-the-art" title="Permanent link">&para;</a></h2>
+<p>Nolla Games' <em>Noita</em> (2019) represents the most sophisticated falling sand game to date. Their GDC 2019 talk revealed key techniques:</p>
+<ul>
+<li>Chunk-based parallel processing</li>
+<li>Material property matrices for reactions</li>
+<li>Rigid body integration for large debris</li>
+<li>GPU-accelerated rendering</li>
+</ul>
+<p>Sunaba builds on these foundations while adding ML-evolved creatures.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Wolfram, S. (2002). <em>A New Kind of Science</em>. Wolfram Media.</li>
+<li>Gardner, M. (1970). "The Fantastic Combinations of John Conway's New Solitaire Game 'Life'." <em>Scientific American</em>.</li>
+<li>Cook, M. (2004). "Universality in Elementary Cellular Automata." <em>Complex Systems</em>.</li>
+<li>Nolla Games. (2019). "Exploring the Tech and Design of Noita." GDC Talk.</li>
+<li>The Powder Toy. (2009). Open-source falling sand game. <a href="https://powdertoy.co.uk/">https://powdertoy.co.uk/</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":[],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.00c35305.min.js"></script>
+      
+    
+  </body>
+</html>
