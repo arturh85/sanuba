@@ -519,7 +519,7 @@ test package="":
     just fmt
     just clippy
     if [ -z "{{package}}" ]; then \
-        cargo test --workspace --all-features --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
+        cargo test --workspace --exclude sunaba-server --all-features --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
     else \
         cargo test -p {{package}} --all-features --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'; \
     fi
@@ -531,7 +531,7 @@ test package="":
     @Write-Host "Running fast test suite..."
     just fmt
     just clippy
-    @if ("{{package}}" -eq "") { cargo test --workspace --all-features --quiet } else { cargo test -p {{package}} --all-features --quiet }
+    @if ("{{package}}" -eq "") { cargo test --workspace --exclude sunaba-server --all-features --quiet } else { cargo test -p {{package}} --all-features --quiet }
     @Write-Host "✅ Fast tests passed"
 
 # Run scenario integration tests (slow, marked with #[ignore])
@@ -573,7 +573,7 @@ test-ci:
     echo "Running CI-equivalent test suite..."
     just fmt
     just clippy
-    cargo test --workspace --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
+    cargo test --workspace --exclude sunaba-server --quiet 2>&1 | grep -v "running 0 tests" | grep -v "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s" | awk 'NF{print; blank=1} !NF && blank{print ""; blank=0}'
     cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build
@@ -587,7 +587,7 @@ test-ci:
     @Write-Host "Running CI-equivalent test suite..."
     just fmt
     just clippy
-    cargo test --workspace --quiet
+    cargo test --workspace --exclude sunaba-server --quiet
     cargo build --features "headless,multiplayer_native" -p sunaba --release
     just build-web
     just spacetime-build

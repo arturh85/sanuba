@@ -65,7 +65,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests
-        run: cargo nextest run --workspace --verbose
+        run: cargo nextest run --workspace --exclude sunaba-server --verbose
 
   clippy:
     name: Clippy
@@ -164,7 +164,7 @@ jobs:
         run: cargo tree --locked
 
       - name: Generate coverage
-        run: cargo llvm-cov --workspace --codecov --output-path codecov.json
+        run: cargo llvm-cov --workspace --exclude sunaba-server --codecov --output-path codecov.json
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4

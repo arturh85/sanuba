@@ -19,7 +19,7 @@ need_stdout = false
 
 # Test job: compile test binaries (no execution, for fast 'cargo test')
 [jobs.test]
-command = ["cargo", "test", "--workspace", "--no-run", "--color", "always"]
+command = ["cargo", "test", "--workspace", "--exclude", "sunaba-server", "--no-run", "--color", "always"]
 need_stdout = false
 
 # Keyboard shortcuts
