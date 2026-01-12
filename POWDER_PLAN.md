@@ -687,7 +687,12 @@ just web-powder  # New justfile command
    - ✅ **Phase 1.3**: Add 5 electrical materials (2024-01-09)
    - ✅ **Phase 1.4**: Add electrical reactions (2026-01-09)
    - ✅ **Phase 1.5**: Implement special behaviors (Spark/Thunder) (2026-01-09)
-   - 🚧 **Phase 1.6**: Testing & validation
+   - ✅ **Phase 1.6**: Testing & validation (2026-01-12)
+     - Added 7 unit tests for ElectricalSystem (new_system, power_source, propagation, discharge, heat_generation, neighbor_pos, chunk_boundary)
+     - Implemented spark drift behavior (sparks move toward powered conductors, get absorbed)
+     - Implemented thunder destruction behavior (powered thunder destroys adjacent non-conductors, generates heat)
+     - Updated 3 scenario tests to match implemented behaviors
+     - All 350 tests pass (7 new tests added)
 3. ✅ **Week 2**: Implement pressure system
    - ✅ **Phase 2.1**: Create PressureSystem module (2026-01-09)
      - Implemented PressureSystem in `sunaba-core/src/world/pressure_system.rs`.
@@ -702,7 +707,26 @@ just web-powder  # New justfile command
      - Added 3 unit tests for pressure system (accumulation, decay, basic flow)
      - All tests pass (343 passed total in sunaba-core)
      - System ready for integration with game world
-4. ⏳ **Week 3**: Add special behaviors
+4. ✅ **Week 3**: Add special behaviors
+   - ✅ **Phase 3.1**: Add special behavior pixel flags (2026-01-13)
+     - Added 5 new pixel flags (BEHAVIOR_ACTIVE, DIRECTION_BIT0, DIRECTION_BIT1, INFECTED, CLONE_SOURCE)
+     - Updated pixel_flags tests in `sunaba-simulation/src/pixel.rs`
+   - ✅ **Phase 3.2**: Create SpecialBehaviorsSystem module (2026-01-13)
+     - Implemented SpecialBehaviorsSystem in `sunaba-core/src/world/special_behaviors_system.rs`
+     - Added behaviors for: Fuse (directional burning), Vine (random tangled growth), Virus (material transformation), Clone (pattern replication)
+     - System uses probabilistic updates for natural-looking behavior
+     - All behaviors handle chunk boundaries correctly
+   - ✅ **Phase 3.3**: Add 4 special behavior materials (2026-01-13)
+     - Added MaterialId::FUSE (44), VINE (45), VIRUS (46), CLONE (47)
+     - Added MaterialDef entries with appropriate properties (flammability, color, tags)
+     - Updated ValidatedMaterialId::MAX to 47
+   - ✅ **Phase 3.4**: Integrate into world update loop (2026-01-13)
+     - Added SpecialBehaviorsSystem field to World struct
+     - Integrated update call after pressure system (step 2.7)
+   - ✅ **Phase 3.5**: Testing & validation (2026-01-13)
+     - Added 8 unit tests for SpecialBehaviorsSystem (direction encoding, boundary crossing, material behaviors)
+     - Created 4 scenario tests (fuse_burn_test, vine_growth_test, virus_spread_test, clone_copy_test)
+     - All 358 tests pass
 5. ⏳ **Week 4**: Add entity AI
 6. ⏳ **Week 5**: Add all 20+ materials
 7. ⏳ **Week 6**: Create sunaba-powder crate

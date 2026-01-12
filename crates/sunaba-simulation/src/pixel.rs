@@ -49,6 +49,13 @@ pub mod pixel_flags {
     pub const CONDUCTIVE: u16 = 1 << 4; // Can conduct electricity
     pub const POWERED: u16 = 1 << 5; // Currently has electrical charge
     pub const SPARK_SOURCE: u16 = 1 << 6; // Battery/active power source
+
+    // Special behavior flags (Phase 6 - Powder Game)
+    pub const BEHAVIOR_ACTIVE: u16 = 1 << 7; // Currently exhibiting special behavior
+    pub const DIRECTION_BIT0: u16 = 1 << 8; // Direction bits (0-3 = up/right/down/left)
+    pub const DIRECTION_BIT1: u16 = 1 << 9; // Direction bits
+    pub const INFECTED: u16 = 1 << 10; // Marked for virus transformation
+    pub const CLONE_SOURCE: u16 = 1 << 11; // Pixel that clone should copy
 }
 
 #[cfg(test)]
@@ -90,6 +97,18 @@ mod tests {
         assert_eq!(pixel_flags::BURNING, 2);
         assert_eq!(pixel_flags::FALLING, 4);
         assert_eq!(pixel_flags::PLAYER_PLACED, 8);
+        assert_eq!(pixel_flags::CONDUCTIVE, 16);
+        assert_eq!(pixel_flags::POWERED, 32);
+        assert_eq!(pixel_flags::SPARK_SOURCE, 64);
+    }
+
+    #[test]
+    fn test_special_behavior_flags() {
+        assert_eq!(pixel_flags::BEHAVIOR_ACTIVE, 128);
+        assert_eq!(pixel_flags::DIRECTION_BIT0, 256);
+        assert_eq!(pixel_flags::DIRECTION_BIT1, 512);
+        assert_eq!(pixel_flags::INFECTED, 1024);
+        assert_eq!(pixel_flags::CLONE_SOURCE, 2048);
     }
 
     #[test]

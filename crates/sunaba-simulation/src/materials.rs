@@ -64,6 +64,12 @@ impl MaterialId {
     pub const BATTERY: u16 = 41;
     pub const WIRE: u16 = 42;
     pub const NITRO: u16 = 43;
+
+    // Special behavior materials
+    pub const FUSE: u16 = 44;
+    pub const VINE: u16 = 45;
+    pub const VIRUS: u16 = 46;
+    pub const CLONE: u16 = 47;
 }
 
 /// How a material behaves physically
@@ -921,6 +927,69 @@ impl Materials {
             burns_to: Some(MaterialId::SMOKE),
             burn_rate: 1.0,          // Instant burn/explosion
             fuel_value: Some(100.0), // High energy
+            ..Default::default()
+        });
+
+        // --- Special Behavior Materials ---
+
+        // Fuse - burns gradually in one direction, ignites explosives
+        self.register(MaterialDef {
+            id: MaterialId::FUSE,
+            name: "fuse".to_string(),
+            material_type: MaterialType::Solid,
+            color: [139, 90, 43, 255], // Dark brown rope color
+            density: 0.5,
+            hardness: Some(1),
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(200.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.1, // Slow gradual burn
+            ..Default::default()
+        });
+
+        // Vine - grows in tangled random patterns
+        self.register(MaterialDef {
+            id: MaterialId::VINE,
+            name: "vine".to_string(),
+            material_type: MaterialType::Solid,
+            color: [34, 139, 34, 255], // Forest green
+            density: 0.3,
+            hardness: Some(1),
+            structural: true,
+            flammable: true,
+            ignition_temp: Some(300.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.3,
+            tags: vec![MaterialTag::Organic],
+            ..Default::default()
+        });
+
+        // Virus - spreads to adjacent materials, transforms them
+        self.register(MaterialDef {
+            id: MaterialId::VIRUS,
+            name: "virus".to_string(),
+            material_type: MaterialType::Solid,
+            color: [148, 0, 211, 255], // Dark violet/purple
+            density: 0.1,
+            hardness: Some(1),
+            structural: false,
+            flammable: false,
+            tags: vec![MaterialTag::Toxic],
+            toxicity: Some(10.0), // Highly toxic
+            ..Default::default()
+        });
+
+        // Clone - copies adjacent material patterns
+        self.register(MaterialDef {
+            id: MaterialId::CLONE,
+            name: "clone".to_string(),
+            material_type: MaterialType::Solid,
+            color: [255, 215, 0, 255], // Gold color
+            density: 1.0,
+            hardness: Some(5), // Hard to destroy
+            structural: true,
+            flammable: false,
             ..Default::default()
         });
     }

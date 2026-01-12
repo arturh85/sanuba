@@ -1,37 +1,35 @@
 (
     name: "Electricity Thunder Test",
-    description: "Tests if THUNDER material destroys non-conductors in its radius.",
+    description: "Tests that powered THUNDER destroys adjacent non-conductors.",
 
     setup: [
-        // Place a battery to power the circuit
+        // Place a battery to power the circuit (uses PlaceMaterial to trigger SPARK_SOURCE flag)
         (type: "PlaceMaterial", material: 41, x: 10, y: 10, radius: 1), // BATTERY
         // Place wire next to battery
-        (type: "PlaceMaterial", material: 42, x: 11, y: 10, radius: 1), // WIRE
-        // Place Thunder next to the wire so it gets powered
-        (type: "PlaceMaterial", material: 39, x: 12, y: 10, radius: 1), // THUNDER
-        // Place non-conductive materials around Thunder
-        (type: "PlaceMaterial", material: 1, x: 11, y: 9, radius: 1), // STONE
-        (type: "PlaceMaterial", material: 4, x: 12, y: 9, radius: 1), // WOOD
-        (type: "PlaceMaterial", material: 1, x: 13, y: 9, radius: 1), // STONE
-        (type: "PlaceMaterial", material: 4, x: 11, y: 11, radius: 1), // WOOD
-        (type: "PlaceMaterial", material: 1, x: 12, y: 11, radius: 1), // STONE
-        (type: "PlaceMaterial", material: 4, x: 13, y: 11, radius: 1), // WOOD
+        (type: "FillRect", min_x: 11, max_x: 11, min_y: 10, max_y: 10, material: 42), // WIRE
+        // Place Thunder next to the wire (will be powered when wire gets power)
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 10, max_y: 10, material: 39), // THUNDER
+        // Place non-conductive materials adjacent to Thunder
+        (type: "FillRect", min_x: 13, max_x: 13, min_y: 10, max_y: 10, material: 1), // STONE (east)
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 9, max_y: 9, material: 4),   // WOOD (south)
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 11, max_y: 11, material: 4), // WOOD (north)
     ],
 
     actions: [
-        (type: "WaitFrames", frames: 2), // Allow thunder to activate and destroy
+        (type: "WaitFrames", frames: 10), // Allow power to propagate and thunder to activate
     ],
 
     verify: [
-        // Check if non-conductive materials are destroyed (turned to AIR)
-        (type: "MaterialAt", x: 11, y: 9, expected: 0), // STONE -> AIR
-        (type: "MaterialAt", x: 12, y: 9, expected: 0), // WOOD -> AIR
-        (type: "MaterialAt", x: 13, y: 9, expected: 0), // STONE -> AIR
-        (type: "MaterialAt", x: 11, y: 11, expected: 0), // WOOD -> AIR
-        (type: "MaterialAt", x: 12, y: 11, expected: 0), // STONE -> AIR
-        (type: "MaterialAt", x: 13, y: 11, expected: 0), // WOOD -> AIR
-        // Check if Thunder pixel itself is now AIR
+        // Battery should remain
+        (type: "MaterialAt", x: 10, y: 10, expected: 41), // BATTERY
+        // Wire should remain
+        (type: "MaterialAt", x: 11, y: 10, expected: 42), // WIRE
+        // Thunder should be consumed (turned to AIR)
         (type: "MaterialAt", x: 12, y: 10, expected: 0), // THUNDER -> AIR
+        // Adjacent non-conductors should be destroyed
+        (type: "MaterialAt", x: 13, y: 10, expected: 0), // STONE -> AIR
+        (type: "MaterialAt", x: 12, y: 9, expected: 0),  // WOOD -> AIR
+        (type: "MaterialAt", x: 12, y: 11, expected: 0), // WOOD -> AIR
     ],
 
     cleanup: [],

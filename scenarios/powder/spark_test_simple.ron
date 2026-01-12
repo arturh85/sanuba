@@ -1,24 +1,26 @@
 (
     name: "Electricity Spark Simple Test",
-    description: "Tests basic SPARK material placement and persistence.",
+    description: "Tests that SPARK moves toward powered conductors and gets absorbed.",
 
     setup: [
         // Place a battery to power the circuit
         (type: "FillRect", min_x: 10, max_x: 10, min_y: 10, max_y: 10, material: 41), // BATTERY
         (type: "FillRect", min_x: 11, max_x: 11, min_y: 10, max_y: 10, material: 42), // WIRE
         (type: "FillRect", min_x: 12, max_x: 12, min_y: 10, max_y: 10, material: 0),  // AIR
+        // Place spark below the wire (spark will move up toward conductor)
         (type: "FillRect", min_x: 11, max_x: 11, min_y: 11, max_y: 11, material: 38), // SPARK
     ],
 
     actions: [
-        (type: "WaitFrames", frames: 2), // Allow power to propagate
+        (type: "WaitFrames", frames: 5), // Allow spark to move and be absorbed
     ],
 
     verify: [
+        // Battery and wire should remain
         (type: "MaterialAt", x: 10, y: 10, expected: 41), // BATTERY
         (type: "MaterialAt", x: 11, y: 10, expected: 42), // WIRE
-        (type: "MaterialAt", x: 12, y: 10, expected: 0),  // AIR
-        (type: "MaterialAt", x: 11, y: 11, expected: 38), // SPARK should still be here
+        // Spark should have moved to wire and been absorbed (now AIR)
+        (type: "MaterialAt", x: 11, y: 11, expected: 0),  // SPARK absorbed, now AIR
     ],
 
     cleanup: [],

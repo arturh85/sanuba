@@ -22,6 +22,7 @@ use super::pixel_queries::PixelQueries;
 use super::player_physics::PlayerPhysicsSystem;
 use super::pressure_system::PressureSystem;
 use super::raycasting::Raycasting;
+use super::special_behaviors_system::SpecialBehaviorsSystem;
 use super::stats::NoopStats;
 use super::{CHUNK_SIZE, Chunk, Pixel, pixel_flags};
 
@@ -74,6 +75,9 @@ pub struct World {
     /// Pressure system (gas accumulation and propagation for Powder Game)
     pressure_system: PressureSystem,
 
+    /// Special behaviors system (fuse, vine, virus, clone for Powder Game)
+    special_behaviors_system: SpecialBehaviorsSystem,
+
     /// Creature manager (spawning, AI, behavior)
     pub creature_manager: crate::creature::spawning::CreatureManager,
 
@@ -113,6 +117,7 @@ impl World {
             debris_system: DebrisSystem::new(),
             electrical_system: ElectricalSystem::new(),
             pressure_system: PressureSystem::new(),
+            special_behaviors_system: SpecialBehaviorsSystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
@@ -737,6 +742,18 @@ impl World {
             puffin::profile_scope!("pressure");
 
             self.pressure_system.update(
+                &mut self.chunk_manager.chunks,
+                &chunks_to_update,
+                &self.materials,
+            );
+        }
+
+        // 2.7. Special behaviors system update (fuse, vine, virus, clone)
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("special_behaviors");
+
+            self.special_behaviors_system.update(
                 &mut self.chunk_manager.chunks,
                 &chunks_to_update,
                 &self.materials,

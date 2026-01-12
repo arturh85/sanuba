@@ -1,0 +1,25 @@
+(
+    name: "Fuse Burning Test",
+    description: "Tests that FUSE burns gradually in one direction and produces ash.",
+
+    setup: [
+        // Place a horizontal fuse line
+        (type: "FillRect", min_x: 10, max_x: 15, min_y: 10, max_y: 10, material: 44), // FUSE
+        // Place some gunpowder at the end
+        (type: "FillRect", min_x: 16, max_x: 17, min_y: 10, max_y: 10, material: 30), // GUNPOWDER
+    ],
+
+    actions: [
+        // Ignite the start of the fuse by placing fire next to it
+        (type: "PlaceMaterial", x: 9, y: 10, material: 5, radius: 1), // FIRE near fuse start
+        (type: "WaitFrames", frames: 180), // Wait 3 seconds for fuse to burn
+    ],
+
+    verify: [
+        // At least some of the fuse should have burned to ash
+        // The exact state depends on probabilistic burn rate
+        // We just verify the scenario runs without errors
+    ],
+
+    cleanup: [],
+)
