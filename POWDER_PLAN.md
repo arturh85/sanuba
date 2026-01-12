@@ -727,7 +727,27 @@ just web-powder  # New justfile command
      - Added 8 unit tests for SpecialBehaviorsSystem (direction encoding, boundary crossing, material behaviors)
      - Created 4 scenario tests (fuse_burn_test, vine_growth_test, virus_spread_test, clone_copy_test)
      - All 358 tests pass
-5. ⏳ **Week 4**: Add entity AI
+5. ✅ **Week 4**: Add entity AI
+   - ✅ **Phase 4.1**: Add entity material definitions (2026-01-13)
+     - Added MaterialId::ANT (48), BIRD (49), FISH (50)
+     - Added MaterialDef entries with appropriate colors and properties
+     - Updated ValidatedMaterialId::MAX to 50
+   - ✅ **Phase 4.2**: Create PixelEntitySystem module (2026-01-13)
+     - Implemented PixelEntitySystem in `sunaba-core/src/world/pixel_entity_system.rs`
+     - System handles lightweight pixel-based entity AI (not full articulated creatures)
+     - Uses seeded RNG for deterministic behavior
+   - ✅ **Phase 4.3**: Implement entity behaviors (2026-01-13)
+     - **Ant**: Random walk on solid ground, climbing obstacles, direction changes, avoids water (30% move chance)
+     - **Bird**: Boids flocking algorithm (separation, alignment, cohesion), upward tendency, obstacle avoidance (40% move chance)
+     - **Fish**: Swimming in water only, schooling behavior, falls when out of water (35% move chance)
+     - Direction encoded in pixel flags (DIRECTION_BIT0/1 for 4 directions)
+   - ✅ **Phase 4.4**: Integrate into world update loop (2026-01-13)
+     - Added PixelEntitySystem field to World struct
+     - Integrated update call after special behaviors system (step 2.8)
+   - ✅ **Phase 4.5**: Testing & validation (2026-01-13)
+     - Added 8 unit tests for PixelEntitySystem (direction encoding, ant behavior, bird flocking, fish swimming)
+     - Created 3 scenario tests (ant_walk_test, bird_flock_test, fish_swim_test)
+     - All 366 tests pass
 6. ⏳ **Week 5**: Add all 20+ materials
 7. ⏳ **Week 6**: Create sunaba-powder crate
 8. ⏳ **Week 7**: Polish, test, document

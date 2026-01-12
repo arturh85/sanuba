@@ -70,6 +70,11 @@ impl MaterialId {
     pub const VINE: u16 = 45;
     pub const VIRUS: u16 = 46;
     pub const CLONE: u16 = 47;
+
+    // Pixel entity materials (simple AI creatures)
+    pub const ANT: u16 = 48;
+    pub const BIRD: u16 = 49;
+    pub const FISH: u16 = 50;
 }
 
 /// How a material behaves physically
@@ -990,6 +995,59 @@ impl Materials {
             hardness: Some(5), // Hard to destroy
             structural: true,
             flammable: false,
+            ..Default::default()
+        });
+
+        // --- Pixel Entity Materials ---
+
+        // Ant - random walk creature, creates pheromone trails
+        self.register(MaterialDef {
+            id: MaterialId::ANT,
+            name: "ant".to_string(),
+            material_type: MaterialType::Powder, // Falls with gravity
+            color: [139, 69, 19, 255],           // Saddle brown
+            density: 0.8,
+            hardness: Some(1),
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(400.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.5,
+            nutritional_value: Some(5.0), // Small food value
+            tags: vec![MaterialTag::Organic],
+            ..Default::default()
+        });
+
+        // Bird - flocking creature, flies in air
+        self.register(MaterialDef {
+            id: MaterialId::BIRD,
+            name: "bird".to_string(),
+            material_type: MaterialType::Gas, // Flies/rises
+            color: [65, 105, 225, 255],       // Royal blue
+            density: 0.1,                     // Very light (flies)
+            hardness: Some(1),
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(350.0),
+            burns_to: Some(MaterialId::ASH),
+            burn_rate: 0.4,
+            nutritional_value: Some(15.0), // Medium food value
+            tags: vec![MaterialTag::Organic],
+            ..Default::default()
+        });
+
+        // Fish - swimming creature, lives in water
+        self.register(MaterialDef {
+            id: MaterialId::FISH,
+            name: "fish".to_string(),
+            material_type: MaterialType::Liquid, // Swims in liquids
+            color: [255, 140, 0, 255],           // Dark orange (goldfish)
+            density: 1.0,                        // Neutral buoyancy in water
+            hardness: Some(1),
+            structural: false,
+            flammable: false,              // Lives in water
+            nutritional_value: Some(20.0), // Good food value
+            tags: vec![MaterialTag::Organic, MaterialTag::Edible],
             ..Default::default()
         });
     }

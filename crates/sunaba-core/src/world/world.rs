@@ -18,6 +18,7 @@ use super::electrical_system::ElectricalSystem;
 use super::light_system::LightSystem;
 use super::mining_system::MiningSystem;
 use super::persistence_system::PersistenceSystem;
+use super::pixel_entity_system::PixelEntitySystem;
 use super::pixel_queries::PixelQueries;
 use super::player_physics::PlayerPhysicsSystem;
 use super::pressure_system::PressureSystem;
@@ -78,6 +79,9 @@ pub struct World {
     /// Special behaviors system (fuse, vine, virus, clone for Powder Game)
     special_behaviors_system: SpecialBehaviorsSystem,
 
+    /// Pixel entity system (ant, bird, fish for Powder Game)
+    pixel_entity_system: PixelEntitySystem,
+
     /// Creature manager (spawning, AI, behavior)
     pub creature_manager: crate::creature::spawning::CreatureManager,
 
@@ -118,6 +122,7 @@ impl World {
             electrical_system: ElectricalSystem::new(),
             pressure_system: PressureSystem::new(),
             special_behaviors_system: SpecialBehaviorsSystem::new(),
+            pixel_entity_system: PixelEntitySystem::new(),
             creature_manager: crate::creature::spawning::CreatureManager::new(200), // Max 200 creatures
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
@@ -754,6 +759,18 @@ impl World {
             puffin::profile_scope!("special_behaviors");
 
             self.special_behaviors_system.update(
+                &mut self.chunk_manager.chunks,
+                &chunks_to_update,
+                &self.materials,
+            );
+        }
+
+        // 2.8. Pixel entity system update (ant, bird, fish AI)
+        {
+            #[cfg(feature = "profiling")]
+            puffin::profile_scope!("pixel_entities");
+
+            self.pixel_entity_system.update(
                 &mut self.chunk_manager.chunks,
                 &chunks_to_update,
                 &self.materials,

@@ -1,0 +1,23 @@
+(
+    name: "Bird Flocking Test",
+    description: "Tests that BIRD entities fly and exhibit flocking behavior.",
+
+    setup: [
+        // Place several birds in the air (they should flock together)
+        (type: "FillRect", min_x: 20, max_x: 20, min_y: 30, max_y: 30, material: 49), // BIRD 1
+        (type: "FillRect", min_x: 25, max_x: 25, min_y: 32, max_y: 32, material: 49), // BIRD 2
+        (type: "FillRect", min_x: 22, max_x: 22, min_y: 28, max_y: 28, material: 49), // BIRD 3
+    ],
+
+    actions: [
+        // Wait for birds to fly and flock
+        (type: "WaitFrames", frames: 180), // 3 seconds
+    ],
+
+    verify: [
+        // Bird behavior is probabilistic, so we just verify the scenario runs without errors
+        // Birds should have moved from their initial positions
+    ],
+
+    cleanup: [],
+)

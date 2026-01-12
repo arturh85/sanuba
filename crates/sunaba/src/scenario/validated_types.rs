@@ -17,7 +17,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct ValidatedMaterialId(u16);
 
 impl ValidatedMaterialId {
-    pub const MAX: u16 = 47; // CLONE is currently the highest defined material (Powder Game special behaviors)
+    pub const MAX: u16 = 50; // FISH is currently the highest defined material (Powder Game pixel entities)
 
     pub fn new(id: u16) -> Result<Self> {
         if id > Self::MAX {
@@ -371,8 +371,8 @@ mod tests {
     #[test]
     fn test_material_id_validation() {
         assert!(ValidatedMaterialId::new(0).is_ok()); // AIR
-        assert!(ValidatedMaterialId::new(47).is_ok()); // CLONE (max)
-        assert!(ValidatedMaterialId::new(48).is_err()); // Out of range
+        assert!(ValidatedMaterialId::new(50).is_ok()); // FISH (max)
+        assert!(ValidatedMaterialId::new(51).is_err()); // Out of range
         assert!(ValidatedMaterialId::new(999).is_err()); // Way out of range
     }
 
