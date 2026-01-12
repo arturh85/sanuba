@@ -23,3 +23,5 @@ runs:
         # Ensure spacetime is in PATH for this step
         export PATH="$HOME/.spacetime/bin:$PATH"
         spacetime generate --lang rust --project-path crates/sunaba-server --out-dir crates/sunaba/src/multiplayer/generated -y
+        # Format generated code to match rustfmt style
+        cargo fmt --manifest-path crates/sunaba/Cargo.toml
