@@ -2,12 +2,12 @@
     name: "Composition Example",
     description: "Demonstrates composition helpers - created with builder pattern",
     setup: [
-        (type: "FillRect", min_x: -30, max_x: 30, min_y: 20, max_y: 25, material: 1),
+        (type: "FillRect", min_x: -30, max_x: 30, min_y: 20, max_y: 25, material: "stone"),
         (type: "TeleportPlayer", x: 0.0, y: 100.0),
-        (type: "FillRect", min_x: -50, max_x: 50, min_y: 0, max_y: 4, material: 1),
-        (type: "FillRect", min_x: -50, max_x: -46, min_y: 0, max_y: 60, material: 1),
-        (type: "FillRect", min_x: 46, max_x: 50, min_y: 0, max_y: 60, material: 1),
-        (type: "FillRect", min_x: -50, max_x: 50, min_y: 56, max_y: 60, material: 1),
+        (type: "FillRect", min_x: -50, max_x: 50, min_y: 0, max_y: 4, material: "stone"),
+        (type: "FillRect", min_x: -50, max_x: -46, min_y: 0, max_y: 60, material: "stone"),
+        (type: "FillRect", min_x: 46, max_x: 50, min_y: 0, max_y: 60, material: "stone"),
+        (type: "FillRect", min_x: -50, max_x: 50, min_y: 56, max_y: 60, material: "stone"),
     ],
     actions: [
         (type: "WaitFrames", frames: 60),

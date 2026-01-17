@@ -4,13 +4,13 @@
 
     setup: [
         // Place a battery to power the circuit
-        (type: "FillRect", min_x: 7, max_x: 7, min_y: 7, max_y: 7, material: 41), // BATTERY
+        (type: "FillRect", min_x: 7, max_x: 7, min_y: 7, max_y: 7, material: "battery"),
         // Place wire next to battery (will be powered)
-        (type: "FillRect", min_x: 8, max_x: 8, min_y: 7, max_y: 7, material: 42), // WIRE
-        (type: "FillRect", min_x: 9, max_x: 9, min_y: 7, max_y: 7, material: 42), // WIRE
+        (type: "FillRect", min_x: 8, max_x: 8, min_y: 7, max_y: 7, material: "wire"),
+        (type: "FillRect", min_x: 9, max_x: 9, min_y: 7, max_y: 7, material: "wire"),
         // Place spark in air gap (adjacent to powered wire at x=9)
         // Spark should move toward the powered wire
-        (type: "FillRect", min_x: 10, max_x: 10, min_y: 7, max_y: 7, material: 38), // SPARK
+        (type: "FillRect", min_x: 10, max_x: 10, min_y: 7, max_y: 7, material: "spark"),
     ],
 
     actions: [
@@ -19,11 +19,11 @@
 
     verify: [
         // Battery and wire should remain
-        (type: "MaterialAt", x: 7, y: 7, expected: 41), // BATTERY
-        (type: "MaterialAt", x: 8, y: 7, expected: 42), // WIRE
-        (type: "MaterialAt", x: 9, y: 7, expected: 42), // WIRE
+        (type: "MaterialAt", x: 7, y: 7, expected: "battery"),
+        (type: "MaterialAt", x: 8, y: 7, expected: "wire"),
+        (type: "MaterialAt", x: 9, y: 7, expected: "wire"),
         // Spark should have been absorbed by the wire (original location now AIR)
-        (type: "MaterialAt", x: 10, y: 7, expected: 0),  // Spark moved/absorbed, now AIR
+        (type: "MaterialAt", x: 10, y: 7, expected: "air"),
     ],
 
     cleanup: [],

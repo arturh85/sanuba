@@ -4,7 +4,7 @@
 
     setup: [
         (type: "TeleportPlayer", x: 0.0, y: 100.0),
-        (type: "FillRect", min_x: -10, min_y: 50, max_x: 10, max_y: 60, material: 1), // Stone
+        (type: "FillRect", min_x: -10, min_y: 50, max_x: 10, max_y: 60, material: "stone"),
         (type: "GiveItem",
             item: (Tool(tool_id: 1001, durability: 100)),
             slot: Some(0)), // Stone pickaxe
@@ -17,7 +17,7 @@
 
     verify: [
         (type: "MaterialCountRange",
-            material: 0, // Air
+            material: "air",
             region: (type: "Rect", min_x: -5, min_y: 50, max_x: 5, max_y: 60),
             min: 10,
             max: 200),

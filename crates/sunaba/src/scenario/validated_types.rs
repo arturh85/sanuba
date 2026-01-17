@@ -10,49 +10,24 @@ use serde::{Deserialize, Deserializer, Serialize};
 // High-priority validation (safety - prevents panics/undefined behavior)
 // ============================================================================
 
-/// Validated material ID (0-37)
+/// Validated material identifier
 ///
-/// Ensures material IDs are within valid range to prevent undefined behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ValidatedMaterialId(u16);
-
-impl ValidatedMaterialId {
-    pub const MAX: u16 = 50; // FISH is currently the highest defined material (Powder Game pixel entities)
-
-    pub fn new(id: u16) -> Result<Self> {
-        if id > Self::MAX {
-            bail!(
-                "Invalid material ID: {}. Valid range: 0-{} (see MaterialId constants in sunaba-simulation)",
-                id,
-                Self::MAX
-            );
-        }
-        Ok(Self(id))
-    }
-
-    pub fn get(&self) -> u16 {
-        self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for ValidatedMaterialId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let id = u16::deserialize(deserializer)?;
-        Self::new(id).map_err(serde::de::Error::custom)
-    }
-}
-
-impl Serialize for ValidatedMaterialId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_u16(self.0)
-    }
-}
+/// This is a type alias for `MaterialName` from sunaba-simulation.
+/// It provides type-safe material identification with:
+/// - Validation at parse time (invalid IDs/names rejected)
+/// - Human-readable names in scenario files (e.g., "sand", "water")
+/// - Backwards-compatible numeric IDs (e.g., 2 for sand)
+///
+/// # Examples in RON scenario files:
+/// ```ron
+/// // Using names (preferred):
+/// (type: "PlaceMaterial", x: 0, y: 50, material: "sand", radius: 5)
+/// (type: "FillRect", min_x: 0, min_y: 0, max_x: 10, max_y: 10, material: "water")
+///
+/// // Using numeric IDs (backwards compatible):
+/// (type: "PlaceMaterial", x: 0, y: 50, material: 2, radius: 5)
+/// ```
+pub type ValidatedMaterialId = sunaba_core::MaterialName;
 
 /// Validated inventory slot index (0-49)
 ///
@@ -370,10 +345,27 @@ mod tests {
 
     #[test]
     fn test_material_id_validation() {
-        assert!(ValidatedMaterialId::new(0).is_ok()); // AIR
-        assert!(ValidatedMaterialId::new(50).is_ok()); // FISH (max)
-        assert!(ValidatedMaterialId::new(51).is_err()); // Out of range
-        assert!(ValidatedMaterialId::new(999).is_err()); // Way out of range
+        use std::str::FromStr;
+
+        // Valid materials by name
+        assert!(ValidatedMaterialId::from_str("air").is_ok());
+        assert!(ValidatedMaterialId::from_str("sand").is_ok());
+        assert!(ValidatedMaterialId::from_str("bubble").is_ok());
+
+        // Case insensitive
+        assert!(ValidatedMaterialId::from_str("SAND").is_ok());
+        assert!(ValidatedMaterialId::from_str("Sand").is_ok());
+
+        // Invalid names
+        assert!(ValidatedMaterialId::from_str("invalid_material").is_err());
+
+        // Valid materials by ID
+        assert!(ValidatedMaterialId::try_from(0u16).is_ok()); // AIR
+        assert!(ValidatedMaterialId::try_from(58u16).is_ok()); // BUBBLE (max)
+
+        // Invalid IDs
+        assert!(ValidatedMaterialId::try_from(59u16).is_err()); // Out of range
+        assert!(ValidatedMaterialId::try_from(999u16).is_err()); // Way out of range
     }
 
     #[test]

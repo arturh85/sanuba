@@ -6,7 +6,7 @@
 
     actions: [
         (type: "Log", message: "Testing FillRect"),
-        (type: "FillRect", min_x: -10, min_y: -10, max_x: 10, max_y: 10, material: 1),
+        (type: "FillRect", min_x: -10, min_y: -10, max_x: 10, max_y: 10, material: "stone"),
         (type: "WaitFrames", frames: 1),
     ],
 
@@ -14,7 +14,7 @@
         // Verify materials were placed
         (
             type: "MaterialCountRange",
-            material: 1,
+            material: "stone",
             region: (type: "Rect", min_x: -10, min_y: -10, max_x: 10, max_y: 10),
             min: 1,
             max: 1000,

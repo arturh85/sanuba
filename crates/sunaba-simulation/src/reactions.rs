@@ -508,10 +508,13 @@ impl ReactionRegistry {
         // === ELECTRICAL REACTIONS ===
 
         // Spark + Flammable Material -> Fire
+        // Note: C_4 and BOMB are excluded - they have specialized detonation reactions
         for mat_def in materials.all_materials() {
             if mat_def.flammable
                 && mat_def.id != MaterialId::FIRE
                 && mat_def.id != MaterialId::SPARK
+                && mat_def.id != MaterialId::C_4
+                && mat_def.id != MaterialId::BOMB
             {
                 self.register(Reaction {
                     name: format!("spark_ignite_{}", mat_def.name),
@@ -592,6 +595,350 @@ impl ReactionRegistry {
             output_b: MaterialId::AIR,
             probability: 1.0,       // Instant explosion
             energy_released: 500.0, // Massive energy release
+        });
+
+        // ===== WEEK 5: ADDITIONAL POWDER GAME REACTIONS =====
+
+        // === C-4 DETONATION ===
+
+        // C-4 + Spark -> Smoke + Fire (electrical detonation)
+        self.register(Reaction {
+            name: "c4_spark_detonate".to_string(),
+            input_a: MaterialId::C_4,
+            input_b: MaterialId::SPARK,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::FIRE,
+            probability: 0.95,      // High probability with spark
+            energy_released: 800.0, // Very powerful explosion
+        });
+
+        // C-4 + Fire -> Smoke + Fire (needs high temp to detonate)
+        self.register(Reaction {
+            name: "c4_fire_detonate".to_string(),
+            input_a: MaterialId::C_4,
+            input_b: MaterialId::FIRE,
+            min_temp: Some(400.0), // Requires high temperature
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::FIRE,
+            probability: 0.8,
+            energy_released: 800.0,
+        });
+
+        // === BOMB EXPLOSION ===
+
+        // Bomb + Fire -> Smoke + Fire (contact detonation)
+        self.register(Reaction {
+            name: "bomb_fire_detonate".to_string(),
+            input_a: MaterialId::BOMB,
+            input_b: MaterialId::FIRE,
+            min_temp: None, // Low temp threshold
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::FIRE,
+            probability: 0.9,
+            energy_released: 400.0, // Medium explosion
+        });
+
+        // Bomb + Sand -> Smoke + Fire (impact detonation with powder)
+        self.register(Reaction {
+            name: "bomb_sand_impact".to_string(),
+            input_a: MaterialId::BOMB,
+            input_b: MaterialId::SAND,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: Some(5.0), // Needs some impact
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::FIRE,
+            probability: 0.7,
+            energy_released: 400.0,
+        });
+
+        // Bomb + Stone -> Smoke + Fire (impact detonation with solid)
+        self.register(Reaction {
+            name: "bomb_stone_impact".to_string(),
+            input_a: MaterialId::BOMB,
+            input_b: MaterialId::STONE,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: Some(3.0), // Lower threshold for hard impact
+            catalyst: None,
+            output_a: MaterialId::SMOKE,
+            output_b: MaterialId::AIR,
+            probability: 0.6,
+            energy_released: 400.0,
+        });
+
+        // === MAGMA REACTIONS ===
+
+        // Magma + Water -> Lava + Steam (rapid cooling)
+        self.register(Reaction {
+            name: "magma_water_cool".to_string(),
+            input_a: MaterialId::MAGMA,
+            input_b: MaterialId::WATER,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::LAVA,
+            output_b: MaterialId::STEAM,
+            probability: 0.5,        // Instant cooling
+            energy_released: -200.0, // Very endothermic
+        });
+
+        // Magma + Ice -> Lava + Water
+        self.register(Reaction {
+            name: "magma_ice_melt".to_string(),
+            input_a: MaterialId::MAGMA,
+            input_b: MaterialId::ICE,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::LAVA,
+            output_b: MaterialId::WATER,
+            probability: 0.6,
+            energy_released: -150.0,
+        });
+
+        // Magma + Wood -> Fire + Fire (instant ignition)
+        self.register(Reaction {
+            name: "magma_wood_ignite".to_string(),
+            input_a: MaterialId::MAGMA,
+            input_b: MaterialId::WOOD,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::FIRE,
+            output_b: MaterialId::FIRE,
+            probability: 0.95, // Almost instant
+            energy_released: 100.0,
+        });
+
+        // Magma + Oil -> Fire + Fire (instant ignition)
+        self.register(Reaction {
+            name: "magma_oil_ignite".to_string(),
+            input_a: MaterialId::MAGMA,
+            input_b: MaterialId::OIL,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::FIRE,
+            output_b: MaterialId::FIRE,
+            probability: 0.98, // Even faster than wood
+            energy_released: 150.0,
+        });
+
+        // === SALT REACTIONS ===
+
+        // Salt + Water -> Seawater + Air (dissolution)
+        self.register(Reaction {
+            name: "salt_dissolve".to_string(),
+            input_a: MaterialId::SALT,
+            input_b: MaterialId::WATER,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::SEAWATER,
+            output_b: MaterialId::AIR,
+            probability: 0.1,      // Gradual dissolution
+            energy_released: -5.0, // Slightly endothermic
+        });
+
+        // === SEAWATER REACTIONS ===
+
+        // Seawater + Fire -> Steam + Salt (evaporation leaves salt)
+        self.register(Reaction {
+            name: "seawater_evaporate".to_string(),
+            input_a: MaterialId::SEAWATER,
+            input_b: MaterialId::FIRE,
+            min_temp: Some(100.0),
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::STEAM,
+            output_b: MaterialId::SALT,
+            probability: 0.08,
+            energy_released: 30.0,
+        });
+
+        // Seawater + Lava -> Steam + Salt (rapid evaporation)
+        self.register(Reaction {
+            name: "seawater_lava_evaporate".to_string(),
+            input_a: MaterialId::SEAWATER,
+            input_b: MaterialId::LAVA,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::STEAM,
+            output_b: MaterialId::STONE, // Lava cools + salt deposits
+            probability: 0.25,
+            energy_released: -80.0,
+        });
+
+        // === SOAPY WATER REACTIONS ===
+
+        // Soapy Water + Air -> Bubble + Soapy Water (bubble creation)
+        self.register(Reaction {
+            name: "soapy_bubble_create".to_string(),
+            input_a: MaterialId::SOAPY_WATER,
+            input_b: MaterialId::AIR,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::SOAPY_WATER, // Soapy water preserved
+            output_b: MaterialId::BUBBLE,      // Air becomes bubble
+            probability: 0.01,                 // Low probability - occasional bubbles
+            energy_released: 0.0,
+        });
+
+        // Soapy Water + Pressure -> Bubble + Soapy Water (agitated bubbles)
+        self.register(Reaction {
+            name: "soapy_pressure_bubble".to_string(),
+            input_a: MaterialId::SOAPY_WATER,
+            input_b: MaterialId::AIR,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: Some(10.0), // Higher pressure creates more bubbles
+            catalyst: None,
+            output_a: MaterialId::SOAPY_WATER,
+            output_b: MaterialId::BUBBLE,
+            probability: 0.2, // Much higher with pressure
+            energy_released: 0.0,
+        });
+
+        // === BUBBLE REACTIONS ===
+
+        // Bubble + Fire -> Air + Air (pops in heat)
+        self.register(Reaction {
+            name: "bubble_fire_pop".to_string(),
+            input_a: MaterialId::BUBBLE,
+            input_b: MaterialId::FIRE,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::AIR,
+            output_b: MaterialId::AIR,
+            probability: 0.99, // Instant pop
+            energy_released: 0.0,
+        });
+
+        // Bubble + Stone -> Air + Stone (pops on solid contact)
+        self.register(Reaction {
+            name: "bubble_stone_pop".to_string(),
+            input_a: MaterialId::BUBBLE,
+            input_b: MaterialId::STONE,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::AIR,
+            output_b: MaterialId::STONE,
+            probability: 0.5, // 50% chance to pop on contact
+            energy_released: 0.0,
+        });
+
+        // Bubble + Metal -> Air + Metal (pops on metal)
+        self.register(Reaction {
+            name: "bubble_metal_pop".to_string(),
+            input_a: MaterialId::BUBBLE,
+            input_b: MaterialId::METAL,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::AIR,
+            output_b: MaterialId::METAL,
+            probability: 0.6,
+            energy_released: 0.0,
+        });
+
+        // Bubble + Glass -> Air + Glass (pops on glass - sharp)
+        self.register(Reaction {
+            name: "bubble_glass_pop".to_string(),
+            input_a: MaterialId::BUBBLE,
+            input_b: MaterialId::GLASS,
+            min_temp: None,
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::AIR,
+            output_b: MaterialId::GLASS,
+            probability: 0.8, // Glass is sharp - higher pop rate
+            energy_released: 0.0,
+        });
+
+        // === MERCURY REACTIONS ===
+
+        // Mercury + Spark -> Spark + Mercury (conducts electricity)
+        // Note: Mercury just passes spark through, handled by conductivity
+
+        // Mercury + Fire -> Poison Gas + Air (vaporization)
+        self.register(Reaction {
+            name: "mercury_vaporize".to_string(),
+            input_a: MaterialId::MERCURY,
+            input_b: MaterialId::FIRE,
+            min_temp: Some(357.0), // Mercury boiling point
+            max_temp: None,
+            requires_contact: true,
+            requires_light: None,
+            min_pressure: None,
+            catalyst: None,
+            output_a: MaterialId::POISON_GAS,
+            output_b: MaterialId::FIRE,
+            probability: 0.1,
+            energy_released: 20.0,
         });
     }
 
@@ -844,5 +1191,183 @@ mod tests {
         );
         assert!(reaction.is_some());
         assert_eq!(reaction.unwrap().name, "test_pressure");
+    }
+
+    // ===== WEEK 5 REACTION TESTS =====
+
+    #[test]
+    fn test_c4_detonation() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // C-4 + Spark should detonate
+        let reaction =
+            registry.find_reaction(MaterialId::C_4, MaterialId::SPARK, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "c4_spark_detonate");
+
+        // C-4 + Fire at low temp should NOT detonate (needs 400°C)
+        let reaction = registry.find_reaction(
+            MaterialId::C_4,
+            MaterialId::FIRE,
+            100.0, // Below 400°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_none());
+
+        // C-4 + Fire at high temp should detonate
+        let reaction = registry.find_reaction(
+            MaterialId::C_4,
+            MaterialId::FIRE,
+            500.0, // Above 400°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "c4_fire_detonate");
+    }
+
+    #[test]
+    fn test_bomb_detonation() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Bomb + Fire should detonate
+        let reaction =
+            registry.find_reaction(MaterialId::BOMB, MaterialId::FIRE, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "bomb_fire_detonate");
+    }
+
+    #[test]
+    fn test_magma_reactions() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Magma + Water -> Lava + Steam
+        let reaction =
+            registry.find_reaction(MaterialId::MAGMA, MaterialId::WATER, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "magma_water_cool");
+
+        // Magma + Wood -> Fire + Fire (instant ignition)
+        let reaction =
+            registry.find_reaction(MaterialId::MAGMA, MaterialId::WOOD, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "magma_wood_ignite");
+    }
+
+    #[test]
+    fn test_salt_dissolution() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Salt + Water -> Seawater + Air
+        let reaction =
+            registry.find_reaction(MaterialId::SALT, MaterialId::WATER, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        let r = reaction.unwrap();
+        assert_eq!(r.name, "salt_dissolve");
+        assert_eq!(r.output_a, MaterialId::SEAWATER);
+    }
+
+    #[test]
+    fn test_seawater_evaporation() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Seawater + Fire at low temp - no evaporation
+        let reaction = registry.find_reaction(
+            MaterialId::SEAWATER,
+            MaterialId::FIRE,
+            50.0, // Below 100°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_none());
+
+        // Seawater + Fire at high temp -> Steam + Salt
+        let reaction = registry.find_reaction(
+            MaterialId::SEAWATER,
+            MaterialId::FIRE,
+            150.0, // Above 100°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_some());
+        let r = reaction.unwrap();
+        assert_eq!(r.name, "seawater_evaporate");
+        assert_eq!(r.output_a, MaterialId::STEAM);
+        assert_eq!(r.output_b, MaterialId::SALT);
+    }
+
+    #[test]
+    fn test_soapy_bubble_creation() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Soapy Water + Air -> Bubble (low probability)
+        let reaction =
+            registry.find_reaction(MaterialId::SOAPY_WATER, MaterialId::AIR, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        let r = reaction.unwrap();
+        assert_eq!(r.name, "soapy_bubble_create");
+        assert_eq!(r.output_b, MaterialId::BUBBLE);
+    }
+
+    #[test]
+    fn test_bubble_popping() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Bubble + Fire -> Air + Air
+        let reaction =
+            registry.find_reaction(MaterialId::BUBBLE, MaterialId::FIRE, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        let r = reaction.unwrap();
+        assert_eq!(r.name, "bubble_fire_pop");
+        assert_eq!(r.output_a, MaterialId::AIR);
+
+        // Bubble + Glass -> Air + Glass (sharp surface)
+        let reaction =
+            registry.find_reaction(MaterialId::BUBBLE, MaterialId::GLASS, 20.0, 0, 1.0, &[]);
+        assert!(reaction.is_some());
+        assert_eq!(reaction.unwrap().name, "bubble_glass_pop");
+    }
+
+    #[test]
+    fn test_mercury_vaporization() {
+        let materials = Materials::new();
+        let registry = ReactionRegistry::new(&materials);
+
+        // Mercury + Fire at low temp - no vaporization
+        let reaction = registry.find_reaction(
+            MaterialId::MERCURY,
+            MaterialId::FIRE,
+            100.0, // Below 357°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_none());
+
+        // Mercury + Fire at high temp -> Poison Gas
+        let reaction = registry.find_reaction(
+            MaterialId::MERCURY,
+            MaterialId::FIRE,
+            400.0, // Above 357°C
+            0,
+            1.0,
+            &[],
+        );
+        assert!(reaction.is_some());
+        let r = reaction.unwrap();
+        assert_eq!(r.name, "mercury_vaporize");
+        assert_eq!(r.output_a, MaterialId::POISON_GAS);
     }
 }

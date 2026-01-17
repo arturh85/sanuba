@@ -7,7 +7,7 @@
         (type: "TeleportPlayer", x: 0.0, y: 100.0),
 
         // Create a stone platform below player
-        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 50, material: 1),
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 50, material: "stone"),
     ],
 
     actions: [
@@ -29,7 +29,7 @@
         // Verify the mined area is mostly empty (allow for some debris)
         (
             type: "MaterialCountRange",
-            material: 0,  // Air
+            material: "air",
             region: (type: "Circle", center_x: 0, center_y: 25, radius: 8),
             min: 150,  // Most should be air
             max: 300,  // Upper bound

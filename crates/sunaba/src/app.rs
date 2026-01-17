@@ -618,10 +618,10 @@ impl App {
                 self.world
                     .ensure_chunks_for_area(x - r, y - r, x + r, y + r);
                 self.world
-                    .place_material_debug(*x, *y, material.get(), radius.get());
+                    .place_material_debug(*x, *y, material.id(), radius.get());
                 Ok(format!(
-                    "Placed material {} at ({}, {}) r={}",
-                    material.get(),
+                    "Placed {} at ({}, {}) r={}",
+                    material,
                     x,
                     y,
                     radius.get()

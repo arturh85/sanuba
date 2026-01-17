@@ -4,15 +4,15 @@
 
     setup: [
         // Place a battery to power the circuit (uses PlaceMaterial to trigger SPARK_SOURCE flag)
-        (type: "PlaceMaterial", material: 41, x: 10, y: 10, radius: 1), // BATTERY
+        (type: "PlaceMaterial", material: "battery", x: 10, y: 10, radius: 1),
         // Place wire next to battery
-        (type: "FillRect", min_x: 11, max_x: 11, min_y: 10, max_y: 10, material: 42), // WIRE
+        (type: "FillRect", min_x: 11, max_x: 11, min_y: 10, max_y: 10, material: "wire"),
         // Place Thunder next to the wire (will be powered when wire gets power)
-        (type: "FillRect", min_x: 12, max_x: 12, min_y: 10, max_y: 10, material: 39), // THUNDER
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 10, max_y: 10, material: "thunder"),
         // Place non-conductive materials adjacent to Thunder
-        (type: "FillRect", min_x: 13, max_x: 13, min_y: 10, max_y: 10, material: 1), // STONE (east)
-        (type: "FillRect", min_x: 12, max_x: 12, min_y: 9, max_y: 9, material: 4),   // WOOD (south)
-        (type: "FillRect", min_x: 12, max_x: 12, min_y: 11, max_y: 11, material: 4), // WOOD (north)
+        (type: "FillRect", min_x: 13, max_x: 13, min_y: 10, max_y: 10, material: "stone"),
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 9, max_y: 9, material: "wood"),
+        (type: "FillRect", min_x: 12, max_x: 12, min_y: 11, max_y: 11, material: "wood"),
     ],
 
     actions: [
@@ -21,15 +21,15 @@
 
     verify: [
         // Battery should remain
-        (type: "MaterialAt", x: 10, y: 10, expected: 41), // BATTERY
+        (type: "MaterialAt", x: 10, y: 10, expected: "battery"),
         // Wire should remain
-        (type: "MaterialAt", x: 11, y: 10, expected: 42), // WIRE
+        (type: "MaterialAt", x: 11, y: 10, expected: "wire"),
         // Thunder should be consumed (turned to AIR)
-        (type: "MaterialAt", x: 12, y: 10, expected: 0), // THUNDER -> AIR
+        (type: "MaterialAt", x: 12, y: 10, expected: "air"),
         // Adjacent non-conductors should be destroyed
-        (type: "MaterialAt", x: 13, y: 10, expected: 0), // STONE -> AIR
-        (type: "MaterialAt", x: 12, y: 9, expected: 0),  // WOOD -> AIR
-        (type: "MaterialAt", x: 12, y: 11, expected: 0), // WOOD -> AIR
+        (type: "MaterialAt", x: 13, y: 10, expected: "air"),
+        (type: "MaterialAt", x: 12, y: 9, expected: "air"),
+        (type: "MaterialAt", x: 12, y: 11, expected: "air"),
     ],
 
     cleanup: [],

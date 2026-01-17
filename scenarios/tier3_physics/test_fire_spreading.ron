@@ -3,8 +3,8 @@
     description: "Validates fire spreads to flammable materials",
 
     setup: [
-        (type: "FillRect", min_x: -10, min_y: 50, max_x: 10, max_y: 60, material: 4), // Wood
-        (type: "PlaceMaterial", x: 0, y: 55, material: 5, radius: 1), // Fire
+        (type: "FillRect", min_x: -10, min_y: 50, max_x: 10, max_y: 60, material: "wood"),
+        (type: "PlaceMaterial", x: 0, y: 55, material: "fire", radius: 1),
     ],
 
     actions: [
@@ -14,7 +14,7 @@
 
     verify: [
         (type: "MaterialCountRange",
-            material: 5, // Fire
+            material: "fire",
             region: (type: "Rect", min_x: -10, min_y: 50, max_x: 10, max_y: 60),
             min: 5,
             max: 500),

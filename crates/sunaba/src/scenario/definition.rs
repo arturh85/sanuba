@@ -70,7 +70,7 @@ impl ScenarioDefinition {
     /// # Example
     /// ```rust,ignore
     /// ScenarioDefinition::new("Test")
-    ///     .with_platform(20, 60, ValidatedMaterialId::new(1).unwrap())
+    ///     .with_platform(20, 60, ValidatedMaterialId::Stone)
     /// ```
     pub fn with_platform(mut self, y: i32, width: u32, material: ValidatedMaterialId) -> Self {
         let half_width = width as i32 / 2;
@@ -105,7 +105,7 @@ impl ScenarioDefinition {
     /// # Example
     /// ```rust,ignore
     /// ScenarioDefinition::new("Test")
-    ///     .with_chamber(-30..30, 0..50, 4, ValidatedMaterialId::new(1).unwrap())
+    ///     .with_chamber(-30..30, 0..50, 4, ValidatedMaterialId::Stone)
     /// ```
     pub fn with_chamber(
         mut self,
@@ -163,7 +163,7 @@ impl ScenarioDefinition {
     /// ```rust,ignore
     /// let scenario = ScenarioDefinition::new("Mining Test")
     ///     .with_description("Test mining mechanics")
-    ///     .with_platform(20, 60, ValidatedMaterialId::new(1).unwrap())
+    ///     .with_platform(20, 60, ValidatedMaterialId::Stone)
     ///     .with_spawn(0.0, 100.0);
     /// ```
     pub fn new(name: impl Into<String>) -> Self {
@@ -243,7 +243,7 @@ mod tests {
 
         let scenario = ScenarioDefinition::new("Platform Test")
             .with_description("Test platform helper")
-            .with_platform(20, 60, ValidatedMaterialId::new(1).unwrap())
+            .with_platform(20, 60, ValidatedMaterialId::Stone)
             .with_spawn(0.0, 100.0);
 
         assert_eq!(scenario.name, "Platform Test");
@@ -263,7 +263,7 @@ mod tests {
                 assert_eq!(*max_x, 30);
                 assert_eq!(*min_y, 20);
                 assert_eq!(*max_y, 25); // y + 5
-                assert_eq!(material.get(), 1);
+                assert_eq!(material.id(), 1);
             }
             _ => panic!("Expected FillRect action"),
         }
@@ -286,16 +286,16 @@ mod tests {
             -30..30,
             0..50,
             4,
-            ValidatedMaterialId::new(1).unwrap(),
+            ValidatedMaterialId::Stone,
         );
 
         assert_eq!(scenario.setup.len(), 4); // floor + left + right + ceiling
 
-        // All should be FillRect actions with material 1
+        // All should be FillRect actions with stone (id=1)
         for action in &scenario.setup {
             match action {
                 ScenarioAction::FillRect { material, .. } => {
-                    assert_eq!(material.get(), 1);
+                    assert_eq!(material.id(), 1);
                 }
                 _ => panic!("Expected FillRect action"),
             }
@@ -336,7 +336,7 @@ mod tests {
 
         let scenario = ScenarioDefinition::new("Save Test")
             .with_description("Test save/load")
-            .with_platform(20, 60, ValidatedMaterialId::new(1).unwrap())
+            .with_platform(20, 60, ValidatedMaterialId::Stone)
             .with_spawn(0.0, 100.0)
             .add_action(ScenarioAction::WaitFrames { frames: 60 });
 

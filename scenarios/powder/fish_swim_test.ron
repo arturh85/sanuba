@@ -4,13 +4,13 @@
 
     setup: [
         // Create a water pool (container)
-        (type: "FillRect", min_x: 15, max_x: 45, min_y: 10, max_y: 10, material: 1), // STONE floor
-        (type: "FillRect", min_x: 15, max_x: 15, min_y: 11, max_y: 25, material: 1), // Left wall
-        (type: "FillRect", min_x: 45, max_x: 45, min_y: 11, max_y: 25, material: 1), // Right wall
+        (type: "FillRect", min_x: 15, max_x: 45, min_y: 10, max_y: 10, material: "stone"),
+        (type: "FillRect", min_x: 15, max_x: 15, min_y: 11, max_y: 25, material: "stone"),
+        (type: "FillRect", min_x: 45, max_x: 45, min_y: 11, max_y: 25, material: "stone"),
         // Fill with water
-        (type: "FillRect", min_x: 16, max_x: 44, min_y: 11, max_y: 24, material: 3), // WATER
+        (type: "FillRect", min_x: 16, max_x: 44, min_y: 11, max_y: 24, material: "water"),
         // Place a fish in the water
-        (type: "FillRect", min_x: 30, max_x: 30, min_y: 17, max_y: 17, material: 50), // FISH
+        (type: "FillRect", min_x: 30, max_x: 30, min_y: 17, max_y: 17, material: "fish"),
     ],
 
     actions: [
@@ -20,8 +20,8 @@
 
     verify: [
         // Pool walls should still exist
-        (type: "MaterialAt", x: 15, y: 15, expected: 1), // Left wall still stone
-        (type: "MaterialAt", x: 45, y: 15, expected: 1), // Right wall still stone
+        (type: "MaterialAt", x: 15, y: 15, expected: "stone"),
+        (type: "MaterialAt", x: 45, y: 15, expected: "stone"),
         // Fish behavior is probabilistic, so we just verify the scenario runs
     ],
 

@@ -3,8 +3,8 @@
     description: "Validates food compass sensor and eating mechanics",
 
     setup: [
-        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: 1),
-        (type: "PlaceMaterial", x: 50, y: 30, material: 17, radius: 3), // Fruit
+        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: "stone"),
+        (type: "PlaceMaterial", x: 50, y: 30, material: "fruit", radius: 3),
     ],
 
     actions: [
@@ -15,7 +15,7 @@
 
     verify: [
         (type: "MaterialCountRange",
-            material: 17,
+            material: "fruit",
             region: (type: "Whole"),
             min: 0,
             max: 50), // Some fruit consumed

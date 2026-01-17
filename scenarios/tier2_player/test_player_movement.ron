@@ -4,7 +4,7 @@
 
     setup: [
         (type: "TeleportPlayer", x: 0.0, y: 100.0),
-        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: 1),
+        (type: "FillRect", min_x: -100, min_y: 0, max_x: 100, max_y: 10, material: "stone"),
     ],
 
     actions: [

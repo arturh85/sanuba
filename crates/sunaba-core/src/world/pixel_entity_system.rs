@@ -248,12 +248,10 @@ impl PixelEntitySystem {
             let mut align_count = 0;
             let mut cohesion_count = 0;
 
-            for j in 0..birds.len() {
+            for (j, &(other_chunk_pos, other_x, other_y, other_dir)) in birds.iter().enumerate() {
                 if i == j {
                     continue;
                 }
-
-                let (other_chunk_pos, other_x, other_y, other_dir) = birds[j];
                 let other_world_x = other_chunk_pos.x * CHUNK_SIZE as i32 + other_x as i32;
                 let other_world_y = other_chunk_pos.y * CHUNK_SIZE as i32 + other_y as i32;
 
@@ -429,12 +427,10 @@ impl PixelEntitySystem {
             let mut target_dy = 0.0_f32;
             let mut neighbor_count = 0;
 
-            for j in 0..fish.len() {
+            for (j, &(other_chunk_pos, other_x, other_y, _)) in fish.iter().enumerate() {
                 if i == j {
                     continue;
                 }
-
-                let (other_chunk_pos, other_x, other_y, _) = fish[j];
                 let other_world_x = other_chunk_pos.x * CHUNK_SIZE as i32 + other_x as i32;
                 let other_world_y = other_chunk_pos.y * CHUNK_SIZE as i32 + other_y as i32;
 

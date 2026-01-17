@@ -7,3 +7,6 @@ pub mod world;
 pub mod creature {
     pub use sunaba_creature::*;
 }
+
+// Re-export MaterialName for scenario files
+pub use sunaba_simulation::MaterialName;

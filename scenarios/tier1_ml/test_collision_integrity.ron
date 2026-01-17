@@ -3,8 +3,8 @@
     description: "Validates creatures can't wall-clip or fall through world",
 
     setup: [
-        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 10, material: 1), // Ground
-        (type: "FillRect", min_x: -60, min_y: 10, max_x: -50, max_y: 100, material: 1), // Wall
+        (type: "FillRect", min_x: -50, min_y: 0, max_x: 50, max_y: 10, material: "stone"), // Ground
+        (type: "FillRect", min_x: -60, min_y: 10, max_x: -50, max_y: 100, material: "stone"), // Wall
     ],
 
     actions: [

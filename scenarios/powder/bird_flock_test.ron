@@ -4,9 +4,9 @@
 
     setup: [
         // Place several birds in the air (they should flock together)
-        (type: "FillRect", min_x: 20, max_x: 20, min_y: 30, max_y: 30, material: 49), // BIRD 1
-        (type: "FillRect", min_x: 25, max_x: 25, min_y: 32, max_y: 32, material: 49), // BIRD 2
-        (type: "FillRect", min_x: 22, max_x: 22, min_y: 28, max_y: 28, material: 49), // BIRD 3
+        (type: "FillRect", min_x: 20, max_x: 20, min_y: 30, max_y: 30, material: "bird"),
+        (type: "FillRect", min_x: 25, max_x: 25, min_y: 32, max_y: 32, material: "bird"),
+        (type: "FillRect", min_x: 22, max_x: 22, min_y: 28, max_y: 28, material: "bird"),
     ],
 
     actions: [

@@ -4,9 +4,9 @@
 
     setup: [
         // Create a solid ground platform
-        (type: "FillRect", min_x: 10, max_x: 50, min_y: 10, max_y: 10, material: 1), // STONE ground
+        (type: "FillRect", min_x: 10, max_x: 50, min_y: 10, max_y: 10, material: "stone"),
         // Place an ant on the platform
-        (type: "FillRect", min_x: 30, max_x: 30, min_y: 11, max_y: 11, material: 48), // ANT
+        (type: "FillRect", min_x: 30, max_x: 30, min_y: 11, max_y: 11, material: "ant"),
     ],
 
     actions: [
@@ -16,7 +16,7 @@
 
     verify: [
         // Ground should still exist
-        (type: "MaterialAt", x: 30, y: 10, expected: 1), // STONE
+        (type: "MaterialAt", x: 30, y: 10, expected: "stone"),
         // Ant behavior is probabilistic, so we just verify the scenario runs
     ],
 

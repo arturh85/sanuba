@@ -7,35 +7,35 @@
         (type: "TeleportPlayer", x: -600.0, y: 200.0),
 
         // Create containing chamber (stone walls)
-        (type: "FillRect", min_x: -150, min_y: -100, max_x: 150, max_y: -95, material: 1),  // Floor
-        (type: "FillRect", min_x: -150, min_y: -100, max_x: -145, max_y: 100, material: 1), // Left wall
-        (type: "FillRect", min_x: 145, min_y: -100, max_x: 150, max_y: 100, material: 1),   // Right wall
+        (type: "FillRect", min_x: -150, min_y: -100, max_x: 150, max_y: -95, material: "stone"),  // Floor
+        (type: "FillRect", min_x: -150, min_y: -100, max_x: -145, max_y: 100, material: "stone"), // Left wall
+        (type: "FillRect", min_x: 145, min_y: -100, max_x: 150, max_y: 100, material: "stone"),   // Right wall
 
         // Fill chamber with alternating layers of materials
         // Layer 1: Sand base
-        (type: "FillRect", min_x: -140, min_y: -90, max_x: 140, max_y: -50, material: 2),
-        
+        (type: "FillRect", min_x: -140, min_y: -90, max_x: 140, max_y: -50, material: "sand"),
+
         // Layer 2: Water pockets (will seep through sand)
-        (type: "FillRect", min_x: -120, min_y: -40, max_x: -80, max_y: -20, material: 3),
-        (type: "FillRect", min_x: -20, min_y: -40, max_x: 20, max_y: -20, material: 3),
-        (type: "FillRect", min_x: 80, min_y: -40, max_x: 120, max_y: -20, material: 3),
-        
+        (type: "FillRect", min_x: -120, min_y: -40, max_x: -80, max_y: -20, material: "water"),
+        (type: "FillRect", min_x: -20, min_y: -40, max_x: 20, max_y: -20, material: "water"),
+        (type: "FillRect", min_x: 80, min_y: -40, max_x: 120, max_y: -20, material: "water"),
+
         // Layer 3: More sand (cap water)
-        (type: "FillRect", min_x: -140, min_y: -10, max_x: 140, max_y: 10, material: 2),
-        
+        (type: "FillRect", min_x: -140, min_y: -10, max_x: 140, max_y: 10, material: "sand"),
+
         // Layer 4: Lava/fire sources (will interact with water)
-        (type: "FillRect", min_x: -100, min_y: 20, max_x: -60, max_y: 30, material: 5),
-        (type: "FillRect", min_x: 60, min_y: 20, max_x: 100, max_y: 30, material: 5),
-        
+        (type: "FillRect", min_x: -100, min_y: 20, max_x: -60, max_y: 30, material: "fire"),
+        (type: "FillRect", min_x: 60, min_y: 20, max_x: 100, max_y: 30, material: "fire"),
+
         // Layer 5: Top sand layer
-        (type: "FillRect", min_x: -140, min_y: 40, max_x: 140, max_y: 60, material: 2),
-        
+        (type: "FillRect", min_x: -140, min_y: 40, max_x: 140, max_y: 60, material: "sand"),
+
         // Add some stone pillars (structural diversity)
-        (type: "FillRect", min_x: -50, min_y: -90, max_x: -45, max_y: 50, material: 1),
-        (type: "FillRect", min_x: 45, min_y: -90, max_x: 50, max_y: 50, material: 1),
-        
+        (type: "FillRect", min_x: -50, min_y: -90, max_x: -45, max_y: 50, material: "stone"),
+        (type: "FillRect", min_x: 45, min_y: -90, max_x: 50, max_y: 50, material: "stone"),
+
         // Add vegetation/organic matter for more reactions
-        (type: "FillRect", min_x: -30, min_y: 10, max_x: 30, max_y: 20, material: 7),
+        (type: "FillRect", min_x: -30, min_y: 10, max_x: 30, max_y: 20, material: "steam"),
     ],
 
     actions: [
@@ -75,7 +75,7 @@
         // Just verify chamber still exists and has materials
         (
             type: "MaterialCountRange",
-            material: 1,  // Stone walls should still exist
+            material: "stone",  // Stone walls should still exist
             region: (type: "Whole"),
             min: 1000,
             max: 50000,

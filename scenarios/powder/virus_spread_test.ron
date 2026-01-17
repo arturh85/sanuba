@@ -4,9 +4,9 @@
 
     setup: [
         // Place virus surrounded by stone (infectable material)
-        (type: "FillRect", min_x: 20, max_x: 24, min_y: 20, max_y: 24, material: 1), // STONE block
+        (type: "FillRect", min_x: 20, max_x: 24, min_y: 20, max_y: 24, material: "stone"),
         // Place virus in the center
-        (type: "FillRect", min_x: 22, max_x: 22, min_y: 22, max_y: 22, material: 46), // VIRUS
+        (type: "FillRect", min_x: 22, max_x: 22, min_y: 22, max_y: 22, material: "virus"),
     ],
 
     actions: [

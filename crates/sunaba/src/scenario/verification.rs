@@ -154,19 +154,15 @@ impl VerificationCondition {
                 expected,
                 tolerance,
             } => {
-                let actual = count_material_in_region(world, material.get(), region);
+                let actual = count_material_in_region(world, material.id(), region);
                 let tol = tolerance.unwrap_or(0);
                 let passed = actual >= expected.saturating_sub(tol) && actual <= expected + tol;
 
                 VerificationResult {
                     passed,
                     message: format!(
-                        "Material {:?} count in {:?}: expected {}±{}, got {}",
-                        material.get(),
-                        region,
-                        expected,
-                        tol,
-                        actual
+                        "Material {} count in {:?}: expected {}±{}, got {}",
+                        material, region, expected, tol, actual
                     ),
                     actual_value: Some(actual.to_string()),
                 }
@@ -178,18 +174,14 @@ impl VerificationCondition {
                 min,
                 max,
             } => {
-                let actual = count_material_in_region(world, material.get(), region);
+                let actual = count_material_in_region(world, material.id(), region);
                 let passed = actual >= *min && actual <= *max;
 
                 VerificationResult {
                     passed,
                     message: format!(
-                        "Material {:?} count in {:?}: expected {}-{}, got {}",
-                        material.get(),
-                        region,
-                        min,
-                        max,
-                        actual
+                        "Material {} count in {:?}: expected {}-{}, got {}",
+                        material, region, min, max, actual
                     ),
                     actual_value: Some(actual.to_string()),
                 }
@@ -200,16 +192,13 @@ impl VerificationCondition {
                     .get_pixel(*x, *y)
                     .map(|p| p.material_id)
                     .unwrap_or(MaterialId::AIR);
-                let passed = actual == expected.get();
+                let passed = actual == expected.id();
 
                 VerificationResult {
                     passed,
                     message: format!(
-                        "Material at ({}, {}): expected {:?}, got {:?}",
-                        x,
-                        y,
-                        expected.get(),
-                        actual
+                        "Material at ({}, {}): expected {}, got {:?}",
+                        x, y, expected, actual
                     ),
                     actual_value: Some(format!("{:?}", actual)),
                 }
@@ -415,7 +404,7 @@ impl VerificationCondition {
                 min_count,
             } => {
                 let count = if let Some(mat_id) = material {
-                    world.player.inventory.count_item(mat_id.get()) as usize
+                    world.player.inventory.count_item(mat_id.id()) as usize
                 } else if let Some(tool_id) = tool {
                     if world
                         .player
@@ -437,7 +426,7 @@ impl VerificationCondition {
                     passed,
                     message: format!(
                         "Has item (material: {:?}, tool: {:?}): expected {}, got {}",
-                        material.map(|m| m.get()),
+                        material.map(|m: ValidatedMaterialId| m.to_string()),
                         tool,
                         min_count,
                         count

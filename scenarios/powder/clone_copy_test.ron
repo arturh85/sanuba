@@ -4,11 +4,11 @@
 
     setup: [
         // Place a bedrock floor so sand doesn't fall
-        (type: "FillRect", min_x: 28, max_x: 33, min_y: 19, max_y: 19, material: 14), // BEDROCK floor
+        (type: "FillRect", min_x: 28, max_x: 33, min_y: 19, max_y: 19, material: "bedrock"),
         // Place clone next to stone (solid, won't fall)
-        (type: "FillRect", min_x: 30, max_x: 30, min_y: 20, max_y: 20, material: 47), // CLONE
-        (type: "FillRect", min_x: 31, max_x: 31, min_y: 20, max_y: 20, material: 1), // STONE (solid)
-        // Air is already present around the clone (material 0)
+        (type: "FillRect", min_x: 30, max_x: 30, min_y: 20, max_y: 20, material: "clone"),
+        (type: "FillRect", min_x: 31, max_x: 31, min_y: 20, max_y: 20, material: "stone"),
+        // Air is already present around the clone
     ],
 
     actions: [
@@ -18,9 +18,9 @@
 
     verify: [
         // Clone should still exist
-        (type: "MaterialAt", x: 30, y: 20, expected: 47), // CLONE
+        (type: "MaterialAt", x: 30, y: 20, expected: "clone"),
         // Source stone should still exist (it's solid, won't move)
-        (type: "MaterialAt", x: 31, y: 20, expected: 1), // STONE
+        (type: "MaterialAt", x: 31, y: 20, expected: "stone"),
         // Clone is probabilistic, so we just verify the scenario runs without errors
     ],
 

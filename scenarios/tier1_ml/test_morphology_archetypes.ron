@@ -3,7 +3,7 @@
     description: "Validates CPPN generates viable body structures",
 
     setup: [
-        (type: "FillRect", min_x: -200, min_y: 0, max_x: 200, max_y: 10, material: 1),
+        (type: "FillRect", min_x: -200, min_y: 0, max_x: 200, max_y: 10, material: "stone"),
     ],
 
     actions: [

@@ -75,6 +75,16 @@ impl MaterialId {
     pub const ANT: u16 = 48;
     pub const BIRD: u16 = 49;
     pub const FISH: u16 = 50;
+
+    // Week 5: Additional Powder Game materials
+    pub const C_4: u16 = 51; // Triggered explosive (electricity/fire)
+    pub const BOMB: u16 = 52; // Contact explosive (impact/pressure)
+    pub const MAGMA: u16 = 53; // Super-hot lava (2000°C+)
+    pub const MERCURY: u16 = 54; // Heavy conductive liquid
+    pub const SALT: u16 = 55; // Dissolves in water
+    pub const SEAWATER: u16 = 56; // Salty water, better conductor
+    pub const SOAPY_WATER: u16 = 57; // Creates bubbles
+    pub const BUBBLE: u16 = 58; // Gas-filled shell, rises, pops
 }
 
 /// How a material behaves physically
@@ -1050,6 +1060,143 @@ impl Materials {
             tags: vec![MaterialTag::Organic, MaterialTag::Edible],
             ..Default::default()
         });
+
+        // ===== WEEK 5: ADDITIONAL POWDER GAME MATERIALS =====
+
+        // C-4 - Stable triggered explosive (needs electricity or high-temp fire)
+        self.register(MaterialDef {
+            id: MaterialId::C_4,
+            name: "c4".to_string(),
+            material_type: MaterialType::Solid,
+            color: [210, 200, 180, 255], // Light gray/tan (plastic explosive)
+            density: 1.5,
+            hardness: Some(2),
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(400.0), // High ignition temp - won't detonate easily
+            burns_to: Some(MaterialId::SMOKE),
+            burn_rate: 1.0,          // Instant when triggered
+            fuel_value: Some(200.0), // Very high energy
+            conducts_electricity: false,
+            ..Default::default()
+        });
+
+        // Bomb - Contact explosive (impact/pressure triggered)
+        self.register(MaterialDef {
+            id: MaterialId::BOMB,
+            name: "bomb".to_string(),
+            material_type: MaterialType::Solid,
+            color: [30, 30, 30, 255], // Black with implied red stripe
+            density: 2.0,
+            hardness: Some(3),
+            structural: false,
+            flammable: true,
+            ignition_temp: Some(200.0), // Lower ignition - more sensitive
+            burns_to: Some(MaterialId::SMOKE),
+            burn_rate: 1.0,          // Instant explosion
+            fuel_value: Some(100.0), // Medium-high energy
+            ..Default::default()
+        });
+
+        // Magma - Super-hot lava (hotter than regular lava)
+        self.register(MaterialDef {
+            id: MaterialId::MAGMA,
+            name: "magma".to_string(),
+            material_type: MaterialType::Liquid,
+            color: [255, 200, 100, 255], // Bright orange-white (hotter than lava)
+            density: 2.8,                // Denser than regular lava
+            hardness: None,
+            viscosity: 0.6,                     // Slightly less viscous than lava
+            freezing_point: Some(1200.0),       // Cools to lava first
+            freezes_to: Some(MaterialId::LAVA), // Becomes regular lava when cooling
+            heat_conductivity: 0.95,            // Excellent heat transfer
+            ..Default::default()
+        });
+
+        // Mercury - Heavy liquid metal
+        self.register(MaterialDef {
+            id: MaterialId::MERCURY,
+            name: "mercury".to_string(),
+            material_type: MaterialType::Liquid,
+            color: [200, 200, 210, 255], // Silver/chrome
+            density: 13.5,               // Very heavy - sinks through most liquids
+            hardness: None,
+            viscosity: 0.05,            // Very low viscosity (flows easily)
+            boiling_point: Some(357.0), // Evaporates at high temp
+            boils_to: Some(MaterialId::POISON_GAS), // Mercury vapor is toxic
+            freezing_point: Some(-39.0), // Freezes very cold
+            freezes_to: Some(MaterialId::METAL), // Solid mercury
+            heat_conductivity: 0.8,
+            conducts_electricity: true,
+            electrical_conductivity: 0.9,
+            toxicity: Some(3.0), // Moderately toxic
+            tags: vec![MaterialTag::Metallic, MaterialTag::Toxic],
+            ..Default::default()
+        });
+
+        // Salt - Dissolvable powder
+        self.register(MaterialDef {
+            id: MaterialId::SALT,
+            name: "salt".to_string(),
+            material_type: MaterialType::Powder,
+            color: [250, 250, 250, 255], // White
+            density: 2.2,
+            hardness: Some(2),
+            friction: 0.2,
+            melting_point: Some(801.0),       // Salt melts at high temp
+            melts_to: Some(MaterialId::LAVA), // Molten salt
+            tags: vec![MaterialTag::Mineral],
+            ..Default::default()
+        });
+
+        // Seawater - Salty water, better conductor
+        self.register(MaterialDef {
+            id: MaterialId::SEAWATER,
+            name: "seawater".to_string(),
+            material_type: MaterialType::Liquid,
+            color: [60, 150, 180, 200], // Blue-green (slightly different from water)
+            density: 1.03,              // Slightly denser than fresh water
+            hardness: None,
+            viscosity: 0.12,                   // Slightly more viscous than water
+            boiling_point: Some(102.0),        // Slightly higher than water
+            boils_to: Some(MaterialId::STEAM), // Evaporates to steam (salt left behind via reaction)
+            freezing_point: Some(-2.0),        // Freezes at lower temp
+            freezes_to: Some(MaterialId::ICE), // Freezes to ice (salt excluded)
+            heat_conductivity: 0.65,
+            conducts_electricity: true,   // Salt water conducts
+            electrical_conductivity: 0.5, // Better than fresh water
+            ..Default::default()
+        });
+
+        // Soapy Water - Creates bubbles with air/pressure
+        self.register(MaterialDef {
+            id: MaterialId::SOAPY_WATER,
+            name: "soapy_water".to_string(),
+            material_type: MaterialType::Liquid,
+            color: [180, 220, 255, 180], // Light blue with slight opacity
+            density: 0.98,               // Slightly lighter than water
+            hardness: None,
+            viscosity: 0.15, // Slightly more viscous
+            boiling_point: Some(100.0),
+            boils_to: Some(MaterialId::STEAM),
+            freezing_point: Some(-1.0),
+            freezes_to: Some(MaterialId::ICE),
+            heat_conductivity: 0.55,
+            ..Default::default()
+        });
+
+        // Bubble - Gas-filled shell that rises and pops
+        self.register(MaterialDef {
+            id: MaterialId::BUBBLE,
+            name: "bubble".to_string(),
+            material_type: MaterialType::Gas,
+            color: [200, 230, 255, 100], // Light blue, very transparent
+            density: 0.01,               // Very light - rises fast
+            hardness: Some(1),           // Pops easily
+            structural: false,
+            flammable: false,
+            ..Default::default()
+        });
     }
 
     fn register(&mut self, material: MaterialDef) {
@@ -1454,5 +1601,137 @@ mod tests {
         assert_eq!(wire.material_type, MaterialType::Solid);
         assert!(wire.conducts_electricity);
         assert_eq!(wire.electrical_conductivity, 0.98);
+    }
+
+    #[test]
+    fn test_material_id_week5() {
+        // Week 5 material IDs
+        assert_eq!(MaterialId::C_4, 51);
+        assert_eq!(MaterialId::BOMB, 52);
+        assert_eq!(MaterialId::MAGMA, 53);
+        assert_eq!(MaterialId::MERCURY, 54);
+        assert_eq!(MaterialId::SALT, 55);
+        assert_eq!(MaterialId::SEAWATER, 56);
+        assert_eq!(MaterialId::SOAPY_WATER, 57);
+        assert_eq!(MaterialId::BUBBLE, 58);
+    }
+
+    #[test]
+    fn test_week5_explosive_materials() {
+        let materials = Materials::new();
+
+        // C-4 - Triggered explosive
+        let c4 = materials.get(MaterialId::C_4);
+        assert_eq!(c4.name, "c4");
+        assert_eq!(c4.material_type, MaterialType::Solid);
+        assert!(c4.flammable);
+        assert_eq!(c4.ignition_temp, Some(400.0)); // High ignition temp
+
+        // Bomb - Contact explosive
+        let bomb = materials.get(MaterialId::BOMB);
+        assert_eq!(bomb.name, "bomb");
+        assert_eq!(bomb.material_type, MaterialType::Solid);
+        assert!(bomb.flammable);
+        assert_eq!(bomb.ignition_temp, Some(200.0)); // Lower ignition - more sensitive
+    }
+
+    #[test]
+    fn test_week5_magma() {
+        let materials = Materials::new();
+
+        let magma = materials.get(MaterialId::MAGMA);
+        assert_eq!(magma.name, "magma");
+        assert_eq!(magma.material_type, MaterialType::Liquid);
+        // Magma is denser than regular lava
+        assert!(magma.density < materials.get(MaterialId::LAVA).density);
+        // Magma cools to lava
+        assert_eq!(magma.freezes_to, Some(MaterialId::LAVA));
+        // Higher heat conductivity
+        assert!(magma.heat_conductivity > 0.9);
+    }
+
+    #[test]
+    fn test_week5_mercury() {
+        let materials = Materials::new();
+
+        let mercury = materials.get(MaterialId::MERCURY);
+        assert_eq!(mercury.name, "mercury");
+        assert_eq!(mercury.material_type, MaterialType::Liquid);
+        // Mercury is VERY dense - heaviest liquid
+        assert!(mercury.density > 13.0);
+        // Mercury conducts electricity
+        assert!(mercury.conducts_electricity);
+        assert!(mercury.electrical_conductivity > 0.8);
+        // Mercury is toxic
+        assert!(mercury.toxicity.is_some());
+        assert!(mercury.tags.contains(&MaterialTag::Toxic));
+        // Mercury vapor is poison gas
+        assert_eq!(mercury.boils_to, Some(MaterialId::POISON_GAS));
+    }
+
+    #[test]
+    fn test_week5_salt_and_seawater() {
+        let materials = Materials::new();
+
+        // Salt
+        let salt = materials.get(MaterialId::SALT);
+        assert_eq!(salt.name, "salt");
+        assert_eq!(salt.material_type, MaterialType::Powder);
+        assert!(salt.tags.contains(&MaterialTag::Mineral));
+
+        // Seawater
+        let seawater = materials.get(MaterialId::SEAWATER);
+        assert_eq!(seawater.name, "seawater");
+        assert_eq!(seawater.material_type, MaterialType::Liquid);
+        // Seawater is slightly denser than fresh water
+        assert!(seawater.density > materials.get(MaterialId::WATER).density);
+        // Seawater conducts electricity (better than fresh water)
+        assert!(seawater.conducts_electricity);
+        assert!(seawater.electrical_conductivity > 0.0);
+    }
+
+    #[test]
+    fn test_week5_soapy_water_and_bubble() {
+        let materials = Materials::new();
+
+        // Soapy water
+        let soapy = materials.get(MaterialId::SOAPY_WATER);
+        assert_eq!(soapy.name, "soapy_water");
+        assert_eq!(soapy.material_type, MaterialType::Liquid);
+        // Slightly lighter than water
+        assert!(soapy.density < materials.get(MaterialId::WATER).density);
+
+        // Bubble
+        let bubble = materials.get(MaterialId::BUBBLE);
+        assert_eq!(bubble.name, "bubble");
+        assert_eq!(bubble.material_type, MaterialType::Gas);
+        // Very light - rises fast
+        assert!(bubble.density < 0.1);
+        // Semi-transparent
+        assert!(bubble.color[3] < 150);
+    }
+
+    #[test]
+    fn test_week5_density_ordering() {
+        let materials = Materials::new();
+
+        // Mercury sinks through everything
+        assert!(
+            materials.get(MaterialId::MERCURY).density > materials.get(MaterialId::LAVA).density
+        );
+        assert!(
+            materials.get(MaterialId::MERCURY).density > materials.get(MaterialId::WATER).density
+        );
+
+        // Seawater slightly denser than fresh water
+        assert!(
+            materials.get(MaterialId::SEAWATER).density > materials.get(MaterialId::WATER).density
+        );
+
+        // Bubble is very light (gas)
+        assert!(
+            materials.get(MaterialId::BUBBLE).density < materials.get(MaterialId::AIR).density
+                || materials.get(MaterialId::BUBBLE).density < 0.05
+        );
     }
 }

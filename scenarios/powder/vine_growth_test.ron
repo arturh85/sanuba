@@ -4,7 +4,7 @@
 
     setup: [
         // Place a single active vine tip
-        (type: "FillRect", min_x: 32, max_x: 32, min_y: 10, max_y: 10, material: 45), // VINE
+        (type: "FillRect", min_x: 32, max_x: 32, min_y: 10, max_y: 10, material: "vine"),
         // Note: The vine needs BEHAVIOR_ACTIVE flag to grow, which is set in the material
         // For this test, we'll verify the vine pixel exists
     ],
@@ -16,7 +16,7 @@
 
     verify: [
         // The original vine should still exist (may have spread)
-        (type: "MaterialAt", x: 32, y: 10, expected: 45), // VINE still present
+        (type: "MaterialAt", x: 32, y: 10, expected: "vine"),
     ],
 
     cleanup: [],

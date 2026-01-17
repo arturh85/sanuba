@@ -488,7 +488,7 @@ Create comprehensive documentation:
 | 36 | GLOWING_MUSHROOM | Solid | Edible, glows |
 | 37 | OBSIDIAN | Solid | Very hard glass |
 
-### New Powder Game Materials (20+)
+### New Powder Game Materials (21)
 
 | ID | Name | Type | Key Feature |
 |----|------|------|-------------|
@@ -498,23 +498,23 @@ Create comprehensive documentation:
 | 41 | BATTERY | Solid | Electrical power source |
 | 42 | WIRE | Solid | High conductivity |
 | 43 | NITRO | Liquid | Pressure-sensitive explosive |
-| 44 | C-4 | Solid | Triggered explosive |
-| 45 | BOMB | Solid | Contact explosive |
-| 46 | FUSE | Solid | Directional burning |
-| 47 | MAGMA | Liquid | Super-hot lava |
-| 48 | MERCURY | Liquid | Heavy conductive liquid |
-| 49 | SALT | Powder | Dissolves in water |
-| 50 | SEAWATER | Liquid | Salty, conductive |
-| 51 | SOAPY_WATER | Liquid | Creates bubbles |
-| 52 | BUBBLE | Special | Gas-filled shell |
-| 53 | VINE | Solid | Tangled growth |
-| 54 | ANT | Entity | Random walk AI |
-| 55 | BIRD | Entity | Flocking AI |
-| 56 | FISH | Entity | Schooling AI |
-| 57 | CLONE | Special | Pattern replication |
-| 58 | VIRUS | Special | Material transformation |
+| 44 | FUSE | Solid | Directional burning |
+| 45 | VINE | Solid | Tangled growth |
+| 46 | VIRUS | Special | Material transformation |
+| 47 | CLONE | Special | Pattern replication |
+| 48 | ANT | Entity | Random walk AI |
+| 49 | BIRD | Entity | Flocking AI |
+| 50 | FISH | Entity | Schooling AI |
+| 51 | C_4 | Solid | Triggered explosive (electricity/fire) |
+| 52 | BOMB | Solid | Contact explosive (impact/pressure) |
+| 53 | MAGMA | Liquid | Super-hot lava (2000°C+) |
+| 54 | MERCURY | Liquid | Heavy conductive liquid (density 13.5) |
+| 55 | SALT | Powder | Dissolves in water |
+| 56 | SEAWATER | Liquid | Salty, better conductor |
+| 57 | SOAPY_WATER | Liquid | Creates bubbles |
+| 58 | BUBBLE | Gas | Gas-filled shell, rises, pops |
 
-**Total**: 58 materials (38 existing + 20 new)
+**Total**: 59 materials (38 existing + 21 new)
 
 ---
 
@@ -748,7 +748,31 @@ just web-powder  # New justfile command
      - Added 8 unit tests for PixelEntitySystem (direction encoding, ant behavior, bird flocking, fish swimming)
      - Created 3 scenario tests (ant_walk_test, bird_flock_test, fish_swim_test)
      - All 366 tests pass
-6. ⏳ **Week 5**: Add all 20+ materials
+6. ✅ **Week 5**: Add remaining materials (2026-01-17)
+   - ✅ **Phase 5.1**: Add 8 new MaterialId constants (C_4, BOMB, MAGMA, MERCURY, SALT, SEAWATER, SOAPY_WATER, BUBBLE)
+   - ✅ **Phase 5.2**: Add MaterialDef entries for all 8 new materials
+     - **C_4** (51): Triggered explosive, needs electricity or 400°C fire
+     - **BOMB** (52): Contact explosive, lower ignition threshold
+     - **MAGMA** (53): Super-hot liquid (2000°C+), denser than lava, cools to lava
+     - **MERCURY** (54): Heavy liquid metal (density 13.5), conductive, toxic vapor
+     - **SALT** (55): Dissolvable powder, melts at 801°C
+     - **SEAWATER** (56): Salty water, conducts electricity, freezes at -2°C
+     - **SOAPY_WATER** (57): Creates bubbles with air/pressure
+     - **BUBBLE** (58): Gas-filled shell, very light, pops on contact
+   - ✅ **Phase 5.3**: Add ~20 new reactions
+     - C-4 detonation (spark + high-temp fire triggered)
+     - Bomb explosion (contact + fire triggered)
+     - Magma cooling (water/ice), ignition (wood/oil)
+     - Salt dissolution (salt + water → seawater)
+     - Seawater evaporation (leaves salt behind)
+     - Soapy bubble creation (low prob, higher with pressure)
+     - Bubble popping (fire, stone, metal, glass)
+     - Mercury vaporization (toxic gas at 357°C)
+   - ✅ **Phase 5.4**: Update ValidatedMaterialId::MAX to 58
+   - ✅ **Phase 5.5**: Add unit tests for new materials and reactions
+     - 6 material tests (IDs, explosives, magma, mercury, salt/seawater, soapy/bubble)
+     - 7 reaction tests (C-4, bomb, magma, salt, seawater, soapy, bubble, mercury)
+   - Total: 21 Powder Game materials implemented (IDs 38-58)
 7. ⏳ **Week 6**: Create sunaba-powder crate
 8. ⏳ **Week 7**: Polish, test, document
 
