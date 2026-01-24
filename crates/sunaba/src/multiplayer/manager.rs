@@ -141,8 +141,14 @@ impl MultiplayerManager {
     }
 
     /// Return to disconnected state
+    ///
+    /// Called when disconnect is detected (e.g., WebSocket closed unexpectedly)
     pub fn mark_disconnected(&mut self) {
-        log::info!("Disconnected from server");
+        if let MultiplayerState::Connected { ref server_url } = self.state {
+            log::info!("Connection lost to {}", server_url);
+        } else {
+            log::info!("Disconnected from server");
+        }
         self.state = MultiplayerState::Disconnected;
         self.saved_singleplayer = false;
     }

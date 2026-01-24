@@ -13,7 +13,8 @@ pub fn render_inventory_overlay(
     egui::Area::new(egui::Id::new("inventory_backdrop"))
         .fixed_pos(egui::pos2(0.0, 0.0))
         .show(ctx, |ui| {
-            let screen_rect = ctx.screen_rect();
+            let screen_rect =
+                ctx.input(|i| i.viewport().inner_rect.unwrap_or(egui::Rect::EVERYTHING));
             ui.painter().rect_filled(
                 screen_rect,
                 CornerRadius::ZERO,

@@ -10,7 +10,25 @@ use crate::config::MultiplayerConfig;
 #[cfg(feature = "multiplayer")]
 use crate::multiplayer::metrics::MultiplayerMetrics;
 #[cfg(feature = "multiplayer")]
-use crate::multiplayer::{MultiplayerManager, MultiplayerState, OAuthClaims};
+use crate::multiplayer::{MultiplayerClient, MultiplayerManager, MultiplayerState, OAuthClaims};
+
+// Traits needed for player table access (native only)
+#[cfg(all(feature = "multiplayer", not(target_arch = "wasm32")))]
+use crate::multiplayer::{PlayerTableAccessTrait, TableTrait};
+
+/// Count online players from the subscription (more accurate than server metrics snapshot)
+#[cfg(all(feature = "multiplayer", not(target_arch = "wasm32")))]
+fn count_online_players(client: &MultiplayerClient) -> Option<usize> {
+    let conn_arc = client.get_connection()?;
+    let conn = conn_arc.lock().ok()?;
+    Some(conn.db.player().iter().filter(|p| p.online).count())
+}
+
+/// WASM stub for online player count
+#[cfg(all(feature = "multiplayer", target_arch = "wasm32"))]
+fn count_online_players(_client: &MultiplayerClient) -> Option<usize> {
+    None // WASM uses metrics from JS SDK
+}
 
 /// UI state for the multiplayer panel
 #[cfg(feature = "multiplayer")]
@@ -81,7 +99,15 @@ pub fn render_multiplayer_panel(
         }
         MultiplayerState::Connected { server_url } => {
             let chunk_progress = manager.chunk_load_progress();
-            render_connected_ui(ui, server_url, metrics, chunk_progress, panel_state);
+            let online_player_count = count_online_players(&manager.client);
+            render_connected_ui(
+                ui,
+                server_url,
+                metrics,
+                chunk_progress,
+                online_player_count,
+                panel_state,
+            );
         }
         MultiplayerState::Reconnecting {
             server_url,
@@ -236,6 +262,7 @@ fn render_connected_ui(
     server_url: &str,
     metrics: Option<&MultiplayerMetrics>,
     chunk_progress: Option<(usize, usize)>,
+    online_player_count: Option<usize>,
     state: &mut MultiplayerPanelState,
 ) {
     ui.horizontal(|ui| {
@@ -317,7 +344,7 @@ fn render_connected_ui(
 
         ui.separator();
         ui.heading("Players & Creatures");
-        render_population(ui, metrics);
+        render_population(ui, metrics, online_player_count);
 
         ui.separator();
         ui.heading("Historical Graphs");
@@ -443,15 +470,23 @@ fn render_server_performance(ui: &mut Ui, metrics: &MultiplayerMetrics) {
 }
 
 #[cfg(feature = "multiplayer")]
-fn render_population(ui: &mut Ui, metrics: &MultiplayerMetrics) {
-    ui.label(format!("Players online: {}", metrics.server_online_players));
+fn render_population(
+    ui: &mut Ui,
+    metrics: &MultiplayerMetrics,
+    online_player_count: Option<usize>,
+) {
+    // Prefer subscription count (real-time) over server metrics (sampled every ~167ms)
+    let player_count = online_player_count
+        .map(|c| c as u32)
+        .unwrap_or(metrics.server_online_players);
+    ui.label(format!("Players online: {}", player_count));
     ui.label(format!(
         "Creatures alive: {}",
         metrics.server_creatures_alive
     ));
     ui.label(format!(
         "Total entities: {}",
-        metrics.server_online_players + metrics.server_creatures_alive
+        player_count + metrics.server_creatures_alive
     ));
 }
 

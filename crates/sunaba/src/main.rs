@@ -1,3 +1,5 @@
+#[cfg(feature = "multiplayer")]
+use anyhow::Context;
 use clap::Parser;
 use std::path::PathBuf;
 use sunaba::App;
@@ -41,6 +43,11 @@ struct Args {
     #[arg(long)]
     #[cfg(feature = "multiplayer")]
     server: Option<String>,
+
+    /// Use fresh anonymous identity (for testing multiple clients)
+    #[arg(long)]
+    #[cfg(feature = "multiplayer")]
+    fresh_identity: bool,
 
     /// Capture a screenshot (level:N, ui:panel, or just N for backward compat)
     #[arg(long)]
@@ -149,10 +156,13 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
-    // Initialize egui_logger for in-game log viewing (also provides env_logger functionality)
-    egui_logger::builder()
-        .init()
-        .expect("Failed to initialize logger");
+    // Initialize env_logger for terminal output first
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .init();
+
+    // Initialize egui_logger for in-game log viewing (uses env_logger as backend)
+    egui_logger::builder().init().ok(); // May fail if logger already initialized, that's fine
 
     // Initialize puffin profiler (native only, when feature enabled)
     #[cfg(feature = "profiling")]
@@ -541,9 +551,13 @@ fn main() -> anyhow::Result<()> {
     // Extract server URL for multiplayer if provided
     #[cfg(feature = "multiplayer")]
     let server_url = args.server;
+    #[cfg(feature = "multiplayer")]
+    let fresh_identity = args.fresh_identity;
 
     #[cfg(not(feature = "multiplayer"))]
     let server_url: Option<String> = None;
+    #[cfg(not(feature = "multiplayer"))]
+    let fresh_identity = false;
 
     // Extract remote control flag
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
@@ -552,7 +566,7 @@ fn main() -> anyhow::Result<()> {
     #[cfg(not(all(not(target_arch = "wasm32"), feature = "headless")))]
     let remote_control = false;
 
-    pollster::block_on(run(server_url, remote_control))
+    pollster::block_on(run(server_url, remote_control, fresh_identity))
 }
 
 #[cfg(feature = "headless")]
@@ -616,22 +630,27 @@ fn run_training(args: &Args) -> anyhow::Result<()> {
 }
 
 #[cfg_attr(not(feature = "multiplayer"), allow(unused_variables, unused_mut))]
-async fn run(server_url: Option<String>, enable_remote_control: bool) -> anyhow::Result<()> {
+async fn run(
+    server_url: Option<String>,
+    _enable_remote_control: bool,
+    fresh_identity: bool,
+) -> anyhow::Result<()> {
     let (mut app, event_loop) = App::new().await?;
 
     // If server URL provided, connect to multiplayer server before starting game loop
+    // Fail hard if connection fails (user explicitly requested server connection)
     #[cfg(feature = "multiplayer")]
     if let Some(url) = server_url {
         log::info!("Connecting to server: {}", url);
-        if let Err(e) = app.connect_to_server(url).await {
-            log::error!("Failed to connect to server: {}", e);
-            log::info!("Continuing in singleplayer mode");
-        }
+        app.connect_to_server(url, fresh_identity)
+            .await
+            .context("Failed to connect to multiplayer server (--server specified)")?;
+        log::info!("Connected to multiplayer server");
     }
 
     // Start TCP remote control server if requested
     #[cfg(all(not(target_arch = "wasm32"), feature = "headless"))]
-    if enable_remote_control {
+    if _enable_remote_control {
         let (cmd_rx, resp_tx) = sunaba::remote_control::start_server()?;
         app.enable_remote_control(cmd_rx, resp_tx);
     }

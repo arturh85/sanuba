@@ -119,6 +119,7 @@ pub struct App {
     ui_state: UiState,
     level_manager: LevelManager,
     game_mode: GameMode,
+    #[allow(dead_code)]
     last_autosave: Instant,
     particle_system: ParticleSystem,
     paused: bool,         // Game pause state (Escape menu)
@@ -394,8 +395,16 @@ impl App {
     }
 
     /// Connect to a multiplayer server
+    ///
+    /// If `fresh_identity` is true, skips loading stored OAuth token and uses a fresh
+    /// anonymous identity. This allows multiple client instances to connect simultaneously
+    /// for testing.
     #[cfg(feature = "multiplayer")]
-    pub async fn connect_to_server(&mut self, server_url: String) -> anyhow::Result<()> {
+    pub async fn connect_to_server(
+        &mut self,
+        server_url: String,
+        fresh_identity: bool,
+    ) -> anyhow::Result<()> {
         let manager = self
             .multiplayer_manager
             .as_mut()
@@ -407,12 +416,18 @@ impl App {
             return Ok(());
         }
 
-        log::info!("Connecting to server: {}", server_url);
-        manager.start_connecting(server_url.clone());
+        // Resolve server shortcuts to actual URLs
+        let resolved_url = Self::resolve_server_url(&server_url);
+        log::info!(
+            "Connecting to server: {} (resolved from: {})",
+            resolved_url,
+            server_url
+        );
+        manager.start_connecting(resolved_url.clone());
 
         // Reset chunk loading state
         self.multiplayer_initial_chunks_loaded = false;
-        self.chunk_loading_started_at = Some(Instant::now());
+        self.chunk_loading_started_at = None; // Timer starts when first data arrives
         self.last_chunk_wait_log = None;
 
         // Save singleplayer world before connecting
@@ -421,7 +436,11 @@ impl App {
         manager.set_singleplayer_saved(true);
 
         // Attempt connection
-        match manager.client.connect(&server_url, "sunaba").await {
+        match manager
+            .client
+            .connect(&resolved_url, "sunaba", fresh_identity)
+            .await
+        {
             Ok(_) => {
                 log::info!("Connected successfully");
 
@@ -429,7 +448,7 @@ impl App {
                 if let Err(e) = manager.client.subscribe_world().await {
                     let error_msg = format!("Failed to subscribe to world: {}", e);
                     log::error!("{}", error_msg);
-                    manager.mark_error(error_msg, server_url);
+                    manager.mark_error(error_msg, resolved_url);
                     return Err(anyhow::anyhow!("Subscription failed"));
                 }
 
@@ -437,17 +456,12 @@ impl App {
                 self.world.disable_persistence();
 
                 // Mark as connected
-                manager.mark_connected(server_url);
+                manager.mark_connected(resolved_url);
 
-                // Initialize progressive chunk loading queue (3 chunks radius initially)
-                manager.chunk_load_queue =
-                    Some(crate::multiplayer::chunk_loader::ChunkLoadQueue::new(
-                        glam::IVec2::ZERO, // Initial center at spawn
-                        10,                // Max radius (will expand after spawn loads)
-                        2,                 // Batch size (2 chunks per frame)
-                    ));
+                // NOTE: chunk_load_queue is initialized AFTER subscription data arrives
+                // (see subscription data detection below) to prevent the spiral from
+                // advancing past spawn chunks before the index is built.
                 manager.subscription_center = glam::IVec2::ZERO;
-                log::info!("Initialized progressive chunk loading (radius 10, batch size 2)");
 
                 // Initialize metrics collector
                 self.ui_state.metrics_collector =
@@ -459,10 +473,23 @@ impl App {
             Err(e) => {
                 let error_msg = format!("Connection failed: {}", e);
                 log::error!("{}", error_msg);
-                manager.mark_error(error_msg.clone(), server_url);
+                manager.mark_error(error_msg.clone(), resolved_url);
                 Err(anyhow::anyhow!(error_msg))
             }
         }
+    }
+
+    /// Resolve server URL shortcuts to actual URLs
+    /// Accepts: "prod", "local", or a full URL
+    #[cfg(feature = "multiplayer")]
+    fn resolve_server_url(url: &str) -> String {
+        let resolved = match url.to_lowercase().as_str() {
+            "prod" | "production" => "https://sunaba.app42.blue".to_string(),
+            "local" | "localhost" | "dev" => "http://localhost:3000".to_string(),
+            // If it looks like a URL already, use it directly
+            _ => url.to_string(),
+        };
+        resolved
     }
 
     /// Disconnect from multiplayer server and restore singleplayer world
@@ -737,14 +764,50 @@ impl App {
             if let Some(manager) = self.multiplayer_manager.as_mut() {
                 manager.client.frame_tick();
 
-                // Progressive chunk sync with rate limiting (2-3 chunks per frame)
+                // Check for disconnect event (WebSocket closed unexpectedly)
+                if manager.state.is_connected() && manager.client.was_disconnected() {
+                    log::warn!("Detected WebSocket disconnect - updating manager state");
+                    manager.mark_disconnected();
+                    manager.client.clear_disconnect_flag();
+                    self.ui_state
+                        .show_toast_error("Connection lost - returned to singleplayer");
+                }
+
+                // FIRST: Initialize queue when subscription data arrives
+                // This MUST happen BEFORE sync_chunks_progressive so the queue exists on the first frame
+                if self.chunk_loading_started_at.is_none() && manager.state.is_connected() {
+                    if manager.client.has_received_subscription_data() {
+                        log::info!(
+                            "First subscription data received - starting chunk loading timer"
+                        );
+                        self.chunk_loading_started_at = Some(Instant::now());
+
+                        // Initialize chunk loading queue NOW (after subscription data is available)
+                        // This prevents the spiral from advancing past spawn chunks before
+                        // the chunk coordinate index is built from subscription data.
+                        if manager.chunk_load_queue.is_none() {
+                            manager.chunk_load_queue =
+                                Some(crate::multiplayer::chunk_loader::ChunkLoadQueue::new(
+                                    glam::IVec2::ZERO, // Initial center at spawn
+                                    10,                // Max radius
+                                    5, // Batch size (5 chunks/frame = 300/sec at 60fps)
+                                ));
+                            log::info!(
+                                "Initialized progressive chunk loading (radius 10, batch size 5)"
+                            );
+                        }
+                    }
+                }
+
+                // THEN: Progressive chunk sync with rate limiting (2-3 chunks per frame)
+                // Now the queue exists on the first frame after subscription data arrives
                 if let Some(ref mut queue) = manager.chunk_load_queue {
                     if let Ok(synced) = manager
                         .client
                         .sync_chunks_progressive(&mut self.world, queue)
                     {
                         if synced > 0 {
-                            log::debug!("Loaded {} chunks (progressive)", synced);
+                            log::info!("Loaded {} chunks (progressive)", synced);
                         }
                     } else {
                         log::error!("Failed to sync chunks progressively");
@@ -801,8 +864,8 @@ impl App {
                         .map(|start| now.duration_since(start))
                         .unwrap_or(std::time::Duration::ZERO);
 
-                    // Check for timeout (60 seconds)
-                    if elapsed.as_secs() >= 60 {
+                    // Check for timeout (30 seconds from first data received)
+                    if elapsed.as_secs() >= 30 {
                         log::error!(
                             "Chunk loading timeout after {}s - disconnecting",
                             elapsed.as_secs()
@@ -1530,7 +1593,8 @@ impl App {
                 if let Some(url) = connect_url {
                     log::info!("Connecting to: {}", url);
                     // Block on async connection (brief freeze during handshake is acceptable)
-                    if let Err(e) = pollster::block_on(self.connect_to_server(url.clone())) {
+                    // Use stored OAuth token for UI connections (fresh_identity = false)
+                    if let Err(e) = pollster::block_on(self.connect_to_server(url.clone(), false)) {
                         log::error!("Failed to connect: {}", e);
                         if let Some(manager) = self.multiplayer_manager.as_mut() {
                             manager.mark_error(e.to_string(), url);
@@ -1901,12 +1965,34 @@ impl App {
         // Get local identity to filter out
         let local_identity = conn.identity();
 
+        // Debug: Log all players in subscription (every ~60 frames to avoid spam)
+        static FRAME_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let frame = FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if frame % 60 == 0 {
+            let all_players: Vec<_> = conn.db.player().iter().collect();
+            log::debug!(
+                "Player subscription: {} total, local={}, players: {:?}",
+                all_players.len(),
+                local_identity,
+                all_players
+                    .iter()
+                    .map(|p| format!(
+                        "{}(online={}, x={:.0}, y={:.0})",
+                        &p.identity.to_string()[..8],
+                        p.online,
+                        p.x,
+                        p.y
+                    ))
+                    .collect::<Vec<_>>()
+            );
+        }
+
         conn.db
             .player()
             .iter()
             .filter(|p| {
-                // Filter out local player
-                p.identity != local_identity
+                // Filter out local player and offline players (ghost prevention)
+                p.identity != local_identity && p.online
             })
             .map(|p| RemotePlayerRenderData {
                 x: p.x,

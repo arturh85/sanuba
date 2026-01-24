@@ -4,6 +4,9 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 # Environment variable for RUST_LOG
 # export RUST_LOG := "info"
 
+#export SERVERURL_PROD := "https://sunaba.app42.blue"
+export SERVERURL_PROD := "http://10.10.10.23:3000"
+
 # Internal helper: ensure SpacetimeDB CLI is installed and generated files exist
 [unix]
 _ensure-generated:
@@ -509,9 +512,22 @@ start-multiplayer server="http://localhost:3000":
 join:
     just start-multiplayer http://localhost:3000
 
-# Join production server (sunaba.app42.blue)
+# Join production server
 join-prod:
-    just start-multiplayer https://sunaba.app42.blue
+    just start-multiplayer $SERVERURL_PROD
+
+# Run second multiplayer client with fresh identity (for testing multiple clients)
+start-multiplayer-fresh server="http://localhost:3000":
+    @echo "Starting multiplayer client with fresh identity (connecting to {{server}})..."
+    RUST_LOG=info cargo run -p sunaba --bin sunaba --release --features multiplayer_native -- --server {{server}} --fresh-identity
+
+# Join local server with fresh identity (second client)
+join-fresh:
+    just start-multiplayer-fresh http://localhost:3000
+
+# Join production server with fresh identity (second client)
+join-prod-fresh:
+    just start-multiplayer-fresh $SERVERURL_PROD
 
 # Fast development test: clippy + fmt + tests (no release builds, no WASM)
 [unix]
@@ -956,16 +972,16 @@ spacetime-status name="sunaba" server="http://localhost:3000":
 
 # Publish to production server
 spacetime-publish-prod name="sunaba":
-    just spacetime-publish {{name}} https://sunaba.app42.blue
+    just spacetime-publish {{name}} $SERVERURL_PROD
 
 # Tail logs from production server
 spacetime-logs-tail-prod name="sunaba":
-    just spacetime-logs-tail {{name}} https://sunaba.app42.blue
+    just spacetime-logs-tail {{name}} $SERVERURL_PROD
 
 # Show production database status
 spacetime-status-prod name="sunaba":
-    just spacetime-status {{name}} https://sunaba.app42.blue
+    just spacetime-status {{name}} $SERVERURL_PROD
 
 # Reset production database - USE WITH CAUTION
 spacetime-reset-prod name="sunaba":
-    just spacetime-reset {{name}} https://sunaba.app42.blue
+    just spacetime-reset {{name}} $SERVERURL_PROD

@@ -100,7 +100,6 @@ pub struct CreaturePhysicsState {
 impl CreaturePhysicsState {
     /// Create new physics state for a creature morphology at the given position
     pub fn new(morphology: &CreatureMorphology, position: Vec2) -> Self {
-
         // Initialize body part states
         let mut parts: Vec<BodyPartState> = morphology
             .body_parts
@@ -147,7 +146,8 @@ impl CreaturePhysicsState {
         // Build legacy compatibility fields
         let part_positions: Vec<Vec2> = parts.iter().map(|p| p.position).collect();
         let part_rotations: Vec<f32> = parts.iter().map(|p| p.rotation).collect();
-        let motor_angular_velocities: Vec<f32> = motors.iter().map(|m| m.angular_velocity).collect();
+        let motor_angular_velocities: Vec<f32> =
+            motors.iter().map(|m| m.angular_velocity).collect();
         let motor_angles: Vec<f32> = motors.iter().map(|m| m.angle).collect();
         let motor_target_angles: Vec<f32> = motors.iter().map(|m| m.target_angle).collect();
         let motor_part_indices: Vec<usize> = motors.iter().map(|m| m.child_part_index).collect();
@@ -207,7 +207,9 @@ impl CreaturePhysicsState {
             // Apply spring acceleration
             motor.angular_velocity += spring_force * dt;
             motor.angular_velocity *= MOTOR_DAMPING;
-            motor.angular_velocity = motor.angular_velocity.clamp(-MAX_ANGULAR_VEL, MAX_ANGULAR_VEL);
+            motor.angular_velocity = motor
+                .angular_velocity
+                .clamp(-MAX_ANGULAR_VEL, MAX_ANGULAR_VEL);
 
             // Integrate angle
             motor.angle += motor.angular_velocity * dt;

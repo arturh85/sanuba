@@ -37,6 +37,10 @@ pub mod metrics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer"))]
 pub use client::MultiplayerClient;
 
+// Re-export traits needed for player table access
+#[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer"))]
+pub use client::{DbContextTrait, PlayerTableAccessTrait, TableTrait};
+
 #[cfg(all(target_arch = "wasm32", feature = "multiplayer"))]
 pub use js_client::MultiplayerClient;
 

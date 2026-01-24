@@ -32,12 +32,10 @@ pub fn load_or_create_chunk(
         && let Ok(chunk) = encoding::decode_chunk(&data.pixel_data)
     {
         world.insert_chunk(pos, chunk);
-        log::debug!("Loaded chunk ({}, {}) from DB", chunk_x, chunk_y);
         return;
     }
 
     // Generate new
-    log::debug!("Generating chunk ({}, {})", chunk_x, chunk_y);
     world.generate_chunk(pos);
 
     // CRITICAL FIX: Save newly generated chunk to database immediately
@@ -46,20 +44,43 @@ pub fn load_or_create_chunk(
         let pixel_data =
             encoding::encode_chunk(chunk).expect("Failed to encode newly generated chunk");
 
+        upsert_chunk(ctx, chunk_x, chunk_y, pixel_data, 0);
+    }
+}
+
+/// Insert or update a chunk in the database (upsert by x,y coordinates)
+/// This prevents duplicate rows when the same chunk is inserted multiple times
+pub fn upsert_chunk(
+    ctx: &ReducerContext,
+    chunk_x: i32,
+    chunk_y: i32,
+    pixel_data: Vec<u8>,
+    tick: u64,
+) {
+    // Check if chunk already exists
+    if let Some(existing) = ctx
+        .db
+        .chunk_data()
+        .iter()
+        .find(|c| c.x == chunk_x && c.y == chunk_y)
+    {
+        // Update existing row
+        ctx.db.chunk_data().id().update(ChunkData {
+            pixel_data,
+            dirty: false,
+            last_modified_tick: tick,
+            ..existing
+        });
+    } else {
+        // Insert new row
         ctx.db.chunk_data().insert(ChunkData {
-            id: 0, // auto_inc
+            id: 0, // auto_inc for new chunks only
             x: chunk_x,
             y: chunk_y,
             pixel_data,
             dirty: false,
-            last_modified_tick: 0,
+            last_modified_tick: tick,
         });
-
-        log::debug!(
-            "Saved newly generated chunk ({}, {}) to DB",
-            chunk_x,
-            chunk_y
-        );
     }
 }
 

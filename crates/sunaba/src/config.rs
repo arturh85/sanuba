@@ -332,10 +332,10 @@ impl Default for MultiplayerConfig {
                 },
                 ServerEntry {
                     name: "Official Server".to_string(),
-                    url: "http://sunaba.app42.blue".to_string(),
+                    url: "https://sunaba.app42.blue".to_string(),
                 },
             ],
-            last_server: Some("http://sunaba.app42.blue".to_string()),
+            last_server: Some("https://sunaba.app42.blue".to_string()),
             connection_timeout_secs: 10,
             reconnect_max_attempts: 10,
             reconnect_max_delay_secs: 30,

@@ -14,19 +14,48 @@ use crate::helpers::{
 };
 use crate::state::{NoOpStats, SERVER_WORLD};
 use crate::tables::{
-    ChunkData, CreatureData, CreatureTickTimer, Player, ServerMetrics, SettleTickTimer,
-    WorldConfig, WorldTickTimer, chunk_data, creature_data, creature_tick_timer, player,
-    server_metrics, settle_tick_timer, world_config, world_tick_timer,
+    CreatureData, CreatureTickTimer, Player, ServerMetrics, SettleTickTimer, WorldConfig,
+    WorldTickTimer, chunk_data, creature_data, creature_tick_timer, player, server_metrics,
+    settle_tick_timer, world_config, world_tick_timer,
 };
 use crate::world_access::SpacetimeWorldAccess;
+
+// ============================================================================
+// Timer Helpers (singleton timer pattern)
+// ============================================================================
+
+/// Delete all world tick timers (must be called before inserting new one).
+/// SpacetimeDB does NOT auto-delete the timer when it fires.
+fn delete_all_world_timers(ctx: &ReducerContext) {
+    for timer in ctx.db.world_tick_timer().iter().collect::<Vec<_>>() {
+        ctx.db.world_tick_timer().id().delete(timer.id);
+    }
+}
+
+/// Delete all creature tick timers.
+fn delete_all_creature_timers(ctx: &ReducerContext) {
+    for timer in ctx.db.creature_tick_timer().iter().collect::<Vec<_>>() {
+        ctx.db.creature_tick_timer().id().delete(timer.id);
+    }
+}
+
+/// Delete all settle tick timers.
+fn delete_all_settle_timers(ctx: &ReducerContext) {
+    for timer in ctx.db.settle_tick_timer().iter().collect::<Vec<_>>() {
+        ctx.db.settle_tick_timer().id().delete(timer.id);
+    }
+}
 
 // ============================================================================
 // Manual Tick Reducers (called by clients or scheduled externally)
 // ============================================================================
 
-/// World simulation tick - scheduled at 60fps
+/// World simulation tick - scheduled at 60fps (or 10fps when idle)
 #[spacetimedb::reducer]
 pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
+    // Delete the current timer (SpacetimeDB doesn't auto-delete on fire)
+    delete_all_world_timers(ctx);
+
     let Some(config) = ctx.db.world_config().id().find(0) else {
         log::error!("World config not found");
         return;
@@ -38,20 +67,25 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
 
     let new_tick_count = config.tick_count + 1;
 
-    // Update tick count
-    ctx.db.world_config().id().update(WorldConfig {
-        tick_count: new_tick_count,
-        ..config
-    });
-
     // Initialize or get World instance
     let mut world_guard = SERVER_WORLD.lock().unwrap();
     if world_guard.is_none() {
-        log::info!("Initializing server World with seed {}", config.seed);
-        let mut world = sunaba_core::world::World::new(true);
-        world.set_generator(config.seed);
-        log::info!("Server world initialized with terrain generation");
-        *world_guard = Some(world);
+        // Check if chunks already exist in database
+        let has_existing_chunks = ctx.db.chunk_data().iter().next().is_some();
+
+        if has_existing_chunks {
+            log::info!("Initializing server World (loading existing chunks from database)");
+            let world = sunaba_core::world::World::new(false); // No terrain gen needed
+            *world_guard = Some(world);
+        } else {
+            log::info!(
+                "Initializing server World with seed {} (fresh database)",
+                config.seed
+            );
+            let mut world = sunaba_core::world::World::new(true);
+            world.set_generator(config.seed);
+            *world_guard = Some(world);
+        }
     }
 
     let Some(world) = world_guard.as_mut() else {
@@ -61,6 +95,21 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
 
     // Get online players
     let online_players: Vec<Player> = ctx.db.player().iter().filter(|p| p.online).collect();
+
+    // Skip simulation if no players are online (reduces CPU usage when idle)
+    if online_players.is_empty() {
+        // Update tick count only
+        ctx.db.world_config().id().update(WorldConfig {
+            tick_count: new_tick_count,
+            ..config
+        });
+        // Schedule next tick but skip simulation
+        ctx.db.world_tick_timer().insert(WorldTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(100).into(), // Slower tick when idle (10fps)
+        });
+        return;
+    }
 
     // Load 7x7 chunks around each player
     let mut chunks_loaded_this_tick = 0;
@@ -78,10 +127,71 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
         chunks_loaded_this_tick += chunks_after - chunks_before;
     }
 
+    // Track if new chunks were loaded (forces simulation to run)
+    let new_chunks_loaded = chunks_loaded_this_tick > 0;
+
+    // Idle detection constants
+    const IDLE_THRESHOLD_TICKS: u64 = 60; // 1 second at 60fps
+
+    // Determine if we should run full simulation
+    // Run simulation if:
+    // 1. World is not idle (recent activity)
+    // 2. New chunks were loaded (need to settle them)
+    // 3. We were previously idle and just woke up
+    let should_simulate = !config.is_idle || new_chunks_loaded;
+
+    let delta_time = 0.016;
+    let mut stats = NoOpStats;
+    let mut rng = ctx.rng();
+    let mut dirty_chunks_synced = 0u32;
+
+    if should_simulate {
+        // Run full simulation (World::update uses dirty chunk optimization internally)
+        world.update(delta_time, &mut stats, &mut rng, true);
+
+        // Sync ONLY dirty chunks to database
+        dirty_chunks_synced = sync_dirty_chunks_to_db(ctx, world, new_tick_count);
+    }
+
+    // Track world activity for idle detection
+    let had_activity = dirty_chunks_synced > 0 || new_chunks_loaded;
+
+    // Calculate new idle state
+    let (last_activity_tick, is_idle) = if had_activity {
+        // Reset idle timer on any activity
+        if config.is_idle {
+            log::info!("[TICK {}] World waking from idle mode", new_tick_count);
+        }
+        (new_tick_count, false)
+    } else {
+        // Check if we've exceeded idle threshold
+        let frames_idle = new_tick_count.saturating_sub(config.last_activity_tick);
+        let entering_idle = frames_idle > IDLE_THRESHOLD_TICKS && !config.is_idle;
+        if entering_idle {
+            log::info!(
+                "[TICK {}] World entering idle mode (no activity for {} frames)",
+                new_tick_count,
+                frames_idle
+            );
+        }
+        (
+            config.last_activity_tick,
+            frames_idle > IDLE_THRESHOLD_TICKS,
+        )
+    };
+
+    // Update config with new tick count and idle state
+    ctx.db.world_config().id().update(WorldConfig {
+        tick_count: new_tick_count,
+        last_activity_tick,
+        is_idle,
+        ..config
+    });
+
     // Log statistics periodically (every 60 ticks = ~1 second at 60fps)
     if new_tick_count % 60 == 0 && !online_players.is_empty() {
         log::info!(
-            "[TICK {}] {} online players, {} chunks in memory{}",
+            "[TICK {}] {} online players, {} chunks in memory{} [{}]",
             new_tick_count,
             online_players.len(),
             world.active_chunks().count(),
@@ -89,33 +199,16 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
                 format!(" (+{} new)", chunks_loaded_this_tick)
             } else {
                 String::new()
-            }
+            },
+            if is_idle { "IDLE" } else { "ACTIVE" }
         );
     }
 
-    // Run simulation (World::update uses dirty chunk optimization internally)
-    let delta_time = 0.016;
-    let mut stats = NoOpStats;
-    let mut rng = ctx.rng();
-
-    // Measure simulation time (for metrics)
-    let will_collect_metrics = new_tick_count % 10 == 0;
-    let sim_start = if will_collect_metrics {
-        Some(std::time::Instant::now())
-    } else {
-        None
-    };
-
-    world.update(delta_time, &mut stats, &mut rng, true); // Server: skip creatures (not implemented server-side)
-
-    let world_tick_time_ms = sim_start
-        .map(|start| start.elapsed().as_secs_f32() * 1000.0)
-        .unwrap_or(0.0);
-
-    // Sync ONLY dirty chunks to database
-    let dirty_chunks_synced = sync_dirty_chunks_to_db(ctx, world, config.tick_count);
+    // Note: std::time::Instant is not available in WASM, so we skip timing metrics
+    let world_tick_time_ms = 0.0_f32;
 
     // Update players (only if their chunk is loaded)
+    // Player physics still runs even when idle (collision checks, etc.)
     for player in online_players {
         let chunk_x = (player.x as i32).div_euclid(64);
         let chunk_y = (player.y as i32).div_euclid(64);
@@ -167,34 +260,32 @@ pub fn world_tick(ctx: &ReducerContext, _arg: WorldTickTimer) {
         cleanup_old_metrics(ctx);
     }
 
-    // Schedule next tick (16ms = 60fps)
+    // Schedule next tick: 10fps when idle, 60fps when active
+    let next_tick_ms = if is_idle { 100 } else { 16 };
     ctx.db.world_tick_timer().insert(WorldTickTimer {
         id: 0,
-        scheduled_at: Duration::from_millis(16).into(),
+        scheduled_at: Duration::from_millis(next_tick_ms).into(),
     });
 }
 
 /// Creature AI tick - scheduled at 30fps
 #[spacetimedb::reducer]
 pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
+    // Delete the current timer (SpacetimeDB doesn't auto-delete on fire)
+    delete_all_creature_timers(ctx);
+
     let delta_time = 0.033; // ~30fps
 
-    // Get current tick for metrics sampling
-    let current_tick = ctx
-        .db
-        .world_config()
-        .id()
-        .find(0)
-        .map(|c| c.tick_count)
-        .unwrap_or(0);
-
-    // Measure timing for sampled ticks
-    let will_collect_metrics = current_tick.is_multiple_of(10);
-    let tick_start = if will_collect_metrics {
-        Some(std::time::Instant::now())
-    } else {
-        None
-    };
+    // Skip creature tick if no players are online (reduces CPU usage when idle)
+    let has_online_players = ctx.db.player().iter().any(|p| p.online);
+    if !has_online_players {
+        // Schedule next tick but skip simulation
+        ctx.db.creature_tick_timer().insert(CreatureTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(200).into(), // Slower tick when idle
+        });
+        return;
+    }
 
     // Get all living creatures
     let creatures: Vec<CreatureData> = ctx.db.creature_data().iter().filter(|c| c.alive).collect();
@@ -290,23 +381,8 @@ pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
         });
     }
 
-    // Write timing to server metrics (sampled at same rate as world tick)
-    if let Some(start) = tick_start {
-        let creature_tick_time_ms = start.elapsed().as_secs_f32() * 1000.0;
-
-        // Update existing metrics row for this tick
-        if let Some(metrics) = ctx
-            .db
-            .server_metrics()
-            .iter()
-            .find(|m| m.tick == current_tick)
-        {
-            ctx.db.server_metrics().id().update(ServerMetrics {
-                creature_tick_time_ms,
-                ..metrics
-            });
-        }
-    }
+    // Note: std::time::Instant is not available in WASM, so timing metrics are not collected
+    // The creature_tick_time_ms field in ServerMetrics will remain 0.0
 
     // Schedule next tick (33ms = 30fps)
     ctx.db.creature_tick_timer().insert(CreatureTickTimer {
@@ -319,12 +395,27 @@ pub fn creature_tick(ctx: &ReducerContext, _arg: CreatureTickTimer) {
 /// Pre-simulates chunks in expanding rings from spawn to prevent falling sand during exploration
 #[spacetimedb::reducer]
 pub fn settle_world_tick(ctx: &ReducerContext, _arg: SettleTickTimer) {
+    // Delete the current timer (SpacetimeDB doesn't auto-delete on fire)
+    delete_all_settle_timers(ctx);
+
     let Some(config) = ctx.db.world_config().id().find(0) else {
         return;
     };
 
     if config.settlement_complete {
-        return; // Already settled
+        // Settlement is done, don't reschedule
+        return;
+    }
+
+    // Skip settlement when no players are online (reduces CPU usage when idle)
+    let has_online_players = ctx.db.player().iter().any(|p| p.online);
+    if !has_online_players {
+        // Reschedule at slower rate but don't do work
+        ctx.db.settle_tick_timer().insert(SettleTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(1000).into(), // 1 second when idle
+        });
+        return;
     }
 
     let mut world_guard = SERVER_WORLD.lock().unwrap();
@@ -340,28 +431,25 @@ pub fn settle_world_tick(ctx: &ReducerContext, _arg: SettleTickTimer) {
         // Load chunk if not already loaded
         load_or_create_chunk(ctx, world, chunk_x, chunk_y);
 
-        // Simulate chunk for 60 ticks (1 second worth of settling)
+        // Simulate chunk for 10 ticks (sufficient for sand/liquid settling)
         let mut rng = ctx.rng();
-        for _ in 0..60 {
+        for _ in 0..10 {
             world.update_chunk_settle(chunk_x, chunk_y, &mut rng);
         }
 
-        // Save settled chunk to DB
+        // Save settled chunk to DB (upsert to avoid duplicate rows)
         if let Some(chunk) = world.get_chunk(chunk_x, chunk_y) {
             let Ok(pixel_data) = encoding::encode_chunk(chunk) else {
                 continue;
             };
 
-            ctx.db.chunk_data().insert(ChunkData {
-                id: 0,
-                x: chunk_x,
-                y: chunk_y,
-                pixel_data,
-                dirty: false, // Settled chunks start clean
-                last_modified_tick: 0,
-            });
+            crate::helpers::upsert_chunk(ctx, chunk_x, chunk_y, pixel_data, 0);
+            log::debug!("Settled chunk ({}, {}) saved to DB", chunk_x, chunk_y);
         }
     }
+
+    // Log ring completion
+    log::info!("Settled ring {}", r);
 
     // Update progress
     let new_progress = r + 1;
@@ -373,10 +461,22 @@ pub fn settle_world_tick(ctx: &ReducerContext, _arg: SettleTickTimer) {
         ..config
     });
 
+    // Log progress periodically (every 5 rings or on completion)
     if complete {
+        let final_db_count = ctx.db.chunk_data().iter().count();
         log::info!(
-            "World settlement complete! Settled {} chunks from spawn",
-            config.settlement_radius
+            "World settlement complete! Settled radius {} ({} expected, {} in database)",
+            config.settlement_radius,
+            (config.settlement_radius * 2 + 1).pow(2),
+            final_db_count
+        );
+    } else if new_progress % 5 == 0 {
+        let progress_pct = (new_progress as f32 / config.settlement_radius as f32 * 100.0) as u32;
+        log::info!(
+            "Settlement progress: ring {}/{} ({}%)",
+            new_progress,
+            config.settlement_radius,
+            progress_pct
         );
     }
 
@@ -385,6 +485,96 @@ pub fn settle_world_tick(ctx: &ReducerContext, _arg: SettleTickTimer) {
         id: 0,
         scheduled_at: Duration::from_millis(100).into(),
     });
+}
+
+// ============================================================================
+// Burst Settlement (High Priority)
+// ============================================================================
+
+/// Settle all spawn chunks immediately in one blocking call.
+/// This avoids scheduler starvation where the 60fps world_tick prevents
+/// the 100ms settle_tick from ever firing.
+///
+/// Called on first player connect to ensure spawn area is ready.
+pub fn settle_spawn_chunks_burst(ctx: &ReducerContext, radius: i32) {
+    log::info!(
+        "Starting burst settlement of {} rings ({} chunks)...",
+        radius + 1,
+        (radius * 2 + 1).pow(2)
+    );
+
+    // Initialize or get World instance
+    let mut world_guard = SERVER_WORLD.lock().unwrap();
+    let config = ctx
+        .db
+        .world_config()
+        .id()
+        .find(0)
+        .expect("World config must exist");
+
+    if world_guard.is_none() {
+        // Check if chunks already exist in database
+        let has_existing_chunks = ctx.db.chunk_data().iter().next().is_some();
+
+        if has_existing_chunks {
+            log::info!(
+                "Initializing server World for burst settlement (loading existing chunks from database)"
+            );
+            let world = sunaba_core::world::World::new(false); // No terrain gen needed
+            *world_guard = Some(world);
+        } else {
+            log::info!(
+                "Initializing server World with seed {} for burst settlement (fresh database)",
+                config.seed
+            );
+            let mut world = sunaba_core::world::World::new(true);
+            world.set_generator(config.seed);
+            *world_guard = Some(world);
+        }
+    }
+
+    let world = world_guard.as_mut().expect("World must exist");
+    let mut rng = ctx.rng();
+    let mut chunks_settled = 0;
+
+    // Settle ALL chunks in radius at once (no timers, blocking)
+    for r in 0..=radius {
+        let chunks_to_settle = get_chunks_at_radius(0, 0, r);
+
+        for (chunk_x, chunk_y) in chunks_to_settle {
+            // Load chunk if not already loaded
+            load_or_create_chunk(ctx, world, chunk_x, chunk_y);
+
+            // Simulate chunk for 10 ticks (sufficient for sand/liquid settling)
+            for _ in 0..10 {
+                world.update_chunk_settle(chunk_x, chunk_y, &mut rng);
+            }
+
+            // Save settled chunk to DB
+            if let Some(chunk) = world.get_chunk(chunk_x, chunk_y)
+                && let Ok(pixel_data) = encoding::encode_chunk(chunk)
+            {
+                crate::helpers::upsert_chunk(ctx, chunk_x, chunk_y, pixel_data, 0);
+                chunks_settled += 1;
+            }
+        }
+    }
+
+    // Mark settlement as complete
+    ctx.db.world_config().id().update(WorldConfig {
+        settlement_progress: radius + 1,
+        settlement_complete: true,
+        ..config
+    });
+
+    // Cancel any pending settle timers (no longer needed)
+    delete_all_settle_timers(ctx);
+
+    log::info!(
+        "Burst settlement complete! Settled {} chunks in {} rings",
+        chunks_settled,
+        radius + 1
+    );
 }
 
 // ============================================================================

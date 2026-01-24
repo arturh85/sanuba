@@ -3,6 +3,7 @@
 use spacetimedb::{ReducerContext, Table};
 use std::time::Duration;
 
+use super::world_ticks::settle_spawn_chunks_burst;
 use crate::tables::{
     AdminUser, CreatureTickTimer, Player, SettleTickTimer, WorldConfig, WorldTickTimer, admin_user,
     creature_tick_timer, player, settle_tick_timer, world_config, world_tick_timer,
@@ -24,9 +25,11 @@ pub fn init(ctx: &ReducerContext) {
         tick_count: 0,
         simulation_paused: false,
         max_creatures: 50,
-        settlement_radius: 50, // Settle 50 chunks from spawn
+        settlement_radius: 3, // Settle 3 chunks from spawn (49 total, ~2.5s)
         settlement_progress: 0,
         settlement_complete: false,
+        last_activity_tick: 0,
+        is_idle: false,
     });
 
     // Schedule world tick at 60fps (16ms)
@@ -104,6 +107,15 @@ pub fn client_connected(ctx: &ReducerContext) {
         });
         log::info!("New player created");
     }
+
+    // Burst settle spawn chunks if not already done
+    // This ensures spawn area is ready IMMEDIATELY when first player connects,
+    // avoiding scheduler starvation where 60fps world_tick blocks settle_tick
+    if let Some(config) = ctx.db.world_config().id().find(0)
+        && !config.settlement_complete
+    {
+        settle_spawn_chunks_burst(ctx, config.settlement_radius);
+    }
 }
 
 /// Handle client disconnection
@@ -117,4 +129,46 @@ pub fn client_disconnected(ctx: &ReducerContext) {
             ..player
         });
     }
+}
+
+/// Restart all tick timers (use when timers are missing after deploy)
+/// This is idempotent - safe to call even if timers already exist.
+#[spacetimedb::reducer]
+pub fn restart_timers(ctx: &ReducerContext) {
+    log::info!("Restarting tick timers...");
+
+    // Check and create world tick timer if missing
+    if ctx.db.world_tick_timer().id().find(0).is_none() {
+        ctx.db.world_tick_timer().insert(WorldTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(16).into(),
+        });
+        log::info!("Created world_tick_timer");
+    } else {
+        log::info!("world_tick_timer already exists");
+    }
+
+    // Check and create creature tick timer if missing
+    if ctx.db.creature_tick_timer().id().find(0).is_none() {
+        ctx.db.creature_tick_timer().insert(CreatureTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(33).into(),
+        });
+        log::info!("Created creature_tick_timer");
+    } else {
+        log::info!("creature_tick_timer already exists");
+    }
+
+    // Check and create settle tick timer if missing
+    if ctx.db.settle_tick_timer().id().find(0).is_none() {
+        ctx.db.settle_tick_timer().insert(SettleTickTimer {
+            id: 0,
+            scheduled_at: Duration::from_millis(100).into(),
+        });
+        log::info!("Created settle_tick_timer");
+    } else {
+        log::info!("settle_tick_timer already exists");
+    }
+
+    log::info!("Timer restart complete");
 }

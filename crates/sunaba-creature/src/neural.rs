@@ -451,7 +451,7 @@ impl GraphNeuralController {
             .collect();
 
         // Output projection: hidden_dim → 1 (one motor per node, but we may have fewer motors)
-        let output_weight_count = hidden_dim * 1; // 1 output per node
+        let output_weight_count = hidden_dim; // 1 output per node
         let output_scale = (2.0 / (hidden_dim + 1) as f32).sqrt();
         let output_weights: Vec<f32> = (0..output_weight_count)
             .map(|_| rng.gen_range_f32(-1.0, 1.0) * output_scale)
@@ -483,11 +483,7 @@ impl GraphNeuralController {
     ///
     /// # Returns
     /// Motor commands for each motor (one per node that has a motor)
-    pub fn forward(
-        &mut self,
-        node_features: &[Vec<f32>],
-        graph: &MorphologyGraph,
-    ) -> Vec<f32> {
+    pub fn forward(&mut self, node_features: &[Vec<f32>], graph: &MorphologyGraph) -> Vec<f32> {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();
 
@@ -569,13 +565,7 @@ impl GraphNeuralController {
             let neighbors: Vec<usize> = graph
                 .edges
                 .iter()
-                .filter_map(|&(from, to)| {
-                    if to == node_idx {
-                        Some(from)
-                    } else {
-                        None
-                    }
-                })
+                .filter_map(|&(from, to)| if to == node_idx { Some(from) } else { None })
                 .collect();
 
             // Aggregate messages from neighbors
@@ -596,10 +586,7 @@ impl GraphNeuralController {
             }
 
             // Update node state: combine self state with aggregated messages
-            new_states[node_idx] = self.update_node(
-                &hidden_states[node_idx],
-                &aggregated_message,
-            );
+            new_states[node_idx] = self.update_node(&hidden_states[node_idx], &aggregated_message);
         }
 
         new_states
@@ -702,7 +689,10 @@ impl HybridNeuralController {
             .joints
             .iter()
             .filter_map(|joint| {
-                if matches!(joint.joint_type, crate::morphology::JointType::Revolute { .. }) {
+                if matches!(
+                    joint.joint_type,
+                    crate::morphology::JointType::Revolute { .. }
+                ) {
                     Some(joint.child_index)
                 } else {
                     None
@@ -1084,9 +1074,7 @@ mod tests {
         let mut controller = GraphNeuralController::from_genome(&genome, &morphology, input_dim);
 
         // Create node features (3 nodes for biped)
-        let node_features: Vec<Vec<f32>> = (0..3)
-            .map(|_| vec![0.5; input_dim])
-            .collect();
+        let node_features: Vec<Vec<f32>> = (0..3).map(|_| vec![0.5; input_dim]).collect();
 
         let outputs = controller.forward(&node_features, &graph);
 
@@ -1141,9 +1129,7 @@ mod tests {
 
         let mut controller = GraphNeuralController::from_genome(&genome, &morphology, 5);
 
-        let node_features: Vec<Vec<f32>> = (0..3)
-            .map(|_| vec![0.5; 5])
-            .collect();
+        let node_features: Vec<Vec<f32>> = (0..3).map(|_| vec![0.5; 5]).collect();
 
         // First forward pass
         let outputs1 = controller.forward(&node_features, &graph);
@@ -1169,9 +1155,7 @@ mod tests {
         let mut controller = HybridNeuralController::from_genome(&genome, &morphology, input_dim);
 
         // Create node features
-        let node_features: Vec<Vec<f32>> = (0..3)
-            .map(|_| vec![0.5; input_dim])
-            .collect();
+        let node_features: Vec<Vec<f32>> = (0..3).map(|_| vec![0.5; input_dim]).collect();
 
         let outputs = controller.forward(&node_features);
 
@@ -1192,8 +1176,8 @@ mod tests {
 
         // Test with different morphology sizes
         let morphologies = vec![
-            CreatureMorphology::test_biped(),     // 3 parts
-            CreatureMorphology::test_quadruped(), // 5 parts
+            CreatureMorphology::test_biped(),       // 3 parts
+            CreatureMorphology::test_quadruped(),   // 5 parts
             CreatureMorphology::archetype_spider(), // 9 parts
             CreatureMorphology::archetype_snake(),  // 6 parts
         ];
@@ -1205,9 +1189,7 @@ mod tests {
 
             let mut controller = GraphNeuralController::from_genome(&genome, &morphology, 5);
 
-            let node_features: Vec<Vec<f32>> = (0..num_parts)
-                .map(|_| vec![0.5; 5])
-                .collect();
+            let node_features: Vec<Vec<f32>> = (0..num_parts).map(|_| vec![0.5; 5]).collect();
 
             let outputs = controller.forward(&node_features, &graph);
 

@@ -189,11 +189,6 @@ impl PersistenceSystem {
         let pos = IVec2::new(chunk_x, chunk_y);
 
         if chunk_manager.chunks.contains_key(&pos) {
-            log::trace!(
-                "[LOAD] Chunk ({}, {}) already loaded, skipping",
-                chunk_x,
-                chunk_y
-            );
             return; // Already loaded
         }
 

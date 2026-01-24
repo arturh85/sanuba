@@ -671,11 +671,7 @@ impl Creature {
     ///
     /// This uses the new physics system with proper forward kinematics,
     /// gravity per body part, and ground collision detection.
-    pub fn apply_full_physics_update(
-        &mut self,
-        world: &impl crate::WorldAccess,
-        delta_time: f32,
-    ) {
+    pub fn apply_full_physics_update(&mut self, world: &impl crate::WorldAccess, delta_time: f32) {
         // Apply pending motor commands first
         if let Some(motor_commands) = self.pending_motor_commands.take() {
             self.physics_state.apply_motor_commands(&motor_commands);
@@ -690,11 +686,11 @@ impl Creature {
             // Scan downward to find ground
             for dy in 0..5 {
                 let y = check_y - dy;
-                if let Some(pixel) = world.get_pixel(check_x, y) {
-                    if pixel.material_id != 0 {
-                        // Found solid ground
-                        return Some((y + 1) as f32);
-                    }
+                if let Some(pixel) = world.get_pixel(check_x, y)
+                    && pixel.material_id != 0
+                {
+                    // Found solid ground
+                    return Some((y + 1) as f32);
                 }
             }
             None

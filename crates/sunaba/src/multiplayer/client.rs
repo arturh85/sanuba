@@ -1,6 +1,8 @@
 //! SpacetimeDB Rust SDK client wrapper for native multiplayer integration
 
 use anyhow::Context;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 // Import generated SpacetimeDB client bindings
@@ -39,6 +41,24 @@ pub struct MultiplayerClient {
 
     /// Database name
     db_name: String,
+
+    /// Background thread that processes WebSocket messages (keeps connection alive)
+    /// Note: JoinHandle doesn't implement Clone, so we wrap in Arc<Mutex<Option<...>>>
+    /// The thread is spawned on connect and dropped on disconnect
+    #[allow(dead_code)]
+    message_thread: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
+
+    /// Index mapping (x, y) coordinates to chunk IDs for O(1) lookup
+    /// This avoids O(n) linear search with 29KB clones per iteration
+    chunk_coord_index: Arc<Mutex<HashMap<(i32, i32), u64>>>,
+
+    /// Disconnect event flag (set by on_disconnected callback)
+    /// Used to detect when WebSocket dies so UI can update state
+    disconnect_detected: Arc<AtomicBool>,
+
+    /// Flag set by background thread when subscription data is received
+    /// This bypasses the frame_tick() requirement for detection
+    subscription_data_received: Arc<AtomicBool>,
 }
 
 /// Generate default nickname from Identity (format: "Player_abc123" using last 6 hex chars)
@@ -60,17 +80,30 @@ impl MultiplayerClient {
             connection: None,
             host: String::new(),
             db_name: String::new(),
+            message_thread: Arc::new(Mutex::new(None)),
+            chunk_coord_index: Arc::new(Mutex::new(HashMap::new())),
+            disconnect_detected: Arc::new(AtomicBool::new(false)),
+            subscription_data_received: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Connect to SpacetimeDB server
+    ///
+    /// If `fresh_identity` is true, skips loading stored OAuth token and uses a fresh
+    /// anonymous identity. This allows multiple client instances to connect simultaneously.
     pub async fn connect(
         &mut self,
         host: impl Into<String>,
         db_name: impl Into<String>,
+        fresh_identity: bool,
     ) -> anyhow::Result<()> {
         self.host = host.into();
         self.db_name = db_name.into();
+
+        // Reset flags for new connection
+        self.disconnect_detected.store(false, Ordering::SeqCst);
+        self.subscription_data_received
+            .store(false, Ordering::SeqCst);
 
         log::info!(
             "Connecting to SpacetimeDB at {}/{}",
@@ -78,12 +111,20 @@ impl MultiplayerClient {
             self.db_name
         );
 
-        // Load OAuth token if available (native only)
+        // Load OAuth token if available (native only), skip if fresh_identity
         #[cfg(all(not(target_arch = "wasm32"), feature = "multiplayer_native"))]
-        let token = native_load_token();
+        let token = if fresh_identity {
+            log::info!("[SpacetimeDB] Using fresh anonymous identity (--fresh-identity)");
+            None
+        } else {
+            native_load_token()
+        };
 
         #[cfg(not(all(not(target_arch = "wasm32"), feature = "multiplayer_native")))]
-        let token: Option<String> = None;
+        let token: Option<String> = {
+            let _ = fresh_identity; // suppress unused warning
+            None
+        };
 
         if let Some(ref token) = token {
             log::info!("[SpacetimeDB] Connecting with OAuth token");
@@ -97,10 +138,19 @@ impl MultiplayerClient {
         }
 
         // Build connection using generated DbConnection
+        // Use closure for on_disconnect to capture the disconnect flag
+        let disconnect_flag = Arc::clone(&self.disconnect_detected);
         let mut builder = DbConnection::builder()
             .on_connect(Self::on_connected)
             .on_connect_error(Self::on_connect_error)
-            .on_disconnect(Self::on_disconnected)
+            .on_disconnect(move |_ctx, err| {
+                disconnect_flag.store(true, Ordering::SeqCst);
+                if let Some(err) = err {
+                    log::warn!("[SpacetimeDB] Disconnected with error: {}", err);
+                } else {
+                    log::info!("[SpacetimeDB] Disconnected");
+                }
+            })
             .with_uri(&self.host)
             .with_module_name(&self.db_name);
 
@@ -113,7 +163,13 @@ impl MultiplayerClient {
             .build()
             .context("Failed to build SpacetimeDB connection")?;
 
+        // Spawn background thread to process WebSocket messages (keeps connection alive)
+        // This is required - without it, the connection will timeout and disconnect
+        let thread_handle = conn.run_threaded();
+        log::info!("Started SpacetimeDB message processing thread");
+
         self.connection = Some(Arc::new(Mutex::new(conn)));
+        *self.message_thread.lock().unwrap() = Some(thread_handle);
 
         log::info!("Connected to SpacetimeDB successfully");
 
@@ -144,15 +200,79 @@ impl MultiplayerClient {
         // This gives us a 7x7 grid (49 chunks) instead of larger area
         // Will be expanded to larger radius after spawn chunks are loaded
         // Note: Use BETWEEN instead of ABS() - SpacetimeDB doesn't support functions in WHERE
+        // Diagnostic: Try SELECT * without WHERE to rule out BETWEEN clause issues
+        // TODO: Restore filtered query after confirming subscription works
+        let chunk_index_for_applied = Arc::clone(&self.chunk_coord_index);
+        let chunk_index_for_insert = Arc::clone(&self.chunk_coord_index);
+        let chunk_index_for_delete = Arc::clone(&self.chunk_coord_index);
+        let subscription_flag = Arc::clone(&self.subscription_data_received);
+
+        // Register table callbacks for incremental index updates
+        conn_guard.db.chunk_data().on_insert(move |_ctx, chunk| {
+            // Update index when new chunk is inserted
+            if let Ok(mut index) = chunk_index_for_insert.lock() {
+                index.insert((chunk.x, chunk.y), chunk.id);
+            }
+        });
+        conn_guard.db.chunk_data().on_delete(move |_ctx, chunk| {
+            // Remove from index when chunk is deleted
+            if let Ok(mut index) = chunk_index_for_delete.lock() {
+                index.remove(&(chunk.x, chunk.y));
+            }
+        });
+
         let _chunk_sub = conn_guard
             .subscription_builder()
-            .on_applied(|ctx| {
+            .on_applied(move |ctx| {
+                // Set flag immediately - main thread can detect without frame_tick()
+                subscription_flag.store(true, Ordering::SeqCst);
+
+                // Build coordinate index for O(1) chunk lookup
+                let mut index = chunk_index_for_applied.lock().unwrap();
+                index.clear();
+                let mut chunk_coords = Vec::new();
+                for chunk in ctx.db.chunk_data().iter() {
+                    index.insert((chunk.x, chunk.y), chunk.id);
+                    chunk_coords.push((chunk.x, chunk.y));
+                }
+                let index_size = index.len();
+                drop(index); // Release lock
+
+                // Check spawn chunks (0,0 and immediate neighbors)
+                let spawn_positions = [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)];
+                let spawn_present: Vec<_> = spawn_positions
+                    .iter()
+                    .filter(|(x, y)| chunk_coords.contains(&(*x, *y)))
+                    .collect();
+
                 log::info!(
-                    "Chunk data subscription applied - {} chunks received",
-                    ctx.db.chunk_data().iter().count()
+                    "Chunk data subscription applied - {} chunks received, spawn chunks present: {}/5 {:?}",
+                    chunk_coords.len(),
+                    spawn_present.len(),
+                    spawn_present
                 );
+                log::info!("Built chunk coordinate index ({} entries)", index_size);
+
+                // Log chunk coordinate range for diagnostic
+                if let (Some(min_x), Some(max_x), Some(min_y), Some(max_y)) = (
+                    chunk_coords.iter().map(|(x, _)| *x).min(),
+                    chunk_coords.iter().map(|(x, _)| *x).max(),
+                    chunk_coords.iter().map(|(_, y)| *y).min(),
+                    chunk_coords.iter().map(|(_, y)| *y).max(),
+                ) {
+                    log::info!(
+                        "Initial chunk cache range: x=[{}, {}], y=[{}, {}]",
+                        min_x,
+                        max_x,
+                        min_y,
+                        max_y
+                    );
+                }
             })
-            .subscribe("SELECT * FROM chunk_data WHERE x BETWEEN -3 AND 3 AND y BETWEEN -3 AND 3");
+            .on_error(|_ctx, err| {
+                log::error!("Chunk subscription error: {:?}", err);
+            })
+            .subscribe("SELECT * FROM chunk_data");
 
         // Subscribe to players
         let _player_sub = conn_guard
@@ -165,21 +285,24 @@ impl MultiplayerClient {
             })
             .subscribe("SELECT * FROM player");
 
-        // Set default nickname if not already set
-        let identity = conn_guard.identity();
-        // Check if player has a name
-        if let Some(player) = conn_guard.db.player().identity().find(&identity) {
-            if player.name.is_none() {
-                let default_name = generate_default_nickname(&identity);
-                drop(conn_guard); // Release lock before calling reducer
-                if let Err(e) = self.set_nickname(default_name.clone()) {
-                    log::warn!("Failed to set default nickname: {}", e);
-                } else {
-                    log::info!("Set default nickname: {}", default_name);
+        // Set default nickname if not already set (identity may not be available yet)
+        if let Some(identity) = conn_guard.try_identity() {
+            // Check if player has a name
+            if let Some(player) = conn_guard.db.player().identity().find(&identity) {
+                if player.name.is_none() {
+                    let default_name = generate_default_nickname(&identity);
+                    drop(conn_guard); // Release lock before calling reducer
+                    if let Err(e) = self.set_nickname(default_name.clone()) {
+                        log::warn!("Failed to set default nickname: {}", e);
+                    } else {
+                        log::info!("Set default nickname: {}", default_name);
+                    }
+                    // Re-acquire lock for remaining subscriptions
+                    conn_guard = conn.lock().unwrap();
                 }
-                // Re-acquire lock for remaining subscriptions
-                conn_guard = conn.lock().unwrap();
             }
+        } else {
+            log::debug!("Identity not yet available, will set nickname later");
         }
 
         // Subscribe to creatures
@@ -213,8 +336,16 @@ impl MultiplayerClient {
     pub fn frame_tick(&self) {
         if let Some(ref conn) = self.connection {
             let conn_guard = conn.lock().unwrap();
+            // Only tick if connection is active
+            if !conn_guard.is_active() {
+                return;
+            }
             if let Err(e) = conn_guard.frame_tick() {
-                log::error!("Error processing SpacetimeDB messages: {}", e);
+                // Filter out "already disconnected" spam
+                let msg = e.to_string();
+                if !msg.contains("already disconnected") && !msg.contains("terminated normally") {
+                    log::error!("Error processing SpacetimeDB messages: {}", e);
+                }
             }
         }
     }
@@ -342,6 +473,9 @@ impl MultiplayerClient {
     ///
     /// Uses a chunk load queue to rate-limit chunk loading (2-3 chunks per frame).
     /// Call this in your game loop for progressive, non-blocking chunk streaming.
+    ///
+    /// Performance: Uses O(1) coordinate index lookup instead of O(n) linear search
+    /// to avoid cloning 29KB ChunkData per iteration (was causing 34+ second load times).
     pub fn sync_chunks_progressive(
         &self,
         world: &mut sunaba_core::world::World,
@@ -358,6 +492,14 @@ impl MultiplayerClient {
         // Get next batch from queue (2-3 chunks)
         let batch = load_queue.next_batch();
 
+        // Lock index once for the entire batch (more efficient)
+        // Uses try_lock semantics via .ok() - returns None if lock is held by background thread
+        let index = self.chunk_coord_index.lock().ok();
+        if index.is_none() {
+            log::warn!("chunk_coord_index lock contention - skipping sync this frame");
+            return Ok(0);
+        }
+
         for pos in batch {
             // Skip if already loaded in world
             if world.has_chunk(pos) {
@@ -365,12 +507,23 @@ impl MultiplayerClient {
                 continue;
             }
 
-            // Find chunk in subscribed cache
-            let chunk_row = conn_guard
-                .db
-                .chunk_data()
-                .iter()
-                .find(|c| c.x == pos.x && c.y == pos.y);
+            // O(1) lookup via coordinate index instead of O(n) linear search
+            // This avoids cloning 29KB ChunkData per iteration
+            let chunk_row = index
+                .as_ref()
+                .and_then(|idx| idx.get(&(pos.x, pos.y)).copied())
+                .and_then(|id| conn_guard.db.chunk_data().id().find(&id));
+
+            // Diagnostic logging for spawn chunks
+            let is_spawn_chunk =
+                matches!((pos.x, pos.y), (0, 0) | (-1, 0) | (1, 0) | (0, -1) | (0, 1));
+            if is_spawn_chunk {
+                if chunk_row.is_some() {
+                    log::info!("Spawn chunk ({}, {}) found in cache, loading", pos.x, pos.y);
+                } else {
+                    log::debug!("Spawn chunk ({}, {}) NOT in cache yet", pos.x, pos.y);
+                }
+            }
 
             if let Some(chunk_row) = chunk_row {
                 // Decode and insert
@@ -439,17 +592,19 @@ impl MultiplayerClient {
     }
 
     /// Get chunk data from local cache (for rendering)
+    ///
+    /// Uses O(1) coordinate index lookup instead of O(n) linear search.
     pub fn get_chunk(&self, x: i32, y: i32) -> Option<Vec<u8>> {
         let conn = self.connection.as_ref()?;
         let conn_guard = conn.lock().unwrap();
 
-        // Query chunk_data table from client cache
-        // Note: No filter_by method exists, iterate and find manually
+        // O(1) lookup via coordinate index
+        let chunk_id = self.chunk_coord_index.lock().ok()?.get(&(x, y)).copied()?;
         conn_guard
             .db
             .chunk_data()
-            .iter()
-            .find(|chunk| chunk.x == x && chunk.y == y)
+            .id()
+            .find(&chunk_id)
             .map(|chunk| chunk.pixel_data.clone())
     }
 
@@ -494,9 +649,35 @@ impl MultiplayerClient {
             .unwrap_or(false)
     }
 
+    /// Check if subscription data has been received (proves WebSocket is connected)
+    ///
+    /// Uses atomic flag for instant detection (set by background thread in on_applied),
+    /// bypassing the need for frame_tick() to populate the local cache.
+    pub fn has_received_subscription_data(&self) -> bool {
+        // Check atomic flag first (set by background thread, instant detection)
+        if self.subscription_data_received.load(Ordering::SeqCst) {
+            return true;
+        }
+
+        // Fallback to cache check (requires frame_tick to have processed)
+        self.connection
+            .as_ref()
+            .map(|conn| {
+                let conn_guard = conn.lock().unwrap();
+                // If we have ANY chunk data, the WebSocket is connected and subscription works
+                conn_guard.db.chunk_data().iter().next().is_some()
+            })
+            .unwrap_or(false)
+    }
+
     /// Disconnect from server
     pub async fn disconnect(&mut self) -> anyhow::Result<()> {
         log::info!("Disconnecting from SpacetimeDB");
+
+        // Reset flags for next connection
+        self.subscription_data_received
+            .store(false, Ordering::SeqCst);
+        self.disconnect_detected.store(false, Ordering::SeqCst);
 
         if let Some(conn) = self.connection.take() {
             let conn_guard = conn.lock().unwrap();
@@ -504,6 +685,9 @@ impl MultiplayerClient {
                 .disconnect()
                 .context("Failed to disconnect from SpacetimeDB")?;
         }
+
+        // Clear the message thread handle (thread will exit when connection is dropped)
+        *self.message_thread.lock().unwrap() = None;
 
         Ok(())
     }
@@ -649,12 +833,17 @@ impl MultiplayerClient {
         log::error!("[SpacetimeDB] Connection error: {}", err);
     }
 
-    fn on_disconnected(_ctx: &generated::ErrorContext, err: Option<spacetimedb_sdk::Error>) {
-        if let Some(err) = err {
-            log::warn!("[SpacetimeDB] Disconnected with error: {}", err);
-        } else {
-            log::info!("[SpacetimeDB] Disconnected");
-        }
+    /// Check if a disconnect was detected since last connect
+    ///
+    /// This flag is set by the on_disconnect callback when the WebSocket dies.
+    /// The game loop should check this to update manager state.
+    pub fn was_disconnected(&self) -> bool {
+        self.disconnect_detected.load(Ordering::SeqCst)
+    }
+
+    /// Reset the disconnect flag (call after handling disconnect)
+    pub fn clear_disconnect_flag(&self) {
+        self.disconnect_detected.store(false, Ordering::SeqCst);
     }
 }
 

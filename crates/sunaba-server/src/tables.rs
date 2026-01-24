@@ -28,6 +28,10 @@ pub struct WorldConfig {
     pub settlement_progress: i32,
     /// Whether settlement is complete
     pub settlement_complete: bool,
+    /// Tick when last dirty chunk was synced (for idle detection)
+    pub last_activity_tick: u64,
+    /// Whether world is currently in idle mode (no simulation needed)
+    pub is_idle: bool,
 }
 
 /// Chunk pixel data
@@ -144,28 +148,28 @@ pub struct ServerMetrics {
 }
 
 /// Timer table for world simulation ticks (60fps)
+/// Note: No #[auto_inc] - we use fixed ID 0 for singleton timer pattern
 #[spacetimedb::table(name = world_tick_timer, scheduled(world_tick))]
 pub struct WorldTickTimer {
     #[primary_key]
-    #[auto_inc]
     pub id: u64,
     pub scheduled_at: ScheduleAt,
 }
 
 /// Timer table for creature AI ticks (30fps)
+/// Note: No #[auto_inc] - we use fixed ID 0 for singleton timer pattern
 #[spacetimedb::table(name = creature_tick_timer, scheduled(creature_tick))]
 pub struct CreatureTickTimer {
     #[primary_key]
-    #[auto_inc]
     pub id: u64,
     pub scheduled_at: ScheduleAt,
 }
 
 /// Timer table for world settlement (10fps, low priority)
+/// Note: No #[auto_inc] - we use fixed ID 0 for singleton timer pattern
 #[spacetimedb::table(name = settle_tick_timer, scheduled(settle_world_tick))]
 pub struct SettleTickTimer {
     #[primary_key]
-    #[auto_inc]
     pub id: u64,
     pub scheduled_at: ScheduleAt,
 }

@@ -161,6 +161,8 @@ pub struct ChunkLoadQueue {
     loaded_this_session: HashSet<IVec2>,
     batch_size: usize,
     total_chunks: usize,
+    center: IVec2,
+    max_radius: i32,
 }
 
 impl ChunkLoadQueue {
@@ -179,6 +181,8 @@ impl ChunkLoadQueue {
             loaded_this_session: HashSet::new(),
             batch_size,
             total_chunks,
+            center,
+            max_radius,
         }
     }
 
@@ -186,6 +190,10 @@ impl ChunkLoadQueue {
     ///
     /// Returns chunk positions that haven't been loaded yet this session.
     /// Empty vector means all chunks have been loaded.
+    ///
+    /// When the spiral iterator exhausts without finding all chunks (some may not
+    /// be in the SpacetimeDB cache yet), it resets to retry. This handles the case
+    /// where subscription data arrives asynchronously.
     pub fn next_batch(&mut self) -> Vec<IVec2> {
         let mut batch = Vec::with_capacity(self.batch_size);
 
@@ -197,7 +205,13 @@ impl ChunkLoadQueue {
                         batch.push(pos);
                     }
                 }
-                None => break, // Spiral exhausted
+                None => {
+                    // Spiral exhausted - reset to retry unloaded chunks
+                    // This handles chunks that weren't in the cache on first pass
+                    self.spiral = SpiralChunkIterator::new(self.center, self.max_radius);
+                    // Break this batch to avoid infinite loop if all chunks are loaded
+                    break;
+                }
             }
         }
 
@@ -228,6 +242,8 @@ impl ChunkLoadQueue {
     /// Used when player moves and we need to re-subscribe to a new area.
     /// Clears loaded chunks tracking and resets spiral to new center.
     pub fn reset_center(&mut self, new_center: IVec2, max_radius: i32) {
+        self.center = new_center;
+        self.max_radius = max_radius;
         self.spiral = SpiralChunkIterator::new(new_center, max_radius);
         self.total_chunks = self.spiral.total_chunks();
         self.loaded_this_session.clear();

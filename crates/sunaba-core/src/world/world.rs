@@ -3,7 +3,9 @@
 use glam::{IVec2, Vec2};
 use std::collections::HashMap;
 
-#[cfg(not(feature = "client"))]
+// Instant is only available on native (std) or browser WASM (web-time)
+// Server WASM (SpacetimeDB) doesn't have time support
+#[cfg(all(not(feature = "client"), not(target_arch = "wasm32")))]
 use std::time::Instant;
 #[cfg(feature = "client")]
 use web_time::Instant;
@@ -99,6 +101,8 @@ pub struct World {
     persistence_system: PersistenceSystem,
 
     /// Session start time (for play time tracking)
+    /// Only available on native and browser WASM (not SpacetimeDB server WASM)
+    #[cfg(any(feature = "client", not(target_arch = "wasm32")))]
     session_start: Instant,
 
     /// Total play time in seconds (accumulated across sessions)
@@ -136,6 +140,7 @@ impl World {
             player: Player::new(glam::Vec2::new(0.0, 100.0)),
             time_accumulator: 0.0,
             persistence_system: PersistenceSystem::new(42), // Default seed
+            #[cfg(any(feature = "client", not(target_arch = "wasm32")))]
             session_start: Instant::now(),
             total_play_time_seconds: 0,
             active_chunk_radius: 3, // Default: 7×7 grid (matches ACTIVE_CHUNK_RADIUS)
@@ -1423,7 +1428,10 @@ impl World {
         if let Ok(persistence) = ChunkPersistence::new("default") {
             let metadata = persistence.load_metadata();
             self.total_play_time_seconds = metadata.play_time_seconds;
-            self.session_start = Instant::now(); // Reset session start
+            #[cfg(any(feature = "client", not(target_arch = "wasm32")))]
+            {
+                self.session_start = Instant::now(); // Reset session start
+            }
             log::info!("Loaded play time: {} seconds", self.total_play_time_seconds);
         }
 
@@ -1451,7 +1459,11 @@ impl World {
     /// Save all chunks and metadata (manual save)
     pub fn save_all_dirty_chunks(&mut self) {
         // Calculate total play time (accumulated + current session)
+        // On server WASM, session tracking is not available
+        #[cfg(any(feature = "client", not(target_arch = "wasm32")))]
         let session_duration = self.session_start.elapsed().as_secs();
+        #[cfg(all(not(feature = "client"), target_arch = "wasm32"))]
+        let session_duration = 0u64;
         let total_play_time = self.total_play_time_seconds + session_duration;
 
         self.persistence_system.save_all_dirty_chunks(
