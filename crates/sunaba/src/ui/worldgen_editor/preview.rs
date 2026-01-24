@@ -50,14 +50,14 @@ impl PreviewState {
     /// Update preview with new config/seed
     pub fn update(&mut self, config: &WorldGenConfig, seed: u64, materials: &Materials) {
         // Create/update generator
-        if self.generator.is_none() || self.current_seed != seed {
-            self.generator = Some(WorldGenerator::from_config(seed, config.clone()));
-            self.current_seed = seed;
-        } else {
-            self.generator
-                .as_mut()
-                .unwrap()
-                .update_config(config.clone());
+        match &mut self.generator {
+            Some(generator) if self.current_seed == seed => {
+                generator.update_config(config.clone());
+            }
+            _ => {
+                self.generator = Some(WorldGenerator::from_config(seed, config.clone()));
+                self.current_seed = seed;
+            }
         }
 
         // Generate preview chunks and build texture
