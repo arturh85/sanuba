@@ -188,10 +188,13 @@ impl MultiplayerClient {
     }
 
     /// Connect to SpacetimeDB server
+    ///
+    /// Note: `fresh_identity` is ignored for WASM builds - identity is managed by the JS SDK
     pub async fn connect(
         &mut self,
         host: impl Into<String>,
         db_name: impl Into<String>,
+        _fresh_identity: bool,
     ) -> anyhow::Result<()> {
         let host = host.into();
         let db_name = db_name.into();
